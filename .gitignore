@@ -1,0 +1,17 @@
+# Build artifacts
+build/
+*.o
+*.out
+*.exe
+a.out
+vec_add
+mat_mul
+transpose
+sync_sample
+device_query
+
+# Local tooling / IDE
+.superpowers/
+.vscode/
+.cache/
+compile_commands.json
