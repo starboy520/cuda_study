@@ -4,11 +4,22 @@ build/
 *.out
 *.exe
 a.out
-vec_add
-mat_mul
-transpose
-sync_sample
-device_query
+
+# Compiled CUDA binaries (path-specific; do not match source directories)
+week01_basics/vec_add/vec_add
+week01_basics/device_query/device_query
+week01_basics/mat_mul_naive/mat_mul
+week02_memory/transpose/transpose
+week02_memory/transpose/my_transpose
+week02_memory/sync/sync_sample
+week02_memory/bank_conflict_demo/bank_conflict_demo
+week02_memory/local_memory_demo/local_memory_demo
+week02_memory/unified_memory_demo/unified_memory_demo
+**/device_query/device_query
+**/transpose/transpose
+**/reduction/reduction
+**/cuda_graph/cuda_graph
+**/overlap_pipeline/overlap_pipeline
 
 # Local tooling / IDE
 .superpowers/
