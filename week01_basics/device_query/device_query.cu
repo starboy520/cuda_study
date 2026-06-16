@@ -22,6 +22,11 @@ void print_device(int device) {
   printf("compute capability: %d.%d\n", prop.major, prop.minor);
   printf("warp size: %d\n", prop.warpSize);
   printf("max threads per block: %d\n", prop.maxThreadsPerBlock);
+  printf("max threads per SM: %d\n", prop.maxThreadsPerMultiProcessor);
+  printf("max warps per SM: %d\n",
+         prop.maxThreadsPerMultiProcessor / prop.warpSize);
+  printf("registers per block: %d\n", prop.regsPerBlock);
+  printf("registers per SM: %d\n", prop.regsPerMultiprocessor);
   printf("shared memory per block: %zu bytes (%.1f KB)\n", prop.sharedMemPerBlock,
          prop.sharedMemPerBlock / 1024.0);
   printf("shared memory per SM:    %zu bytes (%.1f KB)\n",
