@@ -36,7 +36,7 @@
 | 3 | CUDA 内存系统 | 已完成 |
 | 4 | 同步与经典并行算法 | 已完成 |
 | 5 | 性能工程与 Profiling | 已完成 |
-| 6 | 核心算子开发 | 规划完成 |
+| 6 | 核心算子开发 | 核心章节完成 |
 | 7 | 异步执行与 CUDA 系统能力 | 核心章节完成（含可运行实验） |
 | 8 | HPC 与多 GPU | 规划完成 |
 | 9 | GPU 硬件架构深入与代际演进 | 规划完成 |
@@ -108,16 +108,86 @@
 
 ## 配套实验
 
-实验代码统一放在 [`labs/`](../labs/)：
+实验代码统一放在 [`labs/`](../labs/)。下面是**章节 ↔ 实验对照表**，让你清楚每一章
+对应哪个可运行实验（没有对应实验的章节也如实标注）。
+
+### 卷一：GPU 基础
+
+| 章节 | 配套实验 | 说明 |
+|---|---|---|
+| 05 T4 设备观察 | `labs/01_gpu_basics/device_query` | 读 + 跑，看自己 GPU 参数 |
+| 其余章节 | —（纯概念） | 建立硬件直觉，无需代码 |
+
+### 卷二：编程模型（实验最全）
+
+| 章节 | 配套实验 |
+|---|---|
+| 01 第一个完整程序 | `labs/02_programming_model/vector_add` |
+| 02 Grid/Block/Thread 索引 | `labs/02_programming_model/index_mapping` |
+| 03 函数修饰符 | `labs/02_programming_model/function_qualifiers` |
+| 04 内存分配与生命周期 | `labs/02_programming_model/memory_lifecycle` |
+| 05 异步执行与错误 | `labs/02_programming_model/async_errors` |
+| 06 NVCC/PTX 编译流程 | `labs/02_programming_model/compile_inspection` |
+| 07 CUDA Event 计时 | `labs/02_programming_model/event_timing` |
+| 08 二维矩阵加法 | `labs/02_programming_model/matrix_add_2d` |
+| 09 Naive GEMM | `labs/02_programming_model/gemm_naive` |
+
+### 卷三：内存系统
+
+| 章节 | 配套实验 |
+|---|---|
+| 02 合并访问 | `labs/03_memory_system/memory_access` |
+| 05 矩阵转置 | `labs/03_memory_system/transpose` |
+| 01/03/04/06 | —（概念/复习，复用上面实验观察 bank conflict 等） |
+
+### 卷四：并行算法
+
+| 章节 | 配套实验 |
+|---|---|
+| 03 Reduction | `labs/04_parallel_algorithms/reduction`（含 shared 与 warp shuffle 两版） |
+| 01 Race / 02 Atomic / 04 Scan / 05 Convolution | ⏳ 待补 lab（正文有代码骨架，可自己写在 `week03_parallel/`） |
+
+### 卷五：性能工程（设计上复用前面实验）
+
+| 章节 | 配套实验 |
+|---|---|
+| 全卷 | 复用 `memory_access` / `transpose` / `reduction` / `vector_add` |
+
+> 卷五的重点是"测量和分析"，不重写算子——故意复用前几卷的 kernel，把精力放在
+> Nsight / Roofline / occupancy 分析上。
+
+### 卷六：核心算子
+
+| 章节 | 配套实验 |
+|---|---|
+| 02 GEMM Tiling | `labs/06_operators/gemm_tiled`（naive vs tiled，实测 GFLOPS） |
+| 04 Softmax | `labs/06_operators/softmax`（朴素溢出 vs 稳定版） |
+| 01/03/05/06 | ⏳ 待补（register tiling、LayerNorm 融合等可按需落地） |
+
+### 卷七：异步系统
+
+| 章节 | 配套实验 |
+|---|---|
+| 02 传输与计算重叠 | `labs/07_async_system/overlap_pipeline`（实测 2.86x） |
+| 04 CUDA Graph | `labs/07_async_system/cuda_graph`（实测 1.87x） |
+| 01/03 | —（概念，复用 overlap_pipeline 观察） |
+
+### 实验目录结构
 
 ```text
 labs/
-├── common/
+├── common/cuda_check.cuh   # 公共 CUDA_CHECK 宏
 ├── 01_gpu_basics/
-├── 02_programming_model/
-├── 03_memory_system/
-└── 04_parallel_algorithms/
+├── 02_programming_model/   # 9 个（卷二最全）
+├── 03_memory_system/       # 2 个
+├── 04_parallel_algorithms/ # 1 个（reduction）
+├── 06_operators/           # 2 个（gemm_tiled, softmax）
+└── 07_async_system/        # 2 个（overlap_pipeline, cuda_graph）
 ```
+
+> 标 ⏳ 的章节正文有完整原理 + 代码骨架，但还没有独立可运行 lab——这些正好是
+> **留给你自己动手写**的练习（写在 `week0X_*/` 下，写完再对照正文）。"自己写"比
+> "读现成 lab"更能学会。
 
 所有实验都要求：
 

@@ -38,16 +38,24 @@
 
 ## reduction 性能
 
-代码：`cuda_deep_course/labs/04_parallel_algorithms/reduction`，n=1,000,000，均 PASS。
+代码：`week02_memory/reduction/reduction.cu`（**自己手写**），n=1,048,576（1<<20）。
 
-| 版本 | n | Kernel (ms) | PASS |
-|------|---|-------------|------|
-| shared 树形 | 1M | 0.113 | ✅ |
-| warp shuffle 收尾 | 1M | 0.060 | ✅ |
-| atomic（可选） | 1M | 未实现（全局 atomic 串行化，仅作对照概念） | — |
+| 版本 | n | 做法 | 结果 |
+|------|---|------|------|
+| shared 树形 + 多阶段 | 1M | shared 树形归约 + Host 循环多阶段（1M→4096→16→1） | ✅ PASS，相对误差 0 |
 
-要点：warp shuffle 收尾把最后 32 个值的归约从 shared+barrier 换成寄存器交换，
-比纯 shared 树形快约 2 倍。
+验证：CPU 用 `double` 累加做参考（549,755,289,600），GPU `float` 多阶段归约，
+相对误差 `< 1e-4` 判 PASS。本例输入是规整整数，误差恰好为 0。
+
+要点（自己写时踩通的关键）：
+- shared 树形：`for(stride=blockDim/2; stride>0; stride/=2)`，每轮活跃线程减半。
+- sequential addressing：`if(tid < stride)`，活跃线程连续 → 避免 warp 分歧。
+- 边界：`global_id < n` 时取值，否则填 0（加法单位元，不影响结果）。
+- **多阶段**：block 间不能 `__syncthreads()`，靠"kernel 启动边界"当同步墙，
+  Host 循环反复启动 kernel，每轮缩短约 256 倍，3 次归约到 1。
+- 乒乓 buffer：`std::swap(in, out)`，上轮输出当下轮输入。
+
+> 进阶（warp shuffle 收尾、atomic 基线对照）留到卷四，week2 不要求。
 
 ---
 

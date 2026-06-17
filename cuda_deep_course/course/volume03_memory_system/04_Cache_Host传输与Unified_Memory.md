@@ -91,13 +91,79 @@ pageable 的 "async" 拷贝会退化成同步行为。
 
 ## 6. Mapped / Zero-Copy
 
-GPU 直接访问映射 host memory，适合特定场景：
+### 6.1 它是什么：让 GPU"隔着 PCIe"直接读写 host 内存
 
-- 数据只访问一次。
-- 集成 GPU 或共享物理内存系统。
-- 避免显式复制比本地 DRAM 带宽更重要。
+前面 §5 的 pinned 内存是"放在 host、用 DMA 整块搬到 GPU 再算"。**Zero-copy（零拷贝）**
+更进一步：把一块 pinned host 内存**映射**进 GPU 的地址空间，于是 kernel 可以**直接**用
+一个指针访问它，**完全不发生显式 `cudaMemcpy`**——"zero copy"由此得名。
 
-离散 GPU 通过 PCIe 频繁随机读取 mapped memory 通常不适合高带宽计算。
+```text
+普通路径：  host 数据 --cudaMemcpy--> device 显存 --> kernel 读显存
+zero-copy： host 数据 <==== kernel 隔着 PCIe 直接读/写 ====   （没有 memcpy 这一步）
+```
+
+注意"没有拷贝"不等于"没有传输"：离散 GPU 上，kernel 每次访问这块内存，**数据仍要实时
+走 PCIe**。只是把"一次性整块搬运"换成了"按需、细粒度地隔空访问"。
+
+### 6.2 怎么写
+
+两步：分配可映射的 pinned 内存，再拿到它在 device 侧的指针。
+
+```cpp
+// 1) 分配 pinned 且可映射的 host 内存
+float* hostPtr = nullptr;
+CUDA_CHECK(cudaHostAlloc(&hostPtr, bytes, cudaHostAllocMapped));
+
+// 2) 取得同一块内存在 device 地址空间的指针
+float* devPtr = nullptr;
+CUDA_CHECK(cudaHostGetDevicePointer(&devPtr, hostPtr, 0));
+
+// 3) kernel 用 devPtr 直接访问，无需 cudaMemcpy
+kernel<<<grid, block>>>(devPtr);
+CUDA_CHECK(cudaDeviceSynchronize());
+// CPU 仍用 hostPtr 访问同一块数据
+```
+
+要点：
+
+- 必须用 `cudaHostAlloc(..., cudaHostAllocMapped)`（或对已 pinned 的内存用
+  `cudaHostRegister`），普通 `malloc` 不能映射。
+- 在统一虚拟地址（UVA，64 位平台默认）下，`hostPtr` 和 `devPtr` 往往数值相同，但
+  显式取一次 device 指针是最稳妥的写法。
+- kernel 结束要正常同步；CPU 端读结果前确保 kernel 已完成（zero-copy 不豁免同步）。
+
+### 6.3 适合用的场景
+
+```text
+✅ 数据只被访问一次（一次性流式读入，省掉"先 memcpy 整块"的成本和显存占用）
+✅ 集成 GPU / 共享物理内存（host 和 device 本就是同一片内存，无 PCIe 往返）
+✅ 极少量、零散的数据（如一个标志位、少数标量），整块 memcpy 不划算
+✅ kernel 计算足以掩盖访问延迟，或访问可与计算重叠
+```
+
+### 6.4 不适合的场景（离散 GPU 的大坑）
+
+```text
+❌ 离散 GPU 上被反复 / 随机访问的大数组
+   每次访问都隔着 PCIe，带宽只有显存的几十分之一（PCIe ~16 GB/s vs 显存 ~320 GB/s）
+❌ 高带宽计算热点
+   把热点数据放 zero-copy，等于让 SM 一直等 PCIe，吞吐崩塌
+```
+
+一句话判据：**数据要被多次复用，就别用 zero-copy，老老实实 memcpy 进显存**；只有
+"访问一次就丢"或"集成 GPU 无往返"时，省掉拷贝才真正划算。
+
+### 6.5 和另外两种 host 内存的关系
+
+| 方式 | 数据放哪 | 怎么到 GPU | 典型用途 |
+|---|---|---|---|
+| pinned（§5）| host，page-locked | DMA 整块搬进显存再算 | 大块传输、异步重叠的基础 |
+| **zero-copy / mapped** | host，映射进 GPU 地址空间 | kernel **隔 PCIe 直接访问**，无显式 memcpy | 一次性/零散数据、集成 GPU |
+| Unified Memory（§7）| 自动迁移 | 按需**页迁移**到访问方 | 编程方便，靠 prefetch/advise 调性能 |
+
+三者都建立在 pinned 之上，区别在"数据何时、以什么粒度跨过 PCIe"。zero-copy 是
+"细粒度、按需、隔空访问"；pinned memcpy 是"粗粒度、一次性、搬过去再算"；Unified Memory
+是"运行时替你决定迁移"。
 
 ## 7. Unified Memory
 

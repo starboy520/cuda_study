@@ -45,6 +45,10 @@ make -C labs/02_programming_model/gemm_naive clean all
 make -C labs/03_memory_system/memory_access clean all
 make -C labs/03_memory_system/transpose clean all
 make -C labs/04_parallel_algorithms/reduction clean all
+make -C labs/06_operators/gemm_tiled clean all
+make -C labs/06_operators/softmax clean all
+make -C labs/07_async_system/overlap_pipeline clean all
+make -C labs/07_async_system/cuda_graph clean all
 ```
 
 ## 运行当前实验
@@ -63,7 +67,31 @@ make -C labs/04_parallel_algorithms/reduction clean all
 ./labs/03_memory_system/memory_access/memory_access
 ./labs/03_memory_system/transpose/transpose
 ./labs/04_parallel_algorithms/reduction/reduction
+./labs/06_operators/gemm_tiled/gemm_tiled 2048 2048 2048
+./labs/06_operators/softmax/softmax
+./labs/07_async_system/overlap_pipeline/overlap_pipeline
+./labs/07_async_system/cuda_graph/cuda_graph
 ```
+
+## 章节 ↔ 实验对照（速查）
+
+| 卷 | 章节 | 实验 |
+|---|---|---|
+| 1 | 05 设备观察 | `01_gpu_basics/device_query` |
+| 2 | 01–09 各章 | `02_programming_model/`（vector_add / index_mapping / function_qualifiers / memory_lifecycle / async_errors / compile_inspection / event_timing / matrix_add_2d / gemm_naive） |
+| 3 | 02 合并访问 | `03_memory_system/memory_access` |
+| 3 | 05 转置 | `03_memory_system/transpose` |
+| 4 | 03 Reduction | `04_parallel_algorithms/reduction` |
+| 4 | 01/02/04/05 | ⏳ 待补（留作动手练习，写在 `week03_parallel/`） |
+| 5 | 全卷 | 复用 `memory_access` / `transpose` / `reduction` / `vector_add` 做分析 |
+| 6 | 02 GEMM Tiling | `06_operators/gemm_tiled` |
+| 6 | 04 Softmax | `06_operators/softmax` |
+| 6 | 01/03/05/06 | ⏳ 待补 |
+| 7 | 02 重叠 | `07_async_system/overlap_pipeline` |
+| 7 | 04 CUDA Graph | `07_async_system/cuda_graph` |
+
+> 完整对照（含每章说明、纯概念章节标注）见 [course/README.md 配套实验](course/README.md#配套实验)。
+> 标 ⏳ 的章节正文有完整原理 + 代码骨架，但没有现成 lab——这些是留给你**自己写**的练习。
 
 ## 教材设计
 

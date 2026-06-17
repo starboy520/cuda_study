@@ -20,6 +20,9 @@ week02_memory/unified_memory_demo/unified_memory_demo
 **/reduction/reduction
 **/cuda_graph/cuda_graph
 **/overlap_pipeline/overlap_pipeline
+**/gemm_tiled/gemm_tiled
+**/softmax/softmax
+manual_write/vec_add
 
 # Local tooling / IDE
 .superpowers/
