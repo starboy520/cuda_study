@@ -48,46 +48,149 @@ GPU 常见层次包括每个 SM 附近的 L1/共享资源，以及整个 GPU 共
 
 ## 5. Pinned Memory
 
+### 5.0 先认识三个前置概念(否则会懵)
+
+要听懂 pinned memory,先得知道三个底层概念。它们平时写代码用不到,但理解了 pinned 就通了。
+
+**① 虚拟内存与分页(paging)**
+
+你 `malloc` 拿到的指针是**虚拟地址**,不是数据在物理内存条上的真实位置。操作系统用"**分页**"
+管理内存——把内存切成一页页(通常 4KB),并且**有权随时**:
+
+```text
+- 把暂时不用的页"换出"到磁盘(swap),腾出物理内存
+- 在物理内存里"挪动"页的位置(整理碎片)
+你的虚拟地址不变,但它背后的物理位置,OS 说了算、随时会变。
+```
+
+**② DMA(直接内存访问)**
+
+GPU 从 host 内存搬数据,不靠 CPU 一字节字节地拷,而是用一个专门的硬件——**DMA 引擎**。它能
+在 CPU 不参与的情况下,自己把数据从内存搬到 GPU。但 DMA 有个限制:
+
+```text
+DMA 直接按【物理地址】搬数据。
+它要求:在搬运的整个过程中,那块内存的物理位置【不能变】。
+```
+
+**③ 矛盾来了**
+
+把 ① 和 ② 放一起,矛盾就出现了:
+
+```text
+普通 malloc 的内存(pageable,可分页):OS 随时可能换出/挪动它
+DMA:                                 要求物理位置在传输期间固定不动
+→ DMA 不敢直接搬 pageable 内存,万一搬到一半 OS 把页挪走了,就搬错地方了!
+```
+
+**pinned memory 就是解决这个矛盾的**——下面就清楚了。
+
+### 5.1 pinned memory 是什么
+
 ```cpp
 float* host = nullptr;
-CUDA_CHECK(cudaMallocHost(&host, bytes));
+CUDA_CHECK(cudaMallocHost(&host, bytes));   // 分配 pinned(页锁定)内存
+// ... 用完后
+CUDA_CHECK(cudaFreeHost(host));
 ```
 
-要理解 pinned 的价值，先得知道普通 `malloc`/`std::vector` 拿到的是
-**pageable（可分页）内存**——操作系统可以随时把这些页换出到磁盘、或在物理内存
-里挪位置。而 GPU 的 DMA 引擎是直接按**物理地址**搬数据的，它无法容忍页在传输
-途中被 OS 移走。
+**pinned(页锁定,page-locked)内存 = 被"钉死"在物理内存里、OS 保证不换出也不挪动的内存。**
+既然它物理位置固定,DMA 就敢直接搬它了。
 
-于是当你对 pageable 内存做 `cudaMemcpy` 时，驱动其实是**偷偷多走一步**：
+> 名字理解:"pin" 就是"用图钉钉住"——把这块内存钉在物理内存的固定位置,OS 不许动它。
+
+### 5.2 为什么 pinned 更快:省掉一次暗中拷贝
+
+知道了上面的矛盾,就能理解性能差异。当你对**普通 pageable 内存**做 `cudaMemcpy` 时,因为 DMA
+不敢直接搬它,驱动其实**偷偷多走一步**:
 
 ```text
-pageable 传输：
-  你的数据 --(CPU 拷贝)--> 驱动内部的 pinned 暂存区 --(DMA)--> GPU
-            ^^^^^^^^^^^ 这次额外的 CPU 拷贝就是开销来源
+pageable 传输(慢):
+  你的数据(pageable) --(CPU 先拷一份)--> 驱动内部的 pinned 暂存区 --(DMA)--> GPU
+                      ^^^^^^^^^^^^^^^^ 这次额外的 CPU 拷贝,就是开销来源
+  (驱动先把数据拷到一块它自己的 pinned 暂存区,再让 DMA 从那搬——绕了一道)
 ```
 
-`cudaMallocHost` 直接分配**页锁定（pinned）**内存，OS 保证它不被换出、不被移动，
-DMA 可以**直接**从它搬到 GPU，省掉中间那次暂存拷贝：
+而你直接用 `cudaMallocHost` 分配的 pinned 内存,DMA 能**直接**从它搬,省掉中间那次暂存拷贝:
 
 ```text
-pinned 传输：
-  你的数据 --(DMA)--> GPU
+pinned 传输(快):
+  你的数据(pinned) --(DMA 直接搬)--> GPU
+  (没有额外 CPU 拷贝)
 ```
 
-这也解释了为什么真正的 `cudaMemcpyAsync` **必须**用 pinned 内存才能和计算重叠：
-异步传输靠 DMA 引擎独立工作，而 DMA 只能作用在不会被 OS 挪动的 pinned 页上。
-pageable 的 "async" 拷贝会退化成同步行为。
+所以 pinned 传输更快,本质是**省掉了 pageable 必须的那次"暗中 staging 拷贝"**。
 
-优点：
+### 5.3 更关键:pinned 是异步重叠的前提
 
-- 避免运行时为 DMA 临时 staging（省掉上面那次 CPU 拷贝）。
-- 是真正 `cudaMemcpyAsync` 与传输/计算重叠的前提条件。
+pinned 不只是"快一点",它还是 `cudaMemcpyAsync` 真正异步的**必要条件**(卷七的重叠优化全靠它):
 
-代价：
+```text
+cudaMemcpyAsync 想做的是:让 DMA 引擎独立搬数据,同时 CPU/GPU 去干别的 → 重叠
+而 DMA 独立工作的前提是:内存物理位置固定 = pinned
 
-- 占用不可分页系统内存，挤压 OS 可用内存。
-- 过量使用影响整个系统稳定性。
-- 分配成本较高，应**复用**缓冲区而非反复 `cudaMallocHost`/`cudaFreeHost`。
+所以:
+  pinned + cudaMemcpyAsync  → DMA 真异步搬,能和计算重叠(卷七/02)
+  pageable + cudaMemcpyAsync → DMA 没法直接搬,退化成【同步】行为,重叠失效!
+```
+
+> 这是个高频坑:用 `cudaMemcpyAsync` 但忘了用 pinned 内存,以为在重叠,其实退化成同步,白忙。
+
+### 5.4 完整例子
+
+```cpp
+const size_t bytes = N * sizeof(float);
+float* h_pinned = nullptr;
+CUDA_CHECK(cudaMallocHost(&h_pinned, bytes));     // pinned host 内存
+// 填数据
+for (int i = 0; i < N; ++i) h_pinned[i] = i;
+
+float* d_data = nullptr;
+CUDA_CHECK(cudaMalloc(&d_data, bytes));
+
+cudaStream_t stream;
+CUDA_CHECK(cudaStreamCreate(&stream));
+
+// 因为是 pinned,这个 async 拷贝能真异步、和后续计算重叠
+CUDA_CHECK(cudaMemcpyAsync(d_data, h_pinned, bytes,
+                           cudaMemcpyHostToDevice, stream));
+myKernel<<<grid, block, 0, stream>>>(d_data);      // 可与上面的传输重叠
+
+CUDA_CHECK(cudaStreamSynchronize(stream));
+CUDA_CHECK(cudaFreeHost(h_pinned));                // pinned 要用 cudaFreeHost 释放
+CUDA_CHECK(cudaFree(d_data));
+CUDA_CHECK(cudaStreamDestroy(stream));
+```
+
+注意:pinned 内存必须用 `cudaFreeHost` 释放,**不能用普通 `free`**。
+
+### 5.5 优点与代价
+
+```text
+优点:
+  ✓ 传输更快(省掉 pageable 的暗中 staging 拷贝)
+  ✓ 是 cudaMemcpyAsync 真异步、传输与计算重叠的前提(卷七)
+
+代价(不能无脑全用 pinned):
+  ✗ 占用不可分页的物理内存,挤压 OS 和其他程序的可用内存
+  ✗ 过量使用会拖慢甚至卡死整个系统(OS 能调度的内存变少)
+  ✗ 分配/释放比 malloc 慢 → 要【复用】缓冲区,别在循环里反复 malloc/free
+```
+
+> 一句话总结 pinned:**用"把内存钉死在物理位置"换取"DMA 能直接搬"**,从而传输更快、且能异步
+> 重叠。代价是占用宝贵的不可换出内存,所以只给真正需要高速传输的缓冲区用,并复用它。
+
+### 5.6 进阶:`cudaHostAlloc` 的标志位
+
+`cudaMallocHost` 是简化版。更灵活的是 `cudaHostAlloc`,可带标志:
+
+```cpp
+cudaHostAlloc(&ptr, bytes, cudaHostAllocDefault);   // 等价于 cudaMallocHost
+cudaHostAlloc(&ptr, bytes, cudaHostAllocMapped);    // 同时可映射到 GPU 地址空间(zero-copy,见 §6)
+cudaHostAlloc(&ptr, bytes, cudaHostAllocPortable);  // 对所有 CUDA context 都是 pinned
+```
+
+初学用 `cudaMallocHost` 即可;需要 zero-copy(§6)时才用 `cudaHostAllocMapped`。
 
 ## 6. Mapped / Zero-Copy
 
