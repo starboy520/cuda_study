@@ -7,9 +7,9 @@
 **使用方式**：按 Step 01 → 12 顺序做；每步有「阅读」「动手」「完成标志」；做完一步再勾 `[ ]`。
 
 > **前置**：Week 1 完成 `vec_add`、`device_query`、`mat_mul_naive`（1024³ GFLOPS 基线已记录）。  
-> **总纲**：本周对应 [Programming_Guide学习路径.md](Programming_Guide学习路径.md) 的 **阶段 2：SIMT 与内存层次**。  
+> **总纲**：本周对应 [Programming_Guide学习路径.md](../docs/Programming_Guide学习路径.md) 的 **阶段 2：SIMT 与内存层次**。  
 > **官方文档**： [CUDA Programming Guide](https://docs.nvidia.com/cuda/cuda-programming-guide/)  
-> **Week 1 对照**：[Week1详细步骤.md](Week1详细步骤.md)
+> **Week 1 对照**：[Week1详细步骤.md](../docs/Week1详细步骤.md)
 
 > **阅读标注**（贯穿全文）：📖 精读 · 👀 扫读/查阅 · ✍️ 必须自己写代码 · ➕ 需外部补充（Guide 覆盖不了）。
 
@@ -87,9 +87,9 @@
 | 资料 | 章节（v13.x） | 重点 |
 |------|---------------|------|
 | Programming Guide | **2.3** 页内搜 `Global Memory` / `Shared Memory` | 六种内存名字 |
-| [Programming_Model详解.md](Programming_Model详解.md) | Memory 相关小节 | 与 Week 1 衔接 |
-| [GPU架构图资源.md](GPU架构图资源.md) | Memory Hierarchy | 可视化 |
-| [T4实战指南.md](T4实战指南.md) | 硬件速览 | 48KB shared/block |
+| [Programming_Model详解.md](../docs/Programming_Model详解.md) | Memory 相关小节 | 与 Week 1 衔接 |
+| [GPU架构图资源.md](../docs/GPU架构图资源.md) | Memory Hierarchy | 可视化 |
+| [T4实战指南.md](../docs/T4实战指南.md) | 硬件速览 | 48KB shared/block |
 
 ### 核心概念（读完能填表）
 
@@ -450,8 +450,8 @@ Phase 2：CPU 对 blocksums 求和（Week 2 够用）
 
 | 资料 | 重点 |
 |------|------|
-| [T4实战指南.md](T4实战指南.md) | 转置 ~30 GB/s naive → ~200+ GB/s 优化 |
-| [项目清单.md](项目清单.md) | P03、P04 验收 |
+| [T4实战指南.md](../docs/T4实战指南.md) | 转置 ~30 GB/s naive → ~200+ GB/s 优化 |
+| [项目清单.md](../docs/项目清单.md) | P03、P04 验收 |
 
 ### 动手
 
@@ -513,8 +513,8 @@ nsys profile -o week2_transpose ./transpose 1024
 
 ### 阅读
 
-- 回顾 [CUDA学习路线图.md](CUDA学习路线图.md) Week 2 验收项
-- [项目清单.md](项目清单.md) P03、P04
+- 回顾 [CUDA学习路线图.md](../docs/CUDA学习路线图.md) Week 2 验收项
+- [项目清单.md](../docs/项目清单.md) P03、P04
 
 ### 目录自检
 
@@ -609,4 +609,4 @@ notes/
 
 ---
 
-**返回**：[CUDA学习路线图.md](CUDA学习路线图.md) · **总纲**：[Programming_Guide学习路径.md](Programming_Guide学习路径.md)（阶段 2）· **上一步**：[Week1详细步骤.md](Week1详细步骤.md)
+**返回**：[CUDA学习路线图.md](../docs/CUDA学习路线图.md) · **总纲**：[Programming_Guide学习路径.md](../docs/Programming_Guide学习路径.md)（阶段 2）· **上一步**：[Week1详细步骤.md](../docs/Week1详细步骤.md)

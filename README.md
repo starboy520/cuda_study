@@ -35,7 +35,10 @@ make && ./vec_add
 
 | 文档 | 说明 |
 |------|------|
+| [study_plan/](study_plan/README.md) | **学习计划中枢**：8 周周计划(Week1-8)统一入口,从入门到面试 |
 | [CUDA学习路线图.md](docs/CUDA学习路线图.md) | **主文档**：8 周课程、知识点、项目、面试方向（v13.x 阅读章节） |
+| [CUDA面试完整准备指南.md](docs/CUDA面试完整准备指南.md) | **面试题库**：知识地图、50 概念题、手写 kernel、性能/系统设计、进阶主题 |
+| [Occupancy详解_从入门到调优.md](docs/Occupancy详解_从入门到调优.md) | Occupancy 完整文档：基础(延迟隐藏)+ 进阶(精确计算/调优/profiler) |
 | [Programming_Model详解.md](docs/Programming_Model详解.md) | Programming Model 白话详解（配合 v13.x Part 1–2） |
 | [GPU架构图资源.md](docs/GPU架构图资源.md) | 官方架构图、Memory Hierarchy 等配图链接 |
 | [Week1详细步骤.md](docs/Week1详细步骤.md) | **Week 1 逐步清单**（含 v13.x 阅读章节 + Legacy 对照） |

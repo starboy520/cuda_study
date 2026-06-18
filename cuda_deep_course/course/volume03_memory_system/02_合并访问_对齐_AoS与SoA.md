@@ -179,34 +179,83 @@ AoSoA（每 32 个为一组，组内 SoA）：
 
 ## 6. 向量化访问
 
-### 6.1 它想解决什么：用更少的指令搬同样多的数据
+### 6.0 先认识 `float4`:它不是关键词,是"打包好的 4 个 float"
 
-先看普通写法——每个线程读一个 `float`：
+后面会突然用到 `float4`,先把它讲清楚,否则会懵。
 
-```cpp
-float v = input[index];     // 一条 32-bit load 指令，搬 4 bytes
-```
-
-如果每个线程需要连续的 4 个 `float`，最直白的写法是循环读 4 次，发 **4 条** load
-指令。向量化访问的思路是：把这 4 个 `float` 打包成一个 **128-bit 的 `float4`**，用
-**一条**指令一次读回来：
+**`float4` 不是 C++ 关键词**(不像 `int`、`for` 那种语言内置的),而是 **CUDA 头文件里预先定义
+好的一个结构体**——把 4 个 `float` 打包在一起:
 
 ```cpp
-float4 v = reinterpret_cast<const float4*>(input)[index];
-// 一条 128-bit load 指令，一次搬 16 bytes，v.x v.y v.z v.w 四个分量
+// CUDA 内置类型,概念上等价于:
+struct float4 {
+    float x, y, z, w;     // 4 个 float 挨在一起,共 16 字节
+};
 ```
 
-收益有两层：
+CUDA 提供一整套这样的"向量类型",按元素个数和基础类型组合:
 
 ```text
-1. 指令数变少：4 条 32-bit load -> 1 条 128-bit load
-   减少指令发射压力，对 memory-bound kernel 尤其有用（指令也是一种资源）
-2. 每条指令搬运更宽：单指令 128-bit，更容易把内存总线喂满
-   一个 warp 用 float4 一次就请求 32 * 16 = 512 bytes，天然是大块对齐访问
+float1 float2 float3 float4      // 1~4 个 float
+int1   int2   int3   int4        // int 版
+double1 double2                  // double 版
+char4, uchar4 ...                // 还有 char/short/long 等版本
 ```
 
-类比：搬砖时一次搬 4 块（一条指令）比来回跑 4 趟（四条指令）更省力——只要你的手
-（寄存器/对齐）撑得住一次抓 4 块。
+用 `.x .y .z .w` 访问每个分量(2 个的只有 `.x .y`,3 个的到 `.z`):
+
+```cpp
+float4 v;
+v.x = 1.0f; v.y = 2.0f; v.z = 3.0f; v.w = 4.0f;   // 4 个分量
+float2 p;
+p.x = 10.0f; p.y = 20.0f;                          // 只有 2 个分量
+```
+
+> 关键认知:`float4` 只是"**把 4 个 float 摆在一起、当一个整体看待**"。它本身没什么魔法。
+> 真正有用的是——**GPU 能用一条指令一次读写这"一整块 16 字节"**,这才是"向量化访问"的来源。
+> 记住这个铺垫,下面就不懵了。
+
+### 6.1 它想解决什么:用更少的指令搬同样多的数据
+
+先看普通写法——每个线程读一个 `float`:
+
+```cpp
+float v = input[index];     // 一条 32-bit load 指令,搬 4 bytes
+```
+
+如果每个线程需要连续的 4 个 `float`,最直白的写法是循环读 4 次,发 **4 条** load 指令。向量化
+访问的思路是:把这连续的 4 个 `float` 当成一个 **`float4`(16 字节)**,用 **一条** 指令一次读回来:
+
+```cpp
+// reinterpret_cast 是 C++ 的"强制把这块内存当另一种类型看"
+// 这里:把 input(float 指针)重新看成 float4 指针,再取第 index 个 float4
+float4 v = reinterpret_cast<const float4*>(input)[index];
+// 一条 128-bit load 指令,一次搬 16 bytes,得到 v.x v.y v.z v.w 四个分量
+```
+
+这行代码拆开看(怕你卡在 `reinterpret_cast` 上):
+
+```text
+input                                   是 const float*    (指向一串 float)
+reinterpret_cast<const float4*>(input)  把它"重新解释"成 const float4*  (每 16 字节算一个元素)
+[index]                                 取第 index 个 float4,即 input 里第 index*4 ~ index*4+3 这 4 个 float
+v.x = input[index*4 + 0]
+v.y = input[index*4 + 1]   ← 一次性拿到这连续 4 个
+v.z = input[index*4 + 2]
+v.w = input[index*4 + 3]
+```
+
+收益有两层:
+
+```text
+1. 指令数变少:4 条 32-bit load -> 1 条 128-bit load
+   减少指令发射压力,对 memory-bound kernel 尤其有用(指令也是一种资源)
+2. 每条指令搬运更宽:单指令 128-bit,更容易把内存总线喂满
+   一个 warp 用 float4 一次就请求 32 * 16 = 512 bytes,天然是大块对齐访问
+```
+
+类比:搬砖时一次搬 4 块(一条指令)比来回跑 4 趟(四条指令)更省力——只要你的手(寄存器/对齐)
+撑得住一次抓 4 块。
 
 ### 6.2 常见向量化类型
 
@@ -216,7 +265,7 @@ float4  = 16 bytes   int4 / uint4
 double2 = 16 bytes
 ```
 
-`float4` 是最常用的，因为 16 bytes 正好是 GPU 偏好的访问粒度上界。
+`float4` 是最常用的,因为 16 bytes 正好是 GPU 偏好的访问粒度上界。
 
 ### 6.3 三个必须满足的前提（否则崩或变慢）
 
@@ -252,6 +301,66 @@ float4 v = reinterpret_cast<const float4*>(input + 1)[index];
 
 > 一句话总结向量化：**在已经合并的前提下，用更宽的指令减少指令数、喂满总线**。它是
 > "优化的最后一公里"，不是"布局的修正药"。
+
+### 6.5 完整例子:vector add 的普通版 vs 向量化版
+
+把前面的概念拼成一个完整可对照的例子,你就彻底懂了。任务:`c[i] = a[i] + b[i]`。
+
+**普通版**(每个线程算 1 个元素):
+
+```cpp
+__global__ void addNaive(const float* a, const float* b, float* c, int n) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) c[i] = a[i] + b[i];          // 每线程 1 个 float
+}
+// 启动:需要 n 个线程
+addNaive<<<(n + 255) / 256, 256>>>(a, b, c, n);
+```
+
+**向量化版**(每个线程用 `float4` 一次算 4 个元素):
+
+```cpp
+__global__ void addVec4(const float* a, const float* b, float* c, int n) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int n4 = n / 4;                          // 能凑成多少个完整的 float4
+    if (i < n4) {
+        // 把 a/b/c 都当成 float4 数组来读写
+        float4 va = reinterpret_cast<const float4*>(a)[i];   // 一次读 a 的 4 个
+        float4 vb = reinterpret_cast<const float4*>(b)[i];   // 一次读 b 的 4 个
+        float4 vc;
+        vc.x = va.x + vb.x;                  // 4 个分量分别相加
+        vc.y = va.y + vb.y;
+        vc.z = va.z + vb.z;
+        vc.w = va.w + vb.w;
+        reinterpret_cast<float4*>(c)[i] = vc;                // 一次写 c 的 4 个
+    }
+}
+// 启动:只需要 n/4 个线程(每个干 4 个元素的活)
+addVec4<<<(n/4 + 255) / 256, 256>>>(a, b, c, n);
+```
+
+对照看两版的差别:
+
+```text
+普通版:  n 个线程,每个 1 条 load×2 + 1 条 store  → 访存指令多
+向量化:  n/4 个线程,每个 1 条 128-bit load×2 + 1 条 store → 指令数砍到 1/4
+        warp 一次请求更宽,更容易喂满内存总线
+```
+
+**别忘了尾部处理**(§6.3 的第②条):如果 `n` 不是 4 的倍数,`n/4` 会漏掉最后 `n%4` 个元素,要
+单独补一个标量 kernel 或在 host 端处理:
+
+```cpp
+// 处理剩下的 n%4 个(向量化版没覆盖到的尾巴)
+__global__ void addTail(const float* a, const float* b, float* c, int n) {
+    int start = (n / 4) * 4;                 // 从第一个没被 float4 覆盖的元素开始
+    int i = start + blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) c[i] = a[i] + b[i];
+}
+```
+
+> 自己动手:把 `week01_basics/vec_add` 的 kernel 改成 `float4` 版,用大数组(如 1<<26)对比两版
+> 耗时。vector add 是 memory-bound,向量化通常能看到提升——这是体会向量化最直接的实验。
 
 ## 7. Pitch
 

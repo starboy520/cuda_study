@@ -30,7 +30,7 @@ CUDA 岗位通常要求的不只是 `__global__ void kernel()`，而是：
 | 周 | 官方章节（v13.x） | 本地文档 |
 |----|------------------|----------|
 | 1 | **Part 1** + **2.1** + **2.3**（分段）+ **2.5**（扫读）+ **2.7** + **5.1** | [Week1详细步骤](Week1详细步骤.md)、[每日清单](Week1_Day2-Day5学习清单.md) |
-| 2 | **2.3** Shared Memory / Coalescing / Transpose + **5.4.4** 同步原语 | [Week2详细步骤](Week2详细步骤.md) |
+| 2 | **2.3** Shared Memory / Coalescing / Transpose + **5.4.4** 同步原语 | [Week2详细步骤](../study_plan/Week2详细步骤.md) |
 | 3 | **2.5** Async 深入 + **5.4.5** Atomics + **5.4.6** Warp Functions（shuffle）+ **4.1** Unified Memory + **4.3** Stream-Ordered Allocator + **4.4** Cooperative Groups | Week 3 |
 | 4 | cuBLAS / Thrust + **3.1** Advanced CUDA APIs（浏览）+ **3.5** Tour of CUDA Features | Week 4 |
 | 5 | **2.4** Tile Kernels + **2.3** Occupancy + **5.4.11** Warp Matrix（WMMA）+ **4.11** Async Data Copies / **4.10** Pipelines + Best Practices | Week 5 |
@@ -54,7 +54,7 @@ Week 8  面试冲刺           → 四大手写题默写 + 概念题 + 模拟面
 
 > **路线已调整（2026-06-17）**：原 Week4「库与抽象层」单独占一周偏多——cuBLAS/Thrust 本质是
 > API 调用，不值得整周。现把 **GEMM 手写优化提前到 Week4** 并与 **ncu 实测绑定**（GEMM 是练
-> profiler 的最佳载体），cuBLAS 降为"性能标尺"。详见 [Week4 清单](Week4_Day1-Day7学习清单.md)。
+> profiler 的最佳载体），cuBLAS 降为"性能标尺"。详见 [Week4 清单](../study_plan/Week4_Day1-Day7学习清单.md)。
 > 连锁后移：Nsight 系统学→Week5，核心算子→Week6，作品集→Week7，面试冲刺→Week8。
 
 **每周时间分配建议（全职）**
@@ -165,11 +165,11 @@ Week 8  面试冲刺           → 四大手写题默写 + 概念题 + 模拟面
 
 **本周交付**
 
-- `week02_memory/` 代码 + [Week2详细步骤.md](Week2详细步骤.md) + `notes/week02.md`
+- `week02_memory/` 代码 + [Week2详细步骤.md](../study_plan/Week2详细步骤.md) + `notes/week02.md`
 - 性能对比表（至少 3 个 kernel × 3 种实现）
 - 一篇短笔记：「T4 上合并访问实测结论」
 
-**逐步清单**：[Week2详细步骤.md](Week2详细步骤.md)（12 Step）· [Week2_Day1-Day7学习清单.md](Week2_Day1-Day7学习清单.md)（每日勾选）
+**逐步清单**：[Week2详细步骤.md](../study_plan/Week2详细步骤.md)（12 Step）· [Week2_Day1-Day7学习清单.md](../study_plan/Week2_Day1-Day7学习清单.md)（每日勾选）
 
 ---
 
