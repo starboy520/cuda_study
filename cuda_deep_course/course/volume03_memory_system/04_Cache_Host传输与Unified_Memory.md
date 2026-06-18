@@ -138,12 +138,13 @@ cudaMemcpyAsync 想做的是:让 DMA 引擎独立搬数据,同时 CPU/GPU 去干
 
 ### 5.4 完整例子
 
+**先看基础用法**(分配 pinned、async 传输、释放)。注意:这一段**并不构成重叠**——下面会解释为什么。
+
 ```cpp
 const size_t bytes = N * sizeof(float);
 float* h_pinned = nullptr;
 CUDA_CHECK(cudaMallocHost(&h_pinned, bytes));     // pinned host 内存
-// 填数据
-for (int i = 0; i < N; ++i) h_pinned[i] = i;
+for (int i = 0; i < N; ++i) h_pinned[i] = i;      // 填数据
 
 float* d_data = nullptr;
 CUDA_CHECK(cudaMalloc(&d_data, bytes));
@@ -151,16 +152,63 @@ CUDA_CHECK(cudaMalloc(&d_data, bytes));
 cudaStream_t stream;
 CUDA_CHECK(cudaStreamCreate(&stream));
 
-// 因为是 pinned,这个 async 拷贝能真异步、和后续计算重叠
 CUDA_CHECK(cudaMemcpyAsync(d_data, h_pinned, bytes,
                            cudaMemcpyHostToDevice, stream));
-myKernel<<<grid, block, 0, stream>>>(d_data);      // 可与上面的传输重叠
+myKernel<<<grid, block, 0, stream>>>(d_data);     // ⚠️ 见下方说明:这里不会重叠
 
 CUDA_CHECK(cudaStreamSynchronize(stream));
-CUDA_CHECK(cudaFreeHost(h_pinned));                // pinned 要用 cudaFreeHost 释放
+CUDA_CHECK(cudaFreeHost(h_pinned));               // pinned 要用 cudaFreeHost 释放
 CUDA_CHECK(cudaFree(d_data));
 CUDA_CHECK(cudaStreamDestroy(stream));
 ```
+
+> **⚠️ 关键澄清:这段代码并不会"重叠"。** 原因有二:
+> 1. kernel 用的 `d_data` 正是上面在传的数据,它**必须等数据传完**才能算(否则算到空数据)。
+> 2. **同一个 stream 内的操作严格顺序执行**(卷七)——kernel 会乖乖排在传输后面。
+>
+> 这段代码只是说明 pinned + async 的**基本写法**;它"具备重叠的能力",但单数据、单 stream
+> **没有真正重叠**。真正的重叠要靠下面的"多块 + 多 stream"。
+
+### 5.4.1 真正的重叠:多块 + 多 stream 流水线
+
+重叠的本质:**数据传输由 DMA 引擎负责,计算由 SM 负责,是两套独立硬件,能同时干活**。要让它们
+并行,得把数据**切成多块**、放进**不同 stream**,让"传第 2 块"和"算第 1 块"错开:
+
+```cpp
+const int CHUNKS = 4;
+const size_t chunkBytes = bytes / CHUNKS;
+cudaStream_t streams[CHUNKS];
+for (int i = 0; i < CHUNKS; ++i) CUDA_CHECK(cudaStreamCreate(&streams[i]));
+
+// 每块在自己的 stream 里:传输 → 计算。不同块的传/算会重叠
+for (int i = 0; i < CHUNKS; ++i) {
+    size_t off = i * (N / CHUNKS);
+    CUDA_CHECK(cudaMemcpyAsync(d_data + off, h_pinned + off, chunkBytes,
+                               cudaMemcpyHostToDevice, streams[i]));
+    myKernel<<<grid, block, 0, streams[i]>>>(d_data + off);   // 算这一块
+}
+for (int i = 0; i < CHUNKS; ++i) CUDA_CHECK(cudaStreamSynchronize(streams[i]));
+```
+
+时间线上发生了什么:
+
+```text
+不重叠(单 stream,上面 5.4):
+  传输: ████████
+  计算:         ████████        总时间 = 传 + 算
+
+重叠(多 stream 分块,本节):
+  stream0: [传块0][算块0]
+  stream1:       [传块1][算块1]
+  stream2:             [传块2][算块2]
+  stream3:                   [传块3][算块3]
+                 ↑ 算块0 的同时在传块1 → DMA 和 SM 并行 → 传输和计算重叠
+  总时间 ≈ max(总传输, 总计算)   而非两者相加
+```
+
+> 重叠需要**三个条件缺一不可**:① pinned 内存(DMA 才能独立异步搬)② `cudaMemcpyAsync`(异步
+> 提交)③ 多 stream + 分块(让不同块的传/算落在不同 stream 才能并行)。完整的分块流水线和实测
+> 加速见**卷七第 02 章**。本章只需记住:**pinned 是重叠的前提,但光有 pinned 不等于重叠。**
 
 注意:pinned 内存必须用 `cudaFreeHost` 释放,**不能用普通 `free`**。
 
