@@ -34,3 +34,8 @@ compile_commands.json
 manual_write/fence_flag
 manual_write/pin
 manual_write/race
+
+# week3 练习编译产物
+
+# week3 练习编译产物(可执行文件,不含 .cu)
+week3_parallel/atomic_sum/atomic_sum
