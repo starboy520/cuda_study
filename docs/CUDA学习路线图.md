@@ -45,12 +45,17 @@ CUDA 岗位通常要求的不只是 `__global__ void kernel()`，而是：
 Week 1  架构与编程模型     → 向量化、矩阵乘 naive
 Week 2  内存层次与正确性   → transpose、reduction、边界处理
 Week 3  并行模式与同步     → scan、histogram、stream/event
-Week 4  库与抽象层         → cuBLAS、Thrust、自定义算子封装
-Week 5  性能优化方法论     → GEMM 分块、Occupancy、Roofline
-Week 6   profiling 实战    → Nsight 案例、回归基准测试
-Week 7  行业应用方向       → 推理优化 / 图像 / 稀疏 选 1–2 条深入
-Week 8  作品集与面试       → 1 个主打项目 + 文档 + 模拟面试
+Week 4  GEMM 优化 + ncu 入门 → naive→tiling→register、cuBLAS 当标尺、Nsight 初识
+Week 5  性能方法论 + Nsight 深化 → Occupancy、Roofline、ncu/nsys 系统学
+Week 6  核心算子           → softmax、layernorm、融合（卷六）
+Week 7  作品集项目         → 挑一个算子做到极致 + 技术报告
+Week 8  面试冲刺           → 四大手写题默写 + 概念题 + 模拟面试
 ```
+
+> **路线已调整（2026-06-17）**：原 Week4「库与抽象层」单独占一周偏多——cuBLAS/Thrust 本质是
+> API 调用，不值得整周。现把 **GEMM 手写优化提前到 Week4** 并与 **ncu 实测绑定**（GEMM 是练
+> profiler 的最佳载体），cuBLAS 降为"性能标尺"。详见 [Week4 清单](Week4_Day1-Day7学习清单.md)。
+> 连锁后移：Nsight 系统学→Week5，核心算子→Week6，作品集→Week7，面试冲刺→Week8。
 
 **每周时间分配建议（全职）**
 
