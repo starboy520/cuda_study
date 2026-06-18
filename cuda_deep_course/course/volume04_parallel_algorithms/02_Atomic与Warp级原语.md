@@ -4,6 +4,23 @@
 > （让一个 warp 的 32 个线程直接协作，不经过 shared memory）。两者都是"线程协作"的
 > 工具，但粒度不同：atomic 面向任意线程间，warp 原语面向同一 warp 内的 32 条 lane。
 
+## 0.1 术语速查表(先扫一眼)
+
+| 术语 | 一句话定义 |
+|---|---|
+| **atomic** | 对一个地址的"读-改-写"不可被打断 |
+| **atomicCAS** | compare-and-swap,所有 atomic 的底层基础,可拼自定义原子 |
+| **contention(争用)** | 多线程抢同一地址,被串行化 → 慢 |
+| **privatization(分层聚合)** | 先局部攒、再少量汇总,降低 atomic 争用 |
+| **lane** | 线程在 warp 内的编号(0-31) |
+| **mask** | 32 位位图,声明哪些 lane 参与 warp 原语 |
+| **shuffle** | lane 之间直接读彼此寄存器,不经 shared |
+| **vote/ballot** | 一条指令完成全 warp 的条件统计 |
+
+> 两块的关系:**atomic 是"任意线程间"安全更新一个地址(通用但可能慢);warp 原语是"同 warp 内
+> 32 线程"直接协作(极快但仅限 32 个)**。实战中常组合成"warp 级 → block 级 → grid 级"的分层
+> 协作(第 9 节)。
+
 ## 1. Atomic 解决什么问题
 
 错误：
@@ -62,6 +79,57 @@ atomicAnd / atomicOr / atomicXor  // 原子位运算
 - **它们都返回操作前的旧值**——这个旧值很有用（比如用 `atomicAdd` 拿到"我是第几个到的"，做队列分配）。
 - `atomicCAS` 是最底层的原语，其他原子都能用它拼出来；需要自定义原子操作时用它。
 
+### 1.2 数据类型与浮点支持(实战常踩)
+
+atomic 对**不同数据类型和不同架构**的支持不一样,这是实战会踩的坑:
+
+```text
+int / unsigned int：    全系列 atomic 都支持(add/max/min/CAS/位运算...)
+unsigned long long：    支持(64 位计数、地址操作常用)
+float：                 atomicAdd 支持;但 atomicMax/Min 对 float 不直接支持(要用 CAS 拼)
+double：                atomicAdd 需要 CC 6.0+(Pascal 及以上,你的 T4/A100 都行)
+half / __half2：        新架构支持,深度学习用
+```
+
+> 易错点:**`atomicMax(float*, float)` 不存在**!float 只有 atomicAdd/Exch/CAS。要对 float 求
+> 原子最大值,得用 `atomicCAS` 自己拼(见下一节),或用整数位 trick。double 的 atomicAdd 在很老
+> 的卡上没有(CC<6.0),但 T4(7.5)/A100(8.0)都支持。
+
+### 1.3 用 `atomicCAS` 实现自定义原子操作
+
+`atomicCAS(addr, expected, desired)` 是所有 atomic 的基础:**当且仅当 `*addr == expected`
+时,把它改成 `desired`,并返回操作前的旧值**。用它能拼出任意自定义原子操作。
+
+经典模式:**CAS 循环**——读旧值 → 算新值 → CAS 尝试写回 → 如果中途被别人改了就重试:
+
+```cpp
+// 用 CAS 实现 float 的原子最大值(因为没有 atomicMax(float*))
+__device__ float atomicMaxFloat(float* addr, float value) {
+    int* addr_as_int = (int*)addr;
+    int old = *addr_as_int, assumed;
+    do {
+        assumed = old;
+        float cur = __int_as_float(assumed);
+        float newv = fmaxf(cur, value);                  // 自定义的"改"
+        old = atomicCAS(addr_as_int, assumed,            // 尝试写回
+                        __float_as_int(newv));
+    } while (assumed != old);                            // 旧值变了说明被别人改了 → 重试
+    return __int_as_float(old);
+}
+```
+
+理解这个循环:
+
+```text
+1. 读到 old
+2. 假设没人动它(assumed = old),算出 newv
+3. atomicCAS:如果 addr 还等于 assumed(没人动过),就写 newv,成功
+4. 如果 addr 已经被别人改了(返回的 old != assumed),说明算的 newv 过时了 → 循环重试
+```
+
+> CAS 循环是无锁(lock-free)编程的核心模式。竞争激烈时重试多、会慢,但保证正确。需要库没提供的
+> 原子操作(自定义聚合、原子结构体更新)时用它。
+
 ## 2. Atomic 不等于整个算法同步
 
 Atomic 可以安全更新一个位置，但不自动提供：
@@ -102,6 +170,47 @@ contention（原子竞争），是热点计数器最常见的性能杀手。
 global atomic 的争用从百万级降到几千级，**降了两到三个数量级**。代价只是多写
 几行聚合代码。这条"局部攒、少量汇总"的思路贯穿 reduction（第 03 章）和
 histogram（第 04 章）——它们本质都是带聚合算子的分层归约。
+
+### 3.1 shared atomic vs global atomic
+
+上面分层聚合用到了"在 shared memory 上做 atomic"。为什么 shared atomic 更快?
+
+```text
+global atomic:对显存地址做原子操作,要走 L2/显存,延迟高、争用时排队更慢
+shared atomic:对片上 SRAM 做原子操作,延迟低得多(几十拍 vs 几百拍)
+            → 把争用"关进 block 内的 shared",比全局争用快一两个数量级
+```
+
+但 shared atomic 也不是没代价:
+
+```text
+- 同一个 shared 地址被同 block 多线程争,仍会串行(只是片上更快)
+- shared 容量有限,bin 太多放不下(histogram 的约束,卷四/04)
+- 仍需要最后把 shared 结果合并回 global(每 block 一次 global atomic)
+```
+
+> 一句话:**分层聚合的关键就是"把 global atomic 的争用,转移到更快的 shared atomic、再转移到
+> 无争用的寄存器"**——越往上层(寄存器)越快、越无争用,所以尽量在上层攒、少在下层(global)汇总。
+
+### 3.2 atomic 的返回值能干什么
+
+前面提过 atomic 返回"操作前的旧值",这个旧值非常有用,是很多无锁算法的基础:
+
+```cpp
+// 例:并行往队列里追加元素,用 atomicAdd 拿到"我的专属位置"
+__device__ void enqueue(int* queue, int* tail, int value) {
+    int pos = atomicAdd(tail, 1);   // 原子地"占一个位置",返回占之前的下标
+    queue[pos] = value;             // 每个线程拿到不同的 pos,无需再同步
+}
+```
+
+```text
+atomicAdd(tail, 1) 返回旧值的妙处:
+  线程A 拿到 pos=5(并把 tail 变 6)
+  线程B 拿到 pos=6(并把 tail 变 7)
+  → 每个线程拿到唯一、连续的位置,天然不冲突
+用途:队列/栈分配、stream compaction 求输出位置、动态内存分配计数器
+```
 
 ## 4. Warp Lane 与 Active Mask
 
@@ -328,4 +437,50 @@ block 内    → 各 warp 结果写 shared，再归约
 - CUDA C++ Best Practices Guide：Atomics、Warp-level Primitives。
 - PMPP：Histogram、Reduction 与线程协作。
 - 配套：[卷四第 03 章 Reduction](03_Reduction从错误到优化.md)（shuffle 收尾的完整应用）。
+
+## 12. 面试题(附参考答案)
+
+**Q1:为什么 `counter++` 在多线程下会出错?atomic 怎么解决?**
+`counter++` 是"读→改→写"三步,多线程可能都读到旧值、各自加完互相覆盖,丢更新。atomic 让这三步
+不可分割,其他线程要么看到操作前、要么操作后,绝不插中间。
+
+**Q2:atomicCAS 是什么?为什么说它是基础?**
+compare-and-swap:当 `*addr==expected` 时改成 `desired`,返回旧值。其他 atomic 都能用它拼出来。
+用"CAS 循环"(读旧值→算新值→CAS 写回→失败重试)能实现任意自定义原子操作,如 float 的原子 max。
+
+**Q3:为什么百万线程对一个 counter 做 atomic 会很慢?怎么优化?**
+atomic 保证同一时刻只有一个读改写能进行,百万次对同一地址的 atomic 被串行化(contention),并行
+度坍缩到 1。优化:分层聚合(privatization)——寄存器局部攒→shared atomic→每 block 一次 global
+atomic,把争用降两三个数量级。
+
+**Q4:atomic 等于 `__syncthreads()` 吗?**
+不。atomic 只保护单个地址的读改写不被打断,不让线程等待、不保证全 block 到齐、不能原子地同时改
+两个地址。barrier 管"到齐+可见"。两者解决不同问题。
+
+**Q5:float 能用 atomicMax 吗?**
+不能,`atomicMax(float*)` 不存在。float 只有 atomicAdd/Exch/CAS。要对 float 求原子最大值,得用
+atomicCAS 循环自己拼。double 的 atomicAdd 需要 CC 6.0+(T4/A100 都支持)。
+
+**Q6:为什么 warp 原语都要带 `_sync` 和 mask?**
+因为 Volta+ 的独立线程调度让同 warp 的 lane 不再保证锁步。mask(32 位位图)显式声明哪些 lane
+参与,`_sync` 先让这些 lane 同步到此再操作。mask 必须如实反映"此刻哪些 lane 真会执行到这条
+指令",否则未定义。
+
+**Q7:shuffle 为什么比 shared memory 交换快?**
+shared 交换要"写 shared→__syncthreads→读 shared"三步,碰内存+同步;shuffle 一条指令让 lane 间
+寄存器直接传,免内存、免 barrier。所以 reduction 后段(≤32 个值)用 shuffle 收尾。
+
+**Q8:数组尾部不足 32 个元素时,warp 归约要注意什么?**
+不能盲目用 mask=0xffffffff(有些 lane 越界已退出 → 未定义)。要先用 `__ballot_sync(0xffffffff,
+index<count)` 算出有效 lane 的真实 mask,再用它做 shuffle,且读取的 source lane 也必须在参与
+集合里。
+
+**Q9:atomicAdd 返回旧值有什么用?**
+拿到"我是第几个到的"。如 `atomicAdd(tail, 1)` 让每个线程拿到唯一连续的位置,用于队列/栈分配、
+stream compaction 求输出位置——无需额外同步就能让各线程写不冲突的位置。
+
+**Q10:atomic、shared memory、warp 原语怎么选?**
+atomic(global):少量分散更新,热点争用慢;shared memory:block 内复用/树形归约,要 syncthreads;
+warp 原语:同 warp 32 线程协作,最快但仅限 32。实战组合成 warp→block→grid 分层,每层用最便宜
+的工具。
 

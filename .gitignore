@@ -29,3 +29,8 @@ manual_write/vec_add
 .vscode/
 .cache/
 compile_commands.json
+
+# manual_write 练习编译产物
+manual_write/fence_flag
+manual_write/pin
+manual_write/race
