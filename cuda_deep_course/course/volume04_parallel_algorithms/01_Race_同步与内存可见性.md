@@ -4,6 +4,21 @@
 > 但没真正讲清"为什么必须同步"。这一章回答：多个线程同时读写同一块内存时，会出什么错，
 > 以及 CUDA 提供哪些同步工具（barrier / fence / atomic / warp 同步）各管什么。
 
+## 0.1 术语速查表（先扫一眼，下面逐个讲）
+
+| 术语 | 一句话定义 | 让线程等待？ |
+|---|---|---|
+| **data race** | 多线程并发访问同一地址、至少一个写、且无同步 → 结果不确定 | — |
+| **`__syncthreads()`** | block 内 barrier：全员到齐 + 内存可见 | 是 |
+| **`__syncwarp(mask)`** | 一个 warp 内 lane 的同步 | 是 |
+| **`__threadfence*()`** | fence：只保证本线程写入的顺序/可见范围 | **否** |
+| **atomic** | 单地址读-改-写不可分割 | 否 |
+| **happens-before** | "A 的写一定先于 B 的读可见"的顺序保证 | — |
+| **kernel 边界** | 跨 block 唯一可移植的全局同步墙 | （Host 等）|
+
+> 一句话先记住区别：**barrier 管"大家到齐 + 可见"，fence 只管"我的写按序可见"，atomic 管
+> "一个地址不被打断"**。它们解决不同问题，下面逐一展开。
+
 ## 1. 什么是 Data Race
 
 当多个执行者并发访问同一位置，至少一个是写，并且缺少正确同步时，就可能
@@ -271,4 +286,38 @@ warp 内协作          → __syncwarp / shuffle
 - CUDA C++ Best Practices Guide：Thread Synchronization。
 - Compute Sanitizer：Racecheck、Synccheck。
 - 配套：[卷四第 02 章 Atomic 与 Warp 级原语](02_Atomic与Warp级原语.md)、[卷四第 03 章 Reduction](03_Reduction从错误到优化.md)。
+
+## 12. 面试题（附参考答案）
+
+**Q1：data race 的构成条件是什么？**
+三个同时满足：① 多线程访问**同一内存位置**；② **至少一个是写**；③ 之间**没有同步**保证先后。
+缺一不构成 race。它的危险在于"有时对有时错"，难复现。
+
+**Q2：`__syncthreads()` 只是"让线程等一下"吗？**
+不止。它有两个作用：**到齐**（block 内所有线程对齐到同一点）+ **内存可见性**（barrier 前的写
+对 barrier 后全 block 可见，建立 happens-before）。第二点才是消除 race 的根本——没有它，编译器
+重排或写入迟迟不落回 shared，会让"看似先写后读"仍读到旧值。
+
+**Q3：为什么不能把 `__syncthreads()` 放进 `if (threadIdx.x < 16)`？**
+它要求 block 内**每个线程都到达**。部分线程进不去分支就永远到不了 barrier，已到达的线程无限
+等待 → 死锁/未定义行为。包裹 barrier 的条件必须对全 block 一致（如 `blockIdx`），不能依赖
+`threadIdx` 或数据值。
+
+**Q4：fence 和 barrier 有什么区别？**
+barrier（`__syncthreads`）让一群线程**到齐 + 可见**，会等待；fence（`__threadfence`）只保证
+**调用线程自己**的写入按顺序、对指定范围可见，**不让任何线程等待**。fence 单独用没意义，要配
+flag + atomic 才能跨线程通知"数据就绪"。
+
+**Q5：为什么不能依赖"同一 warp 天然锁步"省略同步？**
+Volta+ 的**独立线程调度**让同 warp 的 lane 可能走到不同位置，不再保证锁步。依赖锁步的代码会
+在新架构上**间歇性出错**且极难复现。要显式 `__syncwarp()` 或用自带 `_sync` 的 shuffle 原语。
+
+**Q6：不同 block 之间怎么全局同步？**
+普通 kernel 没有全 grid barrier（block 调度不确定，强行等会死锁）。最常用、最可移植的做法是
+**拆成多个 kernel**——kernel 边界就是天然全局同步墙。其他：全局 atomic、cooperative launch
+（`grid.sync()`，要求所有 block 同时驻留）。
+
+**Q7：racecheck 没报错，是不是就一定没有 race？**
+不是。racecheck 只能发现**这次运行实际发生**的竞争，没覆盖到的执行路径/调度顺序它看不到。
+工具是辅助，真正可靠的是从同步语义上保证正确。
 
