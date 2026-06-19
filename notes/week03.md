@@ -218,7 +218,59 @@ nvcc 编译不了。**看到 `__clang_xxx` 开头的 include 直接删**,`thread
 
 ## Day 3：Reduction 进阶（shuffle 收尾）
 
-（待填）
+### 预习要点（v3「每线程加2个」+ 满血版 grid-stride）
+
+参考：`cuda_deep_course/.../volume04_parallel_algorithms/03_Reduction从错误到优化.md`
+
+**v2 的浪费**：每线程只搬 1 个数进 shared，树循环第一轮 `offset=blockDim/2` 时
+**立刻一半线程退场**——加载阶段全员在岗，第一轮却浪费掉一半。
+
+**v3 优化**：写进 shared 前，先在寄存器里把**两个 global 元素加起来**。
+```cpp
+const int start = blockIdx.x * blockDim.x * 2 + tid;  // ★ *2
+float sum = 0.0F;
+if (start < count)              sum += input[start];
+if (start + blockDim.x < count) sum += input[start + blockDim.x];
+values[tid] = sum;             // 进 shared 已是"两个之和"
+```
+
+**`*2` 为什么**：每个 block 现在管 512 个数（不是 256），所以下个 block 的起点要按 512 跳。
+```text
+v2: 起点 = blockIdx*blockDim       (跳256)  block管256个
+v3: 起点 = blockIdx*blockDim*2     (跳512)  block管512个
+→ blockDim*2 定位 block 起点，+tid 定位 block 内线程
+```
+
+**两个关键细节**：
+- 第二个取 `start+blockDim` 不是 `start+1`：保证 warp 内两次加载都连续（合并访问）。
+- 两个地址**分别 if 判边界**：输入长度未必是 512 的倍数，少判一个会越界读。
+
+**满血版 = grid-stride 攒任意多个**（v3 的极致）：
+```cpp
+int gid = blockIdx.x*blockDim.x + tid;
+int stride = gridDim.x*blockDim.x;        // 总线程数 = 步长
+float sum = 0.0F;
+for (int i = gid; i < count; i += stride) sum += input[i];  // 寄存器攒多个
+values[tid] = sum;
+```
+步长=总线程数 → 每圈 warp 内仍连续（合并访问）。**这就是 Day1 atomic_sum
+reg+shared 版 ~10x 的同款套路**：能在寄存器先攒，就别让数据裸奔到下一层。
+
+```text
+            每线程搬   atomic/同步   访存
+v2 单加载    1         每元素进树    一半线程第一轮退场
+v3 加两个    2         省第一轮      加载即计算
+满血grid     任意多    ~每block一次  带宽吃满
+```
+
+> 一条主线：寄存器 → shared → global，每多压一层，下一层 atomic/同步少一个数量级。
+> reduction 优化 = atomic 优化 = 同一个套路。
+
+### 作业（待做）
+
+block 级两段归约：warp reduce（shuffle）→ shared[warp_id]=partial → __syncthreads()
+→ 第一个 warp 再归约 partials。提示：warp_id=tid/32, lane=tid&31, num_warps=blockDim/32。
+（block 级用第二级归约，**不是** atomicAdd；atomicAdd 只用于跨 block 的 grid 级。）
 
 ---
 
