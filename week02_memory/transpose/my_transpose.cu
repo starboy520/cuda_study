@@ -11,15 +11,7 @@
 
 constexpr int TILE = 32;
 
-#define CUDA_CHECK(call)                                                       \
-  do {                                                                         \
-    cudaError_t err = (call);                                                  \
-    if (err != cudaSuccess) {                                                  \
-      printf("CUDA error %s at %s:%d\n", cudaGetErrorString(err), __FILE__,    \
-             __LINE__);                                                        \
-      exit(1);                                                                 \
-    }                                                                          \
-  } while (0)
+#include "../../common/cuda_check.cuh"
 
 
 // 版本 1：naive —— 写回跨步、不合并（慢）

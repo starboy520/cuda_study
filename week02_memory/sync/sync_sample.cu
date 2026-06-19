@@ -3,15 +3,7 @@
 #include <ctime>
 #include <cuda_runtime.h>
 
-#define CUDA_CHECK(call)                                                       \
-  do {                                                                         \
-    cudaError_t err = (call);                                                  \
-    if (err != cudaSuccess) {                                                  \
-      fprintf(stderr, "CUDA error %s:%d: %s\n", __FILE__, __LINE__,            \
-              cudaGetErrorString(err));                                        \
-      exit(EXIT_FAILURE);                                                      \
-    }                                                                          \
-  } while (0)
+#include "../../common/cuda_check.cuh"
 
 __global__ void example_sync(const int* input_data, int* output_data,
                              int total) {

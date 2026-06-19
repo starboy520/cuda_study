@@ -30,15 +30,7 @@
 #include <cstdio>
 #include <cstdlib>
 
-#define CUDA_CHECK(call)                                                       \
-  do {                                                                         \
-    cudaError_t err = (call);                                                  \
-    if (err != cudaSuccess) {                                                  \
-      printf("CUDA error %s at %s:%d\n", cudaGetErrorString(err), __FILE__,    \
-             __LINE__);                                                        \
-      exit(1);                                                                 \
-    }                                                                          \
-  } while (0)
+#include "../../common/cuda_check.cuh"
 
 __global__ void processKernel(float* data, int n) {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;

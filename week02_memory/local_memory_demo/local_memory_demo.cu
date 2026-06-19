@@ -32,7 +32,6 @@
 //   - noSpillKernel         : 只用几个标量，全放寄存器     → 两种来源都为 0
 //   - dynamicArrayKernel    : 局部数组用"运行时下标"访问   → 触发 stack frame
 //   - registerPressureKernel: 大量标量同时存活、寄存器吃紧 → 触发 spill stores/loads
-、
 //
 // 编译时加 -Xptxas=-v，观察每个 kernel 的:
 //   "N bytes stack frame, M bytes spill stores, M bytes spill loads"
@@ -52,15 +51,7 @@
 #include <cstdio>
 #include <cmath>
 
-#define CUDA_CHECK(call)                                                      \
-  do {                                                                        \
-    cudaError_t err = (call);                                                 \
-    if (err != cudaSuccess) {                                                 \
-      printf("CUDA error %s at %s:%d\n", cudaGetErrorString(err), __FILE__,   \
-             __LINE__);                                                       \
-      return 1;                                                               \
-    }                                                                         \
-  } while (0)
+#include "../../common/cuda_check.cuh"
 
 constexpr int N = 1 << 20;  // 1M 元素
 constexpr int K = 8;        // 每个线程做 K 步变换

@@ -9,15 +9,7 @@
 #include <cstdlib>
 #include <cstring>
 
-#define CUDA_CHECK(call)                                                       \
-  do {                                                                         \
-    cudaError_t err = (call);                                                  \
-    if (err != cudaSuccess) {                                                  \
-      fprintf(stderr, "CUDA error %s:%d: %s\n", __FILE__, __LINE__,            \
-              cudaGetErrorString(err));                                        \
-      exit(EXIT_FAILURE);                                                      \
-    }                                                                          \
-  } while (0)
+#include "../common/cuda_check.cuh"
 
 constexpr int kProducerLane = 0;
 constexpr int kConsumerLane = 32;  // 不同 warp → Volta+ 独立调度，fence 才有意义

@@ -42,15 +42,7 @@
 
 #include <cstdio>
 
-#define CUDA_CHECK(call)                                                      \
-  do {                                                                        \
-    cudaError_t err = (call);                                                 \
-    if (err != cudaSuccess) {                                                 \
-      printf("CUDA error %s at %s:%d\n", cudaGetErrorString(err), __FILE__,   \
-             __LINE__);                                                       \
-      return 1;                                                               \
-    }                                                                         \
-  } while (0)
+#include "../../common/cuda_check.cuh"
 
 constexpr int TILE = 32;        // 32x32 tile，正好一个 warp 一列
 constexpr int REPEAT = 2000;    // 重复多次放大 shared 访问开销
