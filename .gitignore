@@ -35,7 +35,8 @@ manual_write/fence_flag
 manual_write/pin
 manual_write/race
 
-# week3 练习编译产物
-
-# week3 练习编译产物(可执行文件,不含 .cu)
-week3_parallel/atomic_sum/atomic_sum
+# week03 练习编译产物(可执行文件 + .o,不含 .cu)
+week03_parallel/atomic_sum/atomic_sum
+week03_parallel/atomic_sum/atomic_sum.o
+week03_parallel/ballot_sync/ballot_sync
+week03_parallel/warp_reduce/warp_reduce

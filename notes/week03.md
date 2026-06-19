@@ -141,7 +141,78 @@ GPU 优化：让【一个 warp 的 32 线程】的访问空间上连续（合并
 
 ## Day 2：Warp 级原语（shuffle / vote）
 
-（待填）
+### 核心概念
+
+Warp 内 32 条 lane 可以**不经过 shared memory** 直接交换数据/做统计，这是 warp 原语。两大类:
+
+| 类别 | 代表 | 每条 lane 拿到的值 | 用途 |
+|---|---|---|---|
+| **shuffle**（洗牌） | `__shfl_down_sync` | **各不相同**（点对点搬数据） | warp 归约、广播、转置 |
+| **vote/ballot**（投票） | `__ballot_sync` + `__popc` | **全 warp 一致**（同一个统计量） | 计数、判断、分支聚合 |
+
+> 关键区别:shuffle 是"每条 lane 搬到不同的数"，ballot 是"全 warp 算出同一个数"。
+
+### 作业 1：warp_reduce（shuffle 归约）
+
+代码:`week3_parallel/warp_reduce/warp_reduce.cu`。单 warp 用 5 次 `__shfl_down_sync`(偏移 16/8/4/2/1)把 32 个数归约到 lane0。
+
+核心:
+```cpp
+int lane = threadIdx.x & 31;
+for (int offset = 16; offset > 0; offset /= 2) {
+    value += __shfl_down_sync(0xffffffffU, value, offset);
+}
+if (lane == 0) printf("lane 0 value: %d\n", value);  // 32 个数之和
+```
+
+**蝶式归约图解**(8 lane 演示,初值 = lane 号):
+```text
+offset=4:  lane0+=lane4, lane1+=lane5, lane2+=lane6, lane3+=lane7
+offset=2:  lane0+=lane2, lane1+=lane3
+offset=1:  lane0+=lane1  →  lane0 = 0+1+...+7 = 28
+```
+32 lane 同理,多 offset=16、8 两步,共 5 步(log₂32=5)。结果 lane0 = 0+1+...+31 = **496** ✓
+
+**反直觉发现(用 64 元素跑暴露的)**:main 改成 `<<<1,64>>>` 跑 64 个数,打印了**两行**:
+```text
+lane 0 value: 496    ← warp0 (lane 0~31) 的和 = 0+...+31
+lane 0 value: 1520   ← warp1 (lane 32~63) 的和 = 32+...+63
+```
+原因:`lane == 0` 匹配**每个 warp 的第一条 lane**,64 线程 = 2 个 warp = 打印 2 次。
+**这正说明单 warp 归约只是"积木"**——它只能搞定一个 warp 内的 32 个数,跨 warp(>32)
+需要第二级归约(Day3 的 block 归约:每个 warp 先归约 → shared 暂存 → 第一个 warp 再归约一次)。
+
+### 作业 2：ballot_sync（warp 投票 / 计数）
+
+代码:`week3_parallel/ballot_sync/ballot_sync.cu`。数一个 32 元素数组里有几个正数。
+
+核心:
+```cpp
+unsigned int bits = __ballot_sync(0xffffffffU, value > 0);  // 收集"谁>0"成 32 位位图
+int count = __popc(bits);                                   // 数位图里有几个 1
+if (lane == 0) printf("positive count: %d\n", count);       // = 17
+```
+
+**原理**:`__ballot_sync` 把全 warp 每条 lane 的布尔条件(`value>0`)收成一个 32 位整数
+(lane i 的条件对应第 i 位),`__popc` 数其中 1 的个数 = 满足条件的 lane 数。结果 = **17** ✓
+
+**关键理解**:`bits` 这个值**32 条 lane 拿到的完全一样**(投票是全 warp 共享的统计量),
+所以每条 lane 算出的 count 都是 17。`if(lane==0)` 只是为了不打印 32 遍,**不是只有 lane0 才算对**。
+这正是 vote 和 shuffle 的本质区别。
+
+### 踩坑：IDE 误加的内部头文件
+
+ballot_sync.cu 第一次编译报 `fatal error: __clang_cuda_builtin_vars.h: No such file`。
+原因:编辑器(clangd)自动补全塞了 `#include <__clang_cuda_builtin_vars.h>`——这是 IDE 内部头文件,
+nvcc 编译不了。**看到 `__clang_xxx` 开头的 include 直接删**,`threadIdx`/`blockDim` 这些 nvcc 自带。
+
+### 自测（口头答出即掌握）
+
+- [x] shuffle 和 ballot 的本质区别? → shuffle 每条 lane 拿到不同的数;ballot 全 warp 拿到同一个统计量。
+- [x] `__shfl_down_sync` 归约为什么是 5 步? → log₂32 = 5,每步把"有效数据"的跨度减半(蝶式)。
+- [x] 64 个数为什么打印两行? → 64 线程 = 2 warp,`lane==0` 匹配每个 warp 首 lane;单 warp 归约管不了跨 warp。
+- [x] `__ballot_sync` + `__popc` 怎么计数? → ballot 把条件收成位图,popc 数 1 的个数 = 满足条件的 lane 数。
+- [x] 为什么单 warp 归约只是"积木"? → 只能归约 ≤32 个;>32 要第二级(Day3 block 归约)。
 
 ---
 
