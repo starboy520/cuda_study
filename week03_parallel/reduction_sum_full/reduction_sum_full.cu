@@ -1,6 +1,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cuda_runtime.h>
+#include <cub/cub.cuh>
 
 // ---- 常量定义（避免 magic number）----
 constexpr int      WARP_SIZE   = 32;            // 一个 warp 的 lane 数（硬件定死）
@@ -290,6 +291,28 @@ int main() {
         CUDA_CHECK(cudaMemcpy(&got, d_total, sizeof(got), cudaMemcpyDeviceToHost));
         printf("my two-pass (GPU)     : %7.3f ms  sum=%llu  %s  (自己手写，应与 stride 一致)\n",
                ms, got, got == expected ? "PASS" : "FAIL");
+    }
+
+    // ---- CUB DeviceReduce::Sum——工业库标杆 ----
+    // 两段式 API：第一次传 d_temp=nullptr 探测临时显存大小，分配后第二次真算。
+    {
+        void*  d_temp = nullptr;
+        size_t temp_bytes = 0;
+        // 探测所需临时空间（不计算，只填 temp_bytes）
+        cub::DeviceReduce::Sum(d_temp, temp_bytes, d_in, d_total, N);
+        CUDA_CHECK(cudaMalloc(&d_temp, temp_bytes));
+
+        cub::DeviceReduce::Sum(d_temp, temp_bytes, d_in, d_total, N);  // warmup
+        CUDA_CHECK(cudaEventRecord(start));
+        cub::DeviceReduce::Sum(d_temp, temp_bytes, d_in, d_total, N);
+        CUDA_CHECK(cudaEventRecord(stop));
+        CUDA_CHECK(cudaEventSynchronize(stop));
+        CUDA_CHECK(cudaEventElapsedTime(&ms, start, stop));
+        unsigned long long got;
+        CUDA_CHECK(cudaMemcpy(&got, d_total, sizeof(got), cudaMemcpyDeviceToHost));
+        printf("cub DeviceReduce::Sum : %7.3f ms  sum=%llu  %s  (工业库标杆)\n",
+               ms, got, got == expected ? "PASS" : "FAIL");
+        CUDA_CHECK(cudaFree(d_temp));
     }
 
     CUDA_CHECK(cudaEventDestroy(start));
