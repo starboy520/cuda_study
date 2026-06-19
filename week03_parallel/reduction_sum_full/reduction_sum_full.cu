@@ -157,6 +157,22 @@ __global__ void reduction_my(unsigned long long* input, int size, unsigned long 
 
 }
 
+__global__ void reduction_shuffle_only(unsigned long long* input, int size, 
+    unsigned long long* sum) {
+    unsigned long long local = 0;
+    int idx = blockDim.x * blockIdx.x + threadIdx.x;
+    local = (idx < size) ? input[idx] : 0;
+
+    for (int offset = WARP_SIZE / 2; offset > 0; offset /=2) {
+        local += __shfl_down_sync(FULL_MASK, local, offset);
+    }
+
+    int lane = threadIdx.x % WARP_SIZE;
+    if (lane == 0) {
+        atomicAdd(sum, local);
+    }
+
+}
 // ---- 把"每 block 一个部分和"的数组拷回 host 再加起来（用于验证 v3 / stride）----
 static unsigned long long cpuSumPartials(unsigned long long* d_partial, int n) {
     unsigned long long* h = (unsigned long long*)malloc(n * sizeof(unsigned long long));
@@ -313,6 +329,24 @@ int main() {
         printf("cub DeviceReduce::Sum : %7.3f ms  sum=%llu  %s  (工业库标杆)\n",
                ms, got, got == expected ? "PASS" : "FAIL");
         CUDA_CHECK(cudaFree(d_temp));
+    }
+
+    // ---- reduction_shuffle_only：纯 shuffle 版（一线程一元素 + warp shuffle + lane0 atomicAdd）----
+    // 没有 grid-stride 循环、没有 shared：grid 必须开满(一线程一元素)，atomic 一趟出最终值。
+    {
+        int grid = (N + block - 1) / block;                          // 65536，覆盖全部元素
+        CUDA_CHECK(cudaMemset(d_total, 0, sizeof(unsigned long long)));
+        reduction_shuffle_only<<<grid, block>>>(d_in, N, d_total);   // warmup
+        CUDA_CHECK(cudaMemset(d_total, 0, sizeof(unsigned long long)));
+        CUDA_CHECK(cudaEventRecord(start));
+        reduction_shuffle_only<<<grid, block>>>(d_in, N, d_total);
+        CUDA_CHECK(cudaEventRecord(stop));
+        CUDA_CHECK(cudaEventSynchronize(stop));
+        CUDA_CHECK(cudaEventElapsedTime(&ms, start, stop));
+        unsigned long long got;
+        CUDA_CHECK(cudaMemcpy(&got, d_total, sizeof(got), cudaMemcpyDeviceToHost));
+        printf("shuffle_only (1线程1元素): %7.3f ms  sum=%llu  %s  (纯shuffle+atomic，无stride无shared)\n",
+               ms, got, got == expected ? "PASS" : "FAIL");
     }
 
     CUDA_CHECK(cudaEventDestroy(start));

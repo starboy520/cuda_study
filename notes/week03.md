@@ -266,11 +266,87 @@ v3 加两个    2         省第一轮      加载即计算
 > 一条主线：寄存器 → shared → global，每多压一层，下一层 atomic/同步少一个数量级。
 > reduction 优化 = atomic 优化 = 同一个套路。
 
-### 作业（待做）
+### 作业（已完成）✅
 
+代码：`week03_parallel/reduction_sum_full/reduction_sum_full.cu`（8 个版本同台对比）。
 block 级两段归约：warp reduce（shuffle）→ shared[warp_id]=partial → __syncthreads()
-→ 第一个 warp 再归约 partials。提示：warp_id=tid/32, lane=tid&31, num_warps=blockDim/32。
-（block 级用第二级归约，**不是** atomicAdd；atomicAdd 只用于跨 block 的 grid 级。）
+→ 第一个 warp 再归约 partials。（block 级用第二级归约，**不是** atomicAdd；
+atomicAdd 只用于跨 block 的 grid 级。）自己手写的 `reduction_my` 与 `reduction_stride` 等价。
+
+### 实测结果（N=16M=1<<24，全填 1，T4，nvcc -O3 -arch=sm_75）
+
+```text
+v1 global atomic         19.72 ms   基线：全员抢一个地址，串行化
+v2 shared atomic         17.56 ms   1.1x  分层聚合（竞争不极端，提升有限）
+v3 shared tree            1.35 ms   ~15x  树形归约，无 atomic
+stride grid+shuffle       0.44 ms   单趟（到 1024 个部分和）
+stride two-pass (GPU)     0.44 ms   ~45x  两趟全 GPU，出最终单值
+my two-pass (GPU)         0.44 ms   ⭐ 自己手写，与 stride 完全一致
+cub DeviceReduce::Sum     0.44 ms   ⭐ 工业库标杆 —— 追平！
+shuffle_only(1线程1元素)   0.71 ms   纯 shuffle 反例：反而慢 1.6x
+```
+
+### 三个硬核结论（面试素材）
+
+**① 追平 CUB —— 因为撞到带宽天花板**
+```text
+我手写的 grid-stride 版 = CUB = 0.44 ms，完全持平。
+为什么？reduction 是 memory-bound，瓶颈在"读 N 个数"的访存。
+当带宽吃满，CUB 的向量化加载也没法再快 —— 物理上限面前人人平等。
+```
+
+**② 91% 峰值带宽 —— 量化证明已榨干**
+```text
+数据量 = 16M × 8B = 128 MB，只读一遍
+理论最快 = 128MB / 320GB/s ≈ 0.40 ms
+实测 0.44 ms → 达到理论带宽的 ~91%！剩 9% 是启动等固定开销。
+```
+
+**③ 纯 shuffle 反而慢（0.71 vs 0.44）—— 证明 grid-stride 的价值**
+```text
+shuffle_only：一线程一元素 → 16M 线程 + 50万次 atomicAdd
+grid-stride： 26万线程各攒 64 个 → atomic 降到几千次
+→ 慢的根源不是 shuffle，是"聚合粒度"：没有寄存器层先压扁数据。
+→ 这就是工业界都用 grid-stride、不用"一线程一元素"的原因。
+```
+
+### 两个关键概念（今天彻底搞懂）
+
+**两个"32"别混淆**：
+```text
+WARP_SIZE(32) = warp 有 32 条 lane      ← warp"宽度"，决定 shuffle 5 步(log2 32)
+MAX_WARPS(32) = block 最多 32 个 warp   ← warp"数量"=1024/32，决定 value[] 大小
+数值撞了，含义不同。代码用命名常量区分，自解释。
+```
+
+**两趟全 GPU 归约（工业库标准结构）**：
+```text
+趟1: N(1600万) → gridStride(1024) 个部分和   数据量大，耗时主体
+趟2: gridStride(1024) → 1 个最终值           <<<1, block>>> 收尾，几乎免费
+第二趟只多 0.005 ms —— 归约是金字塔，越往上数据越少。
+关键：同一个 grid-stride kernel 复用两次（grid 灵活，任意规模都能跑）。
+全程不回 CPU → 结果可直接喂下一个 kernel（softmax 分母、loss 等）。
+```
+
+### warp shuffle 的两个坑（务必记住）
+
+**坑1：尾部不足 32 时，mask 不能盲目用 0xffffffff**
+```text
+__shfl_*_sync 的 mask 是"点名表"，点名的 lane 必须全部到齐执行该指令。
+错误：if(idx>=n) return; + 0xffffffff → 越界 lane 提前退出，点名表撒谎 → 未定义行为
+正确：local = (idx<n) ? input[idx] : 0;（不 return，只填 0）→ 32 条全到齐，加 0 无害
+口诀：warp 原语面前，宁可空转填 0，也别提前 return。
+```
+
+**坑2：shuffle 归约为什么不用 if(tid<offset)？**
+```text
+shared 树：线程写【公共格子】，多算会污染别人(race) → 必须 if(tid<offset) 让一半退场
+shuffle： 每条 lane 只改【自己的寄存器】，多算只污染自己(最后只取 lane0) → 不用判断
+→ 数据在私有寄存器 vs 公共 shared，是要不要边界判断的根本原因。
+```
+
+> Day3 超额完成：计划只要"加 shuffle 收尾"，实际做了 8 版对比 + 追平 CUB + 91% 带宽分析
+> + 纯 shuffle 反例。reduction 这个主题已吃透（能默写生产级 kernel，理解每个设计选择的为什么）。
 
 ---
 
