@@ -41,3 +41,4 @@ week03_parallel/atomic_sum/atomic_sum.o
 week03_parallel/ballot_sync/ballot_sync
 week03_parallel/warp_reduce/warp_reduce
 week03_parallel/reduction_sum_full/reduction_sum_full
+week03_parallel/scan/scan
