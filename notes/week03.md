@@ -580,7 +580,47 @@ histShared:  ① 清零 shared 私有直方图(grid-stride)
 
 ## Day 6：Stream / Event 重叠
 
-（待填）
+代码：`week03_parallel/stream_overlap/stream_overlap.cu`。任务：H2D → kernel → D2H。
+
+**实测（256MB 数据，T4）—— 重叠提速 2.2x：**
+```text
+串行版(单 stream + cudaMemcpy 同步)：     68.0 ms
+分块多 stream 重叠(pinned + async)：       31.0 ms   → 2.2x ⭐
+```
+
+**重叠三件套（缺一不可）：**
+```text
+① pinned 内存(cudaMallocHost)：DMA 才能直传 → 真异步
+   pageable(malloc) 的 cudaMemcpyAsync 是假异步(驱动偷偷 staging 同步拷贝)→ 重叠失效
+② cudaMemcpyAsync：异步拷贝(普通 cudaMemcpy 是同步,会卡住)
+③ 多个【非默认】stream：同 stream 内顺序、跨 stream 间并发
+   光 async + 默认 stream(0) 也不重叠 → 必须非默认 stream
+```
+
+**为什么能快（流水线重叠）：**
+```text
+串行：[H2D 全部][kernel][D2H 全部]      三段依次,时间相加
+重叠：数据切 N 块,不同块的传/算同时进行
+      s0:[H2D0][算0][D2H0]
+      s1:     [H2D1][算1][D2H1]   ← 块1的H2D 和 块0的算/D2H 重叠
+→ 总时间 ≈ 最长的那一种操作,而非三者相加
+```
+
+**踩的坑（stream/指针/内存管理）：**
+```text
+1. 计时陷阱：异步任务"发起≠完成"！cudaMemcpyAsync/kernel 瞬间返回
+   → cudaDeviceSynchronize() 必须放在 cudaEventRecord(stop)【之前】
+   → 否则测到"发起完"的时间(偏小),不是"执行完"的时间
+2. offset 单位：指针+offset 按【元素】跳,cudaMemcpy 的 size 按【字节】
+   offset = i*(array_size/N)(元素下标)；size = chunk*sizeof(float)(字节)
+3. &d_data 多了个 &：d_data 是 float*，&d_data 是 float**(栈地址)→ 拷错地方崩
+4. pinned 内存释放用 cudaFreeHost，不是 free(malloc 才配 free)
+5. o_data 接收 D2H 也要 cudaMallocHost(pinned)
+```
+
+> 面试金句：分块多 stream + pinned + async，把 H2D/kernel/D2H 三段流水重叠，
+> 256MB 任务从 68ms 降到 31ms(2.2x)。pinned 是前提(pageable 的 async 假异步)。
+> 计时要在所有 stream 完成后记 stop(异步发起≠完成)。
 
 ---
 
