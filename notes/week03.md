@@ -533,9 +533,48 @@ __syncthreads() 管 block 内；kernel 结束（再启动下一个）= block 间
 > 面试金句：手写 grid 三趟 scan，100 万元素 0.1ms、约 60% 带宽；瓶颈是 scan 固有的
 > 多次 data 读写，CUB 用 single-pass(decoupled look-back)减少读写能更快。
 
-### 作业（scan 已完成）✅，histogram 待做
+### 作业（scan 已完成）✅，histogram 已完成 ✅
 
-histogram(global atomic vs shared privatization)，测均匀 vs 90% 集中分布。（待补）
+代码：`week03_parallel/histogram/histogram.cu`，两版对比。
+
+**histogram = Day1 分层聚合换场景**（从"1 个 sum"变"256 个 bin"）：
+```text
+histGlobal:  每线程 atomicAdd(&hist[in[i]], 1)          —— 全员怼 global
+histShared:  ① 清零 shared 私有直方图(grid-stride)
+             ② atomicAdd(&local[value], 1)  在 shared 上(快)
+             ③ grid-stride 合并 atomicAdd(&hist[b], local[b])
+             两个 __syncthreads()：清零后、统计后各一个
+```
+
+**实测（N=16M，T4）—— privatization 在集中分布下碾压：**
+```text
+                  global atomic    shared privat
+场景A 均匀分布:      8.06 ms          1.30 ms      6.2x
+场景B 90%集中bin0:  16.06 ms          1.30 ms      12.3x ⭐
+```
+
+**三个发现：**
+```text
+① 集中分布让 global atomic 翻倍变慢(8→16ms)
+   90% 数据加 bin0 → 几百万线程抢同一地址 → 严重串行化
+② shared privat 几乎不受分布影响(均匀/集中都 1.30ms)
+   privatization 把竞争从【全局规模(1600万线程抢一地址)】缩小到【block规模(256线程抢shared)】
+③ 这正是 Day1 没看到的碾压效果！
+   Day1 数据分散→shared反而慢；今天集中分布→shared快12.3x
+   印证：分层聚合只在【竞争严重】时才划算，集中分布就是它的主场
+```
+
+**两个关键认知（自己推导出来的）：**
+```text
+- 合并必须 grid-stride（for b=tid; b<BINS; b+=blockDim），别假设 block==BINS
+  block<BINS 时直接写 hist[threadIdx.x] 会漏 bin → 用 for 适配任意配置(健壮)
+- "每 block 一个线程合并"不能减少 atomic 次数：每 block 有 BINS 个 bin 要贡献，
+  少不了 blocks×BINS 次。想真省 → if(local[b]!=0) 跳过零 bin(集中分布尤其有效)
+- hist 大小 = 值域(BINS)，不是数据量；值域大(0~10亿)→ shared 装不下 → 量化到 256 bin
+```
+
+> 面试金句：histogram privatization，集中分布时 global 16ms、shared 1.3ms 快 12x；
+> 本质是把竞争从全局规模缩到 block 规模，shared 版几乎不受数据分布影响。
 
 ---
 
