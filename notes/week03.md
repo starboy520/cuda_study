@@ -395,9 +395,62 @@ for (int offset = 1; offset < n; offset <<= 1) {
 
 > 证明"用旧值"这个前提，正是代码两个 `__syncthreads()` 的来源——数学和代码咬合。
 
+### 已完成的 scan 变体（代码：week03_parallel/scan/scan.cu，全 PASS）
+
+```text
+1. scanHillisSteele          单block shared inclusive，N≤1024     末值8128
+2. scanHillisSteeleExclusive 右移补0(exclusive)                   末值8001
+3. 单warp __shfl_up_sync      纯寄存器，仅32个                     末值496
+4. scanBlockTwoStage         block级两阶段，128元素跨4warp ✓       末值8128 ⭐
+```
+
+### block 级两阶段 scan（warp shuffle + shared，突破 32→1024）
+
+把"单 warp scan(32)"升级成"block scan(1024)"，四步（和 Day3 reduction 两阶段同源）：
+```text
+① warp 内 __shfl_up_sync inclusive scan（每个 warp 各自 scan 自己的 32 个）
+② 每个 warp 的总和(lane31 的值)存进 shared warpSum[wid]
+③ 第一个 warp 对 warpSum 做 scan → 每个 warp 的"前面所有 warp 的和"= 偏移
+④ 每个元素 += warpSum[wid-1]（它所在 warp 之前所有 warp 的总和）
+对照 reduction：reduction 是 warp归约→shared→第一warp再归约；
+scan 多了第④步"加回偏移"，因为 scan 要每个位置都对，不只一个总和。
+```
+
+### ⚠️ 这一版踩的 6 个坑（并行编程核心难点，务必记住）
+
+```text
+1. __syncthreads() 不能放在 if(部分线程) 分支里 → 死锁
+   (它要求 block 内所有线程都到达；部分线程不进分支就永久卡死)
+   → 第③步改用 warp shuffle(warp 内 lock-step 天然同步，不需 syncthreads)
+
+2. shuffle 不能边读边写 shared：__shfl_up_sync(..., warpSum[lane], ...) + warpSum[lane]+=
+   → 上一轮写、这一轮读同一 shared 地址 → race
+   → 先读进【寄存器 s】，在 s 上 shuffle，最后再写回 shared
+
+3. warp 总和在 lane==31，不是 lane==0
+   (inclusive scan 后，最后一个 lane 才是全部 32 个的和)
+
+4. 边界用【实际】warp 数 num_warps=blockDim/32，不是【上限】MAX_WARPS=32
+   (MAX_WARPS 只用于 __shared__ 数组声明；读取/循环边界要用实际 num_warps，
+    否则 lane 读到未初始化的 warpSum[垃圾]，被 scan 进去)
+
+5. 跨 warp 读 shared 前必须 __syncthreads()
+   (warp0 在改 warpSum，warp1/2/3 不等它改完就读 → race)
+
+6. 中间不要重复写回 data（只在最后加完偏移后写一次）
+```
+
+### 关键认知
+
+```text
+shuffle 管 warp 内(32)，shared 管 warp 间 —— 分层 scan
+你写的 scanBlockTwoStage = CUB BlockScan 的核心思想(warp scan→shared→scan→加回)
+单 warp scan 只是积木；block scan 把 32 个 warp 的积木拼起来 → 1024
+```
+
 ### 作业（待做）
 
-单 block Hillis-Steele inclusive scan → 多 block 三趟 scan → histogram(global vs privatization)。
+grid 级多 block 三趟 scan（百万元素）→ histogram(global vs privatization)。
 （待补实测）
 
 ---
