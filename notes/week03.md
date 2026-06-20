@@ -448,10 +448,52 @@ shuffle 管 warp 内(32)，shared 管 warp 间 —— 分层 scan
 单 warp scan 只是积木；block scan 把 32 个 warp 的积木拼起来 → 1024
 ```
 
-### 作业（待做）
+### grid 级多 block scan（三趟分层，突破 1024 → 任意大小）
 
-grid 级多 block 三趟 scan（百万元素）→ histogram(global vs privatization)。
-（待补实测）
+block scan 只能 ≤1024（一个 block）。跨多 block 时 **`__syncthreads()` 不能跨 block**，
+靠 **kernel 边界**做全局同步。三趟（GPU Gems 3 §39.2.4 经典算法）：
+```text
+趟1 scanThreeStage<<<grid, block>>>(data, blockSum)
+    每个 block scan 自己的 tile（复用 block 两阶段）+ 输出 block 总和 → blockSum[blockIdx]
+趟2 scanThreeStage<<<1, grid>>>(blockSum, nullptr)
+    对 blockSum 这些"块总和"再 inclusive scan（复用同一 kernel！grid≤1024 即可）
+趟3 addBlockSum<<<grid, block>>>(data, blockSum)
+    每个元素 += blockSum[blockIdx-1]（它前面所有 block 的总和），block0 加 0
+```
+实测：M=2048，8 个 block，数据 i%7 → **PASS（末值 6138）** ✓
+
+**核心认知：跨 block 同步只能靠 kernel 边界**
+```text
+__syncthreads() 管 block 内；kernel 结束（再启动下一个）= block 间唯一的全局屏障
+趟3 要的偏移来自趟2，趟2 要等趟1【所有 block】跑完 → 必须分成 3 个 kernel
+(高级的 single-pass / decoupled look-back 能一个 kernel 搞定，但极复杂，CUB 用)
+```
+
+**这一版又踩 2 个坑：**
+```text
+7. 从 block 版改造时漏了写回 data[idx]=val
+   → 只算了 block 总和，但 data 还是原始值 → 趟3 给原始值加偏移，全错
+   → 教训：改造代码时原有核心逻辑（写回）不能丢
+8. 趟2 自我覆盖：scanThreeStage(blockSum, ..., blockSum) 让输入和"块总和输出"同一块
+   → kernel 结尾 blockSum[0]=val 污染了 scan 结果
+   → 解法：blockSum 加 nullptr 保护（if(blockSum && ...) 才写），趟2 传 nullptr
+```
+
+### scan 完整阶梯（全部 PASS，week03_parallel/scan/scan.cu）
+
+```text
+32        单 warp __shfl_up_sync                              496
+  ↓
+1024      block 两阶段（warp shuffle + shared）               8128
+  ↓
+任意大小   grid 三趟（block scan → scan 总和 → 加回偏移）       6138(M=2048,8block)
+分层主线：warp 原语(32) → shared(block内) → kernel 边界(block间)
+= 你亲手实现了 CUB DeviceScan 的完整结构
+```
+
+### 作业（scan 已完成）✅，histogram 待做
+
+histogram(global atomic vs shared privatization)，测均匀 vs 90% 集中分布。（待补）
 
 ---
 

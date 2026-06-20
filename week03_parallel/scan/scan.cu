@@ -100,6 +100,63 @@ __global__ void scanBlockTwoStage(float* data, int n) {
     if (t < n) data[t] = val;
 }
 
+__global__ void scanThreeStage(float* data, int n, float* blockSum, int blocks) {
+    __shared__ float warpSum[MAX_WARPS_PER_BLOCK];
+    int t = threadIdx.x;
+    int lan = t % 32;
+    int wid = t / 32;
+
+    int idx = threadIdx.x + blockDim.x * blockIdx.x;
+    float val = (idx < n) ? data[idx] : 0.0f;
+
+    for (int offset = 1; offset < 32; offset *= 2) {
+        float cur = __shfl_up_sync(0xffffffffu, val, offset);
+        if (lan >= offset) {
+            val += cur;
+        }
+    }
+
+    if (lan == 31) {
+        warpSum[wid] = val;
+    }
+    __syncthreads();
+
+    if (wid == 0) {
+        int numWarp = blockDim.x /32;
+        float s = (lan < numWarp) ? warpSum[lan] : 0.0f;
+        for (int offset = 1; offset < 32; offset *= 2) {
+            float cur =__shfl_up_sync(0xffffffffu, s, offset);
+            if (lan >= offset) {
+                s += cur;
+            }
+        }
+        if (lan < numWarp) {
+            warpSum[lan] = s;
+        }
+    }
+
+    __syncthreads();
+    val += (wid > 0) ? warpSum[wid-1] : 0;
+
+    // 写回 block 内 scan 结果（关键！否则趟3 加偏移加在原始值上）
+    if (idx < n) {
+        data[idx] = val;
+    }
+
+    // 输出本 block 的总和（blockSum 为 nullptr 时不写，供趟2 复用本 kernel 时避免自我覆盖）
+    if (blockSum && threadIdx.x == blockDim.x - 1) {
+        blockSum[blockIdx.x] = val;
+    }
+}
+
+__global__ void addBlockSum(float* input, int n, float* blockSum, int blocks) {
+    int idx = blockDim.x * blockIdx.x + threadIdx.x;
+    int blkIdx = blockIdx.x;
+    if (idx < n) {
+        input[idx] += (blkIdx > 0) ? blockSum[blkIdx - 1] : 0;
+    }
+}
+
 
 __global__ void scanHillisSteeleExclusive(float* data, int n) {
     extern __shared__ float tmp[];
@@ -193,7 +250,42 @@ int main() {
     printf("block two-stage(128,跨4warp): %s  (末值=%.0f, 期望 8128)\n",
            check_result(h_ref_inc, h_out, N) ? "PASS" : "FAIL", h_out[N-1]);
 
-
-
     cudaFree(d_data);
+
+    // ========================================================================
+    // 三趟 grid 级 scan 测试（N 跨多个 block）
+    // ========================================================================
+    {
+        const int M     = 2048;          // 元素数（跨多个 block）
+        const int block = 256;           // 每 block 线程数
+        const int grid  = (M + block - 1) / block;   // = 8 个 block
+
+        float* h_in  = (float*)malloc(M * sizeof(float));
+        float* h_ref = (float*)malloc(M * sizeof(float));
+        float* h_res = (float*)malloc(M * sizeof(float));
+        for (int i = 0; i < M; i++) h_in[i] = static_cast<float>(i % 7);  // 0..6 循环，强测试
+        cpu_scan(h_in, h_ref, M);        // CPU inclusive 参考
+
+        float *d_in, *d_blockSum;
+        cudaMalloc(&d_in, M * sizeof(float));
+        cudaMalloc(&d_blockSum, grid * sizeof(float));   // 每 block 一个总和
+        cudaMemcpy(d_in, h_in, M * sizeof(float), cudaMemcpyHostToDevice);
+
+        // 趟1：每个 block scan 自己的 tile + 输出 block 总和
+        scanThreeStage<<<grid, block>>>(d_in, M, d_blockSum, grid);
+        // 趟2：对 blockSum（grid 个）再 inclusive scan（1 个 block 搞定，要求 grid ≤ 1024）
+        //      blockSum 传 nullptr：趟2 只想 scan d_blockSum，不要再写 block 总和（否则自我覆盖）
+        scanThreeStage<<<1, grid>>>(d_blockSum, grid, nullptr, 1);
+        // 趟3：每个元素 += 前面所有 block 的总和（blockSum[blkIdx-1]）
+        addBlockSum<<<grid, block>>>(d_in, M, d_blockSum, grid);
+
+        cudaMemcpy(h_res, d_in, M * sizeof(float), cudaMemcpyDeviceToHost);
+        printf("three-stage grid scan(M=%d, %d blocks): %s  (末值=%.0f, 期望 %.0f)\n",
+               M, grid, check_result(h_ref, h_res, M) ? "PASS" : "FAIL",
+               h_res[M-1], h_ref[M-1]);
+
+        cudaFree(d_in);
+        cudaFree(d_blockSum);
+        free(h_in); free(h_ref); free(h_res);
+    }
 }
