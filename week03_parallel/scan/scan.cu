@@ -32,6 +32,74 @@ __global__ void scanHillsSteelsUsingWarpAndLane(float* data, int n) {
     data[idx] = value;
 }
 
+// ============================================================================
+// block 级两阶段 inclusive scan：warp shuffle scan + shared 存 warp 偏移
+// 目标：一个 block 内 scan 最多 1024 个元素（32 warp × 32 lane），突破单 warp 的 32 限制
+// 用 <<<1, blockDim>>> 启动，blockDim 必须是 32 的倍数
+constexpr int LANES_PER_WARP = 32;
+constexpr int MAX_THREADS_PER_BLOCK = 1024;
+constexpr int MAX_WARPS_PER_BLOCK = MAX_THREADS_PER_BLOCK / LANES_PER_WARP;
+
+// ============================================================================
+__global__ void scanBlockTwoStage(float* data, int n) {
+    __shared__ float warpSum[MAX_WARPS_PER_BLOCK];   // 每个 warp 的总和（最多 32 个 warp）
+
+    int t    = threadIdx.x;
+    int lane = t & 31;              // warp 内编号 0~31
+    int wid  = t >> 5;              // 第几个 warp（t / 32）
+
+    float val = (t < n) ? data[t] : 0.0f;
+
+    // ── 第①步：warp 内 inclusive scan（用 __shfl_up_sync，和你上面那个 kernel 一样）──
+    // TODO: 5 步 shuffle，循环后 val = 本 warp 内从头到 lane 的 inclusive scan
+    for (int offset = 1; offset < 32; offset *= 2) {
+        // TODO
+        float cur = __shfl_up_sync(0xffffffffu, val, offset);
+        if (lane >= offset) {
+            val += cur;
+        }
+    }
+
+    // data[idx] = val;  // 写回（先写回，后续还会改这个位置）
+    if (lane == 31) {
+        warpSum[wid] = val;  // 每个 warp 的最后一个 lane 的 val 就是这个 warp 的总和
+    }
+
+    // ── 第②步：每个 warp 的总和（= 该 warp 最后一个 lane 的 val）存进 shared ──
+    // 提示：lane == 31 的 val 就是这个 warp 的总和
+    // TODO: if (lane == 31) warpSum[wid] = val;
+    __syncthreads();
+
+    // ── 第③步：让第一个 warp 对 warpSum[] 做 exclusive scan ──
+    //   得到每个 warp 的"起始偏移"= 它前面所有 warp 的总和
+    //   提示：可以先做 inclusive scan 再转 exclusive，或直接 exclusive
+    //   num_warps = blockDim.x / 32
+    // TODO: 只让 wid == 0 的那个 warp 干活，对 warpSum 的前 num_warps 个做 exclusive scan
+    if (wid == 0) {
+        // TODO
+        int num_warps = blockDim.x / 32;
+        float s = (lane < num_warps) ? warpSum[lane] : 0.0f;
+        for (int offset = 1; offset < 32; offset *= 2) {
+            float cur = __shfl_up_sync(0xffffffffu, s, offset);
+            if (lane >= offset) {
+                s += cur;
+            }
+        }
+        if (lane < num_warps) {
+            warpSum[lane] = s;
+        }
+    }
+
+    __syncthreads();
+    val += (wid > 0) ? warpSum[wid - 1] : 0.0f;  // 每个 warp 的起始偏移 = 前面所有 warp 的总和
+
+    // ── 第④步：每个元素 += 它所在 warp 的偏移（warpSum[wid]）──
+    // TODO: val += warpSum[wid];
+
+    // 写回
+    if (t < n) data[t] = val;
+}
+
 
 __global__ void scanHillisSteeleExclusive(float* data, int n) {
     extern __shared__ float tmp[];
@@ -117,6 +185,13 @@ int main() {
     cudaMemcpy(h_out, d_data, N * sizeof(float), cudaMemcpyDeviceToHost);
     printf("using warp and lane(单warp,前32): %s  (末值=%.0f, 期望 496)\n",
            check_result(h_ref_inc, h_out, 32) ? "PASS" : "FAIL", h_out[31]);
+
+    // ---- 测 scanBlockTwoStage（block 级两阶段，128 个元素 = 4 个 warp，跨 warp 要接得上）----
+    cudaMemcpy(d_data, h_input, N * sizeof(float), cudaMemcpyHostToDevice);
+    scanBlockTwoStage<<<1, N>>>(d_data, N);   // 注意：用 __shared__ 固定数组，无需第三参数
+    cudaMemcpy(h_out, d_data, N * sizeof(float), cudaMemcpyDeviceToHost);
+    printf("block two-stage(128,跨4warp): %s  (末值=%.0f, 期望 8128)\n",
+           check_result(h_ref_inc, h_out, N) ? "PASS" : "FAIL", h_out[N-1]);
 
 
 
