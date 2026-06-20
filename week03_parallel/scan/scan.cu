@@ -190,6 +190,7 @@ void cpu_scan(const float* input, float* output, int n) {
 void cpu_scan_exclusive(const float* input, float* output, int n) {
     if (n > 0) {
         output[0] = 0.0f;
+
         for (int i = 1; i < n; i++) {
             output[i] = output[i-1] + input[i-1];  // 注意是 input[i-1]
         }
@@ -284,6 +285,58 @@ int main() {
                M, grid, check_result(h_ref, h_res, M) ? "PASS" : "FAIL",
                h_res[M-1], h_ref[M-1]);
 
+        cudaFree(d_in);
+        cudaFree(d_blockSum);
+        free(h_in); free(h_ref); free(h_res);
+    }
+
+    // ========================================================================
+    // 1M 元素计时测试（三趟版上限：grid=1024 × block=1024 = 100万）
+    // ========================================================================
+    {
+        const int M     = 1 << 20;       // 1,048,576 个元素（正好 1M）
+        const int block = 1024;          // 每 block 1024 线程
+        const int grid  = (M + block - 1) / block;   // = 1024 个 block（正好到上限）
+
+        float* h_in  = (float*)malloc(M * sizeof(float));
+        float* h_ref = (float*)malloc(M * sizeof(float));
+        float* h_res = (float*)malloc(M * sizeof(float));
+        for (int i = 0; i < M; i++) h_in[i] = static_cast<float>(i % 7);
+        cpu_scan(h_in, h_ref, M);
+
+        float *d_in, *d_blockSum;
+        cudaMalloc(&d_in, M * sizeof(float));
+        cudaMalloc(&d_blockSum, grid * sizeof(float));
+        cudaMemcpy(d_in, h_in, M * sizeof(float), cudaMemcpyHostToDevice);
+
+        cudaEvent_t start, stop;
+        cudaEventCreate(&start);
+        cudaEventCreate(&stop);
+
+        // warmup（首次含 JIT/context 开销，不计时）
+        scanThreeStage<<<grid, block>>>(d_in, M, d_blockSum, grid);
+        scanThreeStage<<<1, grid>>>(d_blockSum, grid, nullptr, 1);
+        addBlockSum<<<grid, block>>>(d_in, M, d_blockSum, grid);
+
+        // 重新上传（warmup 改了 d_in），正式计时三趟
+        cudaMemcpy(d_in, h_in, M * sizeof(float), cudaMemcpyHostToDevice);
+        cudaEventRecord(start);
+        scanThreeStage<<<grid, block>>>(d_in, M, d_blockSum, grid);
+        scanThreeStage<<<1, grid>>>(d_blockSum, grid, nullptr, 1);
+        addBlockSum<<<grid, block>>>(d_in, M, d_blockSum, grid);
+        cudaEventRecord(stop);
+        cudaEventSynchronize(stop);
+
+        float ms = 0.0f;
+        cudaEventElapsedTime(&ms, start, stop);
+        cudaMemcpy(h_res, d_in, M * sizeof(float), cudaMemcpyDeviceToHost);
+
+        printf("three-stage 1M(grid=%d): %s  %.3f ms  (末值=%.0f, 期望 %.0f)\n",
+               grid, check_result(h_ref, h_res, M) ? "PASS" : "FAIL",
+               ms, h_res[M-1], h_ref[M-1]);
+
+        cudaEventDestroy(start);
+        cudaEventDestroy(stop);
         cudaFree(d_in);
         cudaFree(d_blockSum);
         free(h_in); free(h_ref); free(h_res);

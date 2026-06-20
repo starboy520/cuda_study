@@ -491,6 +491,25 @@ __syncthreads() 管 block 内；kernel 结束（再启动下一个）= block 间
 = 你亲手实现了 CUB DeviceScan 的完整结构
 ```
 
+### 1M 实测 + 三趟的上限（重要）
+
+```text
+1M(2^20) 元素，grid=1024 × block=1024（正好顶格）：PASS  0.105 ms
+  比 CPU 串行(1~2ms)快 10~20x；约 60% 带宽利用
+  (scan 要多次读写 data，带宽利用不如 reduction 的 91% 极致)
+```
+
+**三趟版的上限 = 1024 block × 1024 元素 = 100 万**：
+```text
+瓶颈在趟2：用【1 个 block】scan 所有 blockSum → grid 必须 ≤ 1024
+超过 100 万怎么办？→ 递归：对 blockSum 再做一次完整三趟
+  层数 vs 容量：1层(block)=1024，2层(现在)=1024²=1M，3层=1024³=10亿
+工程：1M 以内用这版；更大直接用 CUB DeviceScan(内部自动多级递归)
+```
+
+> 面试金句：手写 grid 三趟 scan，100 万元素 0.1ms、约 60% 带宽；瓶颈是 scan 固有的
+> 多次 data 读写，CUB 用 single-pass(decoupled look-back)减少读写能更快。
+
 ### 作业（scan 已完成）✅，histogram 待做
 
 histogram(global atomic vs shared privatization)，测均匀 vs 90% 集中分布。（待补）
