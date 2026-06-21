@@ -165,7 +165,7 @@ __global__ void scanHillisSteeleExclusive(float* data, int n) {
 
     __syncthreads();
 
-    for (int offset = 1; offset <n; offset = offset * 2) {
+    for (int offset = 1; offset < n; offset = offset * 2) {
         float add = (t >= offset) ? tmp[t-offset] : 0.0f;
         __syncthreads();
         tmp[t] += add;

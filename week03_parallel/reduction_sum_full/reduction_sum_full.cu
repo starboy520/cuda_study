@@ -255,6 +255,7 @@ int main() {
         reduction_stride<<<gridStride, block>>>(d_in, N, d_partial);  // warmup
         CUDA_CHECK(cudaEventRecord(start));
         reduction_stride<<<gridStride, block>>>(d_in, N, d_partial);
+        reduction_stride<<<1, block>>>(d_partial, gridStride, d_total);  // 二次归约
         CUDA_CHECK(cudaEventRecord(stop));
         CUDA_CHECK(cudaEventSynchronize(stop));
         CUDA_CHECK(cudaEventElapsedTime(&ms, start, stop));
@@ -274,7 +275,6 @@ int main() {
 
         CUDA_CHECK(cudaEventRecord(start));
         reduction_stride<<<gridStride, block>>>(d_in, N, d_partial);          // 趟1
-        reduction_stride<<<1, block>>>(d_partial, gridStride, d_total);        // 趟2
         CUDA_CHECK(cudaEventRecord(stop));
         CUDA_CHECK(cudaEventSynchronize(stop));
         CUDA_CHECK(cudaEventElapsedTime(&ms, start, stop));

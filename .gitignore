@@ -44,3 +44,7 @@ week03_parallel/reduction_sum_full/reduction_sum_full
 week03_parallel/scan/scan
 week03_parallel/histogram/histogram
 week03_parallel/stream_overlap/stream_overlap
+
+# week04 练习编译产物(可执行文件,不含 .cu)
+week04_gemm/gemm_naive/gemm_naive
+week04_gemm/gemm_tiled/gemm_tiled
