@@ -83,6 +83,7 @@ void async_overlap_kernel() {
     CUDA_CHECK(cudaMallocHost(&o_data, TRANSFER_SIZE));
 
     int array_size = TRANSFER_SIZE/sizeof(float);
+    int chunk_size = (array_size + STREAM_NUMBER - 1) / STREAM_NUMBER;
     CUDA_CHECK(cudaMalloc(&d_data, TRANSFER_SIZE));
 
     for (int i = 0; i < array_size; i++) {
@@ -95,12 +96,12 @@ void async_overlap_kernel() {
     CUDA_CHECK(cudaEventRecord(start));
     for (int i = 0 ; i < STREAM_NUMBER; i++) {
         cudaStreamCreate(&streams[i]);
-        int offset = i *  TRANSFER_SIZE/STREAM_NUMBER/sizeof(float);
-        CUDA_CHECK(cudaMemcpyAsync(d_data + offset, h_data + offset, TRANSFER_SIZE/STREAM_NUMBER, cudaMemcpyHostToDevice, streams[i]));
-        mykernel<<<256, 256, 0, streams[i]>>>(d_data + offset, array_size/STREAM_NUMBER);
+        int offset = i *  array_size/STREAM_NUMBER;
+        CUDA_CHECK(cudaMemcpyAsync(d_data + offset, h_data + offset, chunk_size * sizeof(float), cudaMemcpyHostToDevice, streams[i]));
+        mykernel<<<256, 256, 0, streams[i]>>>(d_data + offset, chunk_size);
 
         CUDA_CHECK(cudaGetLastError());
-        CUDA_CHECK(cudaMemcpyAsync(o_data + offset, d_data + offset, TRANSFER_SIZE/STREAM_NUMBER, cudaMemcpyDeviceToHost, streams[i]));
+        CUDA_CHECK(cudaMemcpyAsync(o_data + offset, d_data + offset, chunk_size * sizeof(float), cudaMemcpyDeviceToHost, streams[i]));
     }
     CUDA_CHECK(cudaDeviceSynchronize());
 
