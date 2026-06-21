@@ -626,4 +626,91 @@ histShared:  ① 清零 shared 私有直方图(grid-stride)
 
 ## Day 7：复盘 + 性能表
 
-（待填）
+### Week3 性能总表（T4，全部 PASS）
+
+```text
+Day1 atomic_sum     global 16.6ms → reg+shared 1.68ms(~10x)  分层聚合
+Day3 reduction      global 19.7ms → 追平CUB 0.44ms(45x,91%带宽)
+Day5 scan(1M)       T4 0.105ms / A100 0.028ms(3.75x);三趟上限1M
+Day5 histogram      集中分布 global 16ms → privat 1.3ms(12.3x)
+Day6 stream         串行68ms → 多stream重叠31ms(2.18x)
+```
+
+### 一条主线：分层聚合（贯穿全周）
+
+```text
+atomic / reduction / scan / histogram 全是同一招：
+  能在便宜的地方(寄存器/shared)先攒，就别让数据裸奔到下一层(global)
+  warp 原语(32) → shared(block内) → kernel边界(block间) → global
+  每多压一层，下一层的 atomic/同步少一个数量级
+```
+
+### 何时用 atomic vs shuffle vs shared（口述总结）
+
+```text
+atomic：    少量、分散的更新；不规则写入。代价=热点地址争用(串行化)
+shared：    block 内复用/协作/树形归约。代价=要 __syncthreads + 占 shared
+warp shuffle：同 warp 内 32 线程协作(≤32)、归约/scan 收尾。
+            省=shared占用 + syncthreads + shared读写往返。
+选择口诀：跨block大量聚合→分层(寄存器→shared→global)；
+        warp内→shuffle；block内复用→shared；分散少量→直接atomic。
+```
+
+### 本周核心问题自测（标准答案）
+
+**Q1 atomic 为什么保证正确但可能慢？怎么缓解？**
+```text
+atomic 把"读-改-写"变不可分割(像锁)，保证正确；但同一地址被串行化，
+百万线程抢一个地址时并行度坍缩→慢。缓解：分层聚合，局部(寄存器/shared)先攒，
+每 block 只发一次 global atomic。
+```
+
+**Q2 warp shuffle 相比 shared 归约省了什么？什么时候用？**
+```text
+省三样：① shared 占用(数据在寄存器) ② __syncthreads(warp lock-step 天然同步)
+③ shared 读写往返(寄存器直接交换)。数据 ≤32(warp内)、或归约/scan 收尾时用。
+```
+
+**Q3 Hillis-Steele scan 工作量为什么 O(n log n)？**
+```text
+每轮 ~n 个位置各做一次加法 × log₂n 轮 = O(n log n)。比串行 O(n) 多 log n 倍
+(不是 work-efficient)；但每轮 n 个加法并行，墙钟看深度 log n，GPU 上仍快。
+```
+
+**Q4 多 block scan 为什么分三步？**
+```text
+__syncthreads 只在 block 内有效，跨 block 同步只能靠 kernel 边界(结束再启动)。
+所以拆三步、三个 kernel：① 块内 scan + 出块总和 ② scan 块总和→块偏移
+③ 把偏移加回各 block。
+```
+
+**Q5 histogram privatization 解决什么问题？**
+```text
+解决 global atomic 的【热点竞争】(性能问题，非正确性)。每 block 先在 shared 建私有
+直方图，把竞争从"全局规模(百万线程抢一地址)"缩到"block 规模(256线程抢shared)"，
+global atomic 从"每元素一次"降到"每 block 每 bin 一次"。集中分布下快 12x。
+```
+
+**Q6 stream 核心语义？pinned 为什么是重叠前提？**
+```text
+同 stream 内顺序、跨 stream 间并发。pinned(cudaMallocHost)锁页→DMA 直传→真异步；
+pageable(malloc)会被 OS 换出，DMA 不敢直搬，驱动要先 staging 同步拷贝→假异步→
+重叠失效。重叠三件套：pinned + cudaMemcpyAsync + 多个非默认 stream，缺一不可。
+```
+
+### 本周踩坑汇总（速查）
+
+```text
+- IDE 自动加 __clang_cuda_*.h 头 → 编译前删
+- warp 原语：宁可空转填0也别 return(mask 点名表撒谎→未定义行为)
+- block scan 的两个"32"：WARP_SIZE(宽度) vs MAX_WARPS(数量=1024/32)
+- shuffle 不能边读写 shared → 寄存器中转
+- __syncthreads 不能放 if(部分线程)分支 → 死锁
+- 跨 block 同步只能 kernel 边界；改造代码别丢"写回"
+- stream 计时：deviceSync 必须在 record(stop) 前(异步发起≠完成)
+- 指针+offset 按元素跳，memcpy size 按字节(别混单位)
+- pinned 释放用 cudaFreeHost，不是 free
+```
+
+> Week3 完成：atomic/warp原语/reduction/scan/histogram/stream 全部手写 PASS，
+> 7 个程序、双卡对比、~16 个坑。核心收获：分层聚合主线 + 何时用哪种协作工具。
