@@ -38,6 +38,78 @@ nsys status --environment
 
 检查环境能力，并在报告中注明缺失的数据类型。
 
+## 2.5 命令选项详解与常用工作流
+
+上面是最小命令，实战里几个选项几乎每次都要用，逐个说清楚它们干什么。
+
+### 关键选项速查
+
+| 选项 | 作用 | 什么时候用 |
+|---|---|---|
+| `--trace=cuda,nvtx,osrt` | 选择采集哪些事件源 | `cuda`=CUDA API/kernel/memcpy；`nvtx`=你的代码标记；`osrt`=OS 系统调用；图形加 `opengl/vulkan` |
+| `-o <名字>` | 输出报告名（`.nsys-rep`）| 每次都给有意义的名字，便于前后对比 |
+| `--force-overwrite=true` | 覆盖同名报告 | 反复测同一个程序时 |
+| `--stats=true` | 跑完直接在终端打印汇总表 | 想快速看一眼、不开 GUI 时 |
+| `--cuda-memory-usage=true` | 记录显存分配/占用 | 怀疑显存或想看分配时间线 |
+| `--gpu-metrics-device=all` | 采集 GPU 硬件计数器（SM/显存利用率曲线）| 想在时间线上叠加 GPU 利用率（需权限/较新版本）|
+| `--capture-range=cudaProfilerApi` | 只采集 `cudaProfilerStart/Stop` 之间的区间 | 程序很长、只想 profile 稳态那几次迭代 |
+| `--delay=<秒>` / `--duration=<秒>` | 延迟开始 / 限制采集时长 | 跳过 warmup、控制报告大小 |
+| `-w true`（`--show-output`）| 同时显示被测程序的 stdout | 调试时方便 |
+
+### 工作流 A：一条命令看全貌（最常用）
+
+```bash
+nsys profile \
+  --trace=cuda,nvtx,osrt \
+  --stats=true \
+  --force-overwrite=true \
+  -o reports/transpose_systems \
+  ./labs/03_memory_system/transpose/transpose 4096 4096
+```
+
+`--stats=true` 会在终端直接打出 CUDA API / kernel / memcpy 的汇总，先看这个定方向，
+再用 `nsys-ui reports/transpose_systems.nsys-rep` 打开时间线确认关系。
+
+### 工作流 B：只 profile 稳态迭代（长程序必备）
+
+长程序前面有初始化、warmup，全程采集既慢、报告又大。用 `cudaProfilerStart/Stop` 在
+代码里圈出你真正关心的几次迭代：
+
+```cpp
+#include <cuda_profiler_api.h>
+// ... warmup 若干次 ...
+cudaProfilerStart();
+for (int i = 0; i < 10; ++i) {     // 只采集这 10 次稳态迭代
+    myKernel<<<grid, block>>>(...);
+}
+cudaProfilerStop();
+```
+
+```bash
+nsys profile --capture-range=cudaProfilerApi \
+  --trace=cuda,nvtx -o reports/steady ./my_program
+```
+
+### 工作流 C：命令行直接出汇总，不开 GUI
+
+服务器上没有图形界面时，全程命令行也能拿到结论：
+
+```bash
+# 1) 采集
+nsys profile --trace=cuda -o reports/run ./my_program
+
+# 2) 列出可用报表
+nsys stats --help-reports reports/run.nsys-rep
+
+# 3) 出具体汇总（例：按 kernel 耗时排序）
+nsys stats --report cuda_gpu_kern_sum reports/run.nsys-rep
+nsys stats --report cuda_gpu_mem_time_sum reports/run.nsys-rep   # memcpy 耗时
+nsys stats --report cuda_api_sum         reports/run.nsys-rep   # API 调用耗时
+```
+
+报表名随版本变化，先用 `--help-reports` 列出当前可用的。需要二次分析时还可
+`nsys export --type sqlite reports/run.nsys-rep` 导出成 SQLite 自己查询。
+
 ## 3. 先看 Summary
 
 ```bash

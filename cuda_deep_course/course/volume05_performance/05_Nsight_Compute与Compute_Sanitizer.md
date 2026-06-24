@@ -63,6 +63,83 @@ nvcc -lineinfo ...
 
 实验 Makefile 已为 transpose/reduction 加入 `-lineinfo`。
 
+## 4.2 命令选项详解与常用工作流
+
+`ncu` 比 `nsys` 重得多——它为采集硬件计数器会**重放同一个 kernel 很多次**，所以一定要
+缩小范围，否则又慢又出一堆没用的数据。下面是必须掌握的几个选项。
+
+### 关键选项速查
+
+| 选项 | 作用 | 为什么重要 |
+|---|---|---|
+| `--kernel-name regex:<模式>` | 只 profile 名字匹配的 kernel | 程序里有很多 kernel 时**必加**，否则全都 profile |
+| `--launch-count <n>` | 只采集前 n 次 launch | kernel 在循环里被调用很多次时，采 1~2 次就够 |
+| `--launch-skip <n>` | 跳过前 n 次 launch | 跳过 warmup，采稳态那次 |
+| `--set <名>` | 选指标集合：`basic`/`full`/`detailed` | `full` 最全但最慢；定位阶段先 `basic` |
+| `--section <名>` | 只采某个分析区块 | 已知要看访存就只采 `MemoryWorkloadAnalysis`，快很多 |
+| `--metrics <m1,m2>` | 只采指定的几个底层指标 | 最快、最省，适合脚本化批量对比 |
+| `-o <名>` / `-f` | 存报告（`.ncu-rep`）/ 覆盖 | 配 `ncu-ui` 看，或留档对比 |
+| `--csv` / `--page raw` | 输出 CSV / 原始指标页 | 想把数字喂给脚本/表格时 |
+| `--target-processes all` | 连子进程一起 profile | 被测程序会 fork 子进程时 |
+| `--clock-control none` | 不锁频（默认会锁基频以求稳定）| 想测真实 boost 频率下的表现时 |
+| `--import <报告>` | 离线重新分析已存报告 | 在没 GPU 的机器上看结果 |
+
+### 工作流 A：定位阶段——只采关键 kernel 的 basic 集
+
+```bash
+ncu --kernel-name regex:transposeShared \
+    --launch-count 1 \
+    --set basic \
+    ./labs/03_memory_system/transpose/transpose 4096 4096
+```
+
+`--launch-count 1` + `--set basic` 让它快速跑完，先看 Speed of Light 分流（memory/
+compute/latency-bound，见第 5.1 节）。
+
+### 工作流 B：深挖阶段——存 full 报告进 GUI
+
+定方向后，对那一个 kernel 采全量并存档，用 `ncu-ui` 逐 section 看：
+
+```bash
+ncu --kernel-name regex:transposeShared \
+    --launch-skip 2 --launch-count 1 \
+    --set full \
+    -f -o reports/transpose_shared \
+    ./labs/03_memory_system/transpose/transpose 4096 4096
+# 打开： ncu-ui reports/transpose_shared.ncu-rep
+```
+
+`--launch-skip 2` 跳过前两次 warmup，采第 3 次稳态。
+
+### 工作流 C：脚本化——只抓几个指标做前后对比
+
+验证某个优化时，你往往只关心一两个指标（如 store 效率）。直接用 `--metrics` + `--csv`
+最快，便于优化前后 diff：
+
+```bash
+ncu --kernel-name regex:transpose \
+    --launch-count 1 --csv \
+    --metrics \
+gld_efficiency,\
+gst_efficiency,\
+sm__throughput.avg.pct_of_peak_sustained_elapsed,\
+gpu__dram_throughput.avg.pct_of_peak_sustained_elapsed \
+    ./labs/03_memory_system/transpose/transpose 4096 4096
+```
+
+常用指标名（用 `ncu --query-metrics` 查全量；新旧命名混用，以本机为准）：
+
+```text
+gld_efficiency / gst_efficiency                              global load/store 合并效率
+sm__throughput.avg.pct_of_peak_sustained_elapsed             计算吞吐占峰值%（SoL Compute）
+gpu__dram_throughput.avg.pct_of_peak_sustained_elapsed       DRAM 吞吐占峰值%（SoL Memory）
+sm__warps_active.avg.pct_of_peak_sustained_active            achieved occupancy
+l1tex__data_bank_conflicts_pipe_lsu_mem_shared_op_ld.sum     shared load bank conflict 数
+```
+
+> 经验：**定位用 `--set basic` 全 section 扫一遍，深挖用 `ncu-ui` 看 full，回归对比用
+> `--metrics --csv` 抓固定几个数**。三种粒度对应三个阶段，别一上来就 `--set full` 全跑。
+
 ## 4.1 Performance Counter 权限
 
 服务器上可能出现：

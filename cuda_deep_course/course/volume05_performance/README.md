@@ -9,15 +9,36 @@
 - 正确理解 occupancy、寄存器压力、分歧和 stall。
 - 使用 Nsight Systems、Nsight Compute 和 Compute Sanitizer。
 - 从证据提出单一优化假设并验证。
+- 能按 10 天路线完成一次从计时、指标、profiling 到优化报告的训练。
 
 ## 章节
 
+0. [卷五小白学习路线与每日计划](00_卷五小白学习路线与每日计划.md)
 1. [APOD 与可靠 Benchmark](01_APOD与可靠Benchmark.md)
 2. [性能指标、Scaling 与 Roofline](02_性能指标_Scaling与Roofline.md)
 3. [Occupancy、分歧与延迟隐藏](03_Occupancy_分歧与延迟隐藏.md)
 4. [Nsight Systems 系统时间线](04_Nsight_Systems系统时间线.md)
 5. [Nsight Compute 与 Compute Sanitizer](05_Nsight_Compute与Compute_Sanitizer.md)
 6. [完整优化案例、复习与面试](06_完整优化案例_复习与面试.md)
+7. [GPU Profiling 实战专题](07_GPU_Profiling实战专题.md)
+
+## 明天怎么开始
+
+先读：
+
+```text
+00_卷五小白学习路线与每日计划.md
+01_APOD与可靠Benchmark.md
+```
+
+第一天只做一件事：把计时和 benchmark 边界搞清楚。不要急着打开 Nsight Compute，也不要急着改
+kernel。
+
+```bash
+cd /home/qichengjie/workspace/cuda_study/cuda_deep_course
+make -C labs/02_programming_model/event_timing clean all
+./labs/02_programming_model/event_timing/event_timing
+```
 
 ## 实践对象
 
@@ -41,4 +62,3 @@ vector_add
 - [ ] 能从 Nsight Compute 提出具体而非模糊的优化假设。
 - [ ] 能区分 occupancy 问题与 memory/instruction 问题。
 - [ ] 完成 transpose 或 reduction 优化报告。
-

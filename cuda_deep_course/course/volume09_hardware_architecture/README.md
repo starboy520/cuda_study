@@ -13,6 +13,9 @@
 - 理解功耗、频率、散热如何影响持续性能。
 - 看懂 Turing → Ampere → Hopper → Blackwell 的关键演进。
 - 会读规格表、Compute Capability、白皮书和 SASS。
+- 深入理解 Hopper/Blackwell 的 TMA、WGMMA、Thread Block Cluster、DSM。
+- 能解释 Tensor Core、MMA/WMMA/WGMMA、FP8/FP4 等 AI 低精度硬件路径。
+- 能把单卡硬件扩展到 AI infra：NVLink/NVSwitch、NCCL、HBM、MIG、DCGM。
 
 ## 为什么需要这一卷（一张图）
 
@@ -36,14 +39,18 @@
 5. [功耗、频率、散热与持续性能](05_功耗_频率_散热与持续性能.md)
 6. [代际演进：Turing → Ampere → Hopper → Blackwell](06_代际演进_Turing_Ampere_Hopper_Blackwell.md)
 7. [读规格表、Compute Capability、白皮书与 SASS](07_读规格表_ComputeCapability_白皮书与SASS.md)
+8. [Hopper / Blackwell 深挖：TMA、WGMMA、Cluster、DSM](08_Hopper_Blackwell深挖_TMA_WGMMA_Cluster_DSM.md)
+9. [Tensor Core、MMA、WMMA、WGMMA 与 AI 低精度](09_Tensor_Core_MMA_WMMA_WGMMA与AI低精度.md)
+10. [AI Infra 硬件：NVLink、NCCL、HBM、MIG、DCGM](10_AI_Infra硬件_NVLink_NCCL_HBM_MIG_DCGM.md)
+11. [GPU 硬件面试题与口述模板](11_GPU硬件面试题与口述模板.md)
 
 ## 怎么学这一卷
 
 ```text
 这一卷偏"理解"而非"动手"——大部分是建立硬件心智模型，少量 microbenchmark。
 建议：在完成卷一~卷五后读，把前面学的软件优化逐条对应到这里的硬件结构。
-重点：01-04（结构）打底，06（演进）面试高频，07（怎么读资料）实用。
-05（功耗）和代际细节了解即可。
+重点：01-04（结构）打底，06-09（现代架构与 Tensor Core）面试高频，10（AI infra）
+连接系统部署，11 用来准备口述。05（功耗）和 07（怎么读资料）作为工程补充。
 ```
 
 > 实事求是的提醒：本卷涉及的微架构细节，**只用 NVIDIA 官方公开资料**（白皮书、Programming

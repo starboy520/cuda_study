@@ -14,6 +14,64 @@ active warps per SM / maximum warps per SM
 - 指令效率。
 - Cache 命中。
 
+## 1.5 为什么需要 occupancy：延迟隐藏与 Little 定律
+
+这一节回答全章最根本的问题：**occupancy 高到底有什么用？** 答案是——**用足够多的
+warp 把访存/指令延迟藏起来，让计算单元别空转**。GPU 没有大乱序、没有大分支预测，它
+隐藏延迟的唯一武器就是“换一个 warp 接着干”。
+
+### 核心机制：stall 了就切 warp
+
+一条 global load 大约要 **400~800 个时钟周期**才能拿到数据。CPU 会用乱序执行和大
+cache 硬扛这段延迟；GPU 的做法完全不同：
+
+```text
+warp A 发一条 load -> 数据没回来，A 进入 stall
+  -> 调度器立刻切到 warp B 发指令
+     -> B 也 stall -> 切到 warp C ...
+        -> 等轮回到 A 时，A 的数据可能已经回来了
+```
+
+只要**随时有别的 warp 可发射**，那 400 周期延迟就被其他 warp 的有效工作填满了，对外
+表现为“延迟被隐藏”。如果活跃 warp 太少，轮一圈回来数据还没到，SM 就只能干等——这就是
+latency-bound。
+
+### 用 Little 定律量化：到底需要多少 warp
+
+Little 定律说：**在途请求数 = 延迟 × 吞吐率**。套到延迟隐藏上：
+
+```text
+需要的在途并发 = 要隐藏的延迟(周期) × 每周期要发射的指令数
+```
+
+代入一个粗略例子（数量级感受即可）：
+
+```text
+访存延迟 L        ≈ 400 周期
+想让访存单元每周期都有 1 个请求在途（不空闲）
+=> 需要约 400 个独立的访存请求同时在飞
+```
+
+T4 每个 SM 最多驻留 **32 个 warp**。如果每个 warp 同一时刻只有 1 个独立访存请求在飞，
+那 32 个 warp 只能提供 32 个在途请求，**离 400 差得远**——这正是很多 memory-bound
+kernel 即便 occupancy 拉满也打不到带宽峰值的原因。两条出路：
+
+```text
+提高 occupancy(TLP)：更多 warp -> 更多在途请求   <- occupancy 的价值就在这
+提高 ILP：           每个 warp 一次发多个独立 load（循环展开、float4）
+                     -> 单 warp 也能贡献多个在途请求
+```
+
+**这就解释了两个看似矛盾的现象**：
+
+- 为什么 occupancy 重要——warp 是隐藏延迟的“燃料”，太少就藏不住。
+- 为什么 occupancy 不必 100%——只要在途并发够盖住延迟就行；Volkov 的经典反例用很高
+  的 ILP（每线程多个独立操作）在低 occupancy 下照样跑满，因为 `TLP × ILP` 的乘积才是
+  真正的在途并发量。
+
+> 一句话面试答法：occupancy 的作用是提供足够的并发 warp 来隐藏访存/指令延迟；够用即
+> 可，多余的 occupancy 不再带来收益，此时瓶颈通常已转移到带宽或指令吞吐。
+
 ## 2. 限制因素
 
 每个 SM 有限：
@@ -56,6 +114,68 @@ Tile 调参必须同时看：
 - Barrier。
 - Bank conflict。
 - 边界浪费。
+
+## 4.5 手算 occupancy：用 T4 规格走一遍
+
+光说“寄存器多了 occupancy 会降”太抽象。下面用 **Tesla T4（Turing）单个 SM 的真实
+上限**手算一遍，你就能自己判断瓶颈是谁，而不必每次都开 profiler。T4 每个 SM 的硬限制：
+
+```text
+寄存器       65536 个（32-bit）
+最大线程     1024 / SM
+最大 warp    32 / SM
+最大 block   16 / SM
+shared mem   64 KB / SM（opt-in 上限）
+```
+
+**occupancy 的算法**：分别算出“寄存器/shared/线程/block 各自允许多少个 block 驻留”，
+取**最小值**就是真正能驻留的 block 数，再换算成 warp 占比。
+
+### 例 1：32 寄存器/线程，block = 256
+
+```text
+按线程上限：   1024 / 256              = 4 block
+按 warp 上限： 32 / (256/32) = 32 / 8  = 4 block
+按寄存器：     65536 / (32 × 256)      = 65536 / 8192  = 8 block
+按 block 上限： 16                      = 16 block
+-------------------------------------------------------------
+取最小 = 4 block  -> 4 × 256 = 1024 线程 = 32 warp = 32/32 = 100% occupancy
+```
+
+此时**线程/warp 数是限制因素**，寄存器还很宽裕。
+
+### 例 2：把寄存器压到 72/线程（其余不变）
+
+```text
+按寄存器：     65536 / (72 × 256) = 65536 / 18432 ≈ 3.55  -> 向下取整 = 3 block
+其余仍是 4 block
+-------------------------------------------------------------
+取最小 = 3 block  -> 3 × 256 = 768 线程 = 24 warp = 24/32 = 75% occupancy
+```
+
+**寄存器一涨，它就成了限制因素**，occupancy 从 100% 掉到 75%。这正是“register pressure
+降低 resident warps”的具体数字。用 `nvcc -Xptxas=-v` 能看到每线程寄存器数，自己代进去
+就知道会掉到几档。（注意真实硬件还有寄存器分配粒度，手算是上界，精确值以 profiler 为准。）
+
+### 例 3：shared memory 成为限制因素
+
+转置 tile `float[32][33]` 每 block 用 `32×33×4 ≈ 4.2 KB`：
+
+```text
+按 shared： 64 KB / 4.2 KB ≈ 15 block  -> 不是瓶颈（还没到 16 block 上限）
+```
+
+但若把 tile 放大到每 block 用 48 KB：
+
+```text
+按 shared： 64 / 48 = 1 block  -> 只能驻留 1 个 block！
+```
+
+大 tile 提高了数据复用，却把 occupancy 砸到地板——**这就是第 4 节说的“tile 调参要同时
+看复用和 occupancy”的量化版本**。
+
+> 手算的价值：拿到一个 kernel，先用 `-Xptxas=-v` 看寄存器/shared 用量，代进上面三组
+> 除法，30 秒就能判断 occupancy 卡在哪个资源上，再决定要不要动 block size 或 tile 大小。
 
 ## 5. Warp Divergence
 
@@ -113,10 +233,54 @@ Warp 可能因以下原因无法发射：
 
 ## 8. Occupancy API
 
+手算适合快速估计，运行时让 CUDA 帮你算更准、更省事。两个核心 API：
+
 ```cpp
-cudaOccupancyMaxActiveBlocksPerMultiprocessor(...)
-cudaOccupancyMaxPotentialBlockSize(...)
+cudaOccupancyMaxActiveBlocksPerMultiprocessor(...)  // 给定 block size，每 SM 能驻留几个 block
+cudaOccupancyMaxPotentialBlockSize(...)             // 直接建议一个 occupancy 最优的 block size
 ```
+
+### 可直接运行的示例
+
+```cpp
+__global__ void myKernel(const float* in, float* out, int n) { /* ... */ }
+
+void reportOccupancy() {
+    int device;
+    cudaGetDevice(&device);
+    cudaDeviceProp prop;
+    cudaGetDeviceProperties(&prop, device);
+
+    // 1) 让 CUDA 推荐一个 occupancy 友好的 block size
+    int minGridSize = 0, blockSize = 0;
+    cudaOccupancyMaxPotentialBlockSize(
+        &minGridSize, &blockSize, myKernel, /*dynamicSMem=*/0, /*blockSizeLimit=*/0);
+
+    // 2) 在该 block size 下，每个 SM 能驻留多少 block
+    int maxBlocksPerSM = 0;
+    cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+        &maxBlocksPerSM, myKernel, blockSize, /*dynamicSMem=*/0);
+
+    // 3) 换算成理论 occupancy（活跃 warp / SM 上限 warp）
+    int activeWarps   = maxBlocksPerSM * blockSize / prop.warpSize;
+    int maxWarpsPerSM = prop.maxThreadsPerMultiProcessor / prop.warpSize;
+    float occupancy   = (float)activeWarps / maxWarpsPerSM;
+
+    printf("建议 blockSize = %d\n", blockSize);
+    printf("每 SM 驻留 block = %d\n", maxBlocksPerSM);
+    printf("理论 occupancy   = %.0f%%\n", occupancy * 100.0f);
+}
+```
+
+要点：
+
+- `cudaOccupancyMaxPotentialBlockSize` 适合“懒人起步”——不确定 block size 时先用它给的值，
+  再围绕它做 scan。
+- 若 kernel 用了**动态 shared memory**，把每 block 字节数传进 `dynamicSMem` 参数，否则
+  算出来偏乐观。
+- 这套数字是**理论上界**，不含尾部效应、负载不均、实际 stall。最终仍要 benchmark + 用
+  Nsight Compute 的 achieved occupancy 对照（理论高但 achieved 低，往往是 grid 太小或负载
+  不均，见第 05 章判读表）。
 
 API 可计算资源约束下的理论驻留，但仍需实际 benchmark。
 

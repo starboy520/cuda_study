@@ -151,7 +151,21 @@ tiled T32   —                   5.355 ms / 401      ✅  ← 反而略慢!
 
 ## Day 3：Register Tiling
 
-（待填）
+> ⏸️ **暂缓**（2026-06-22 决定）：register/1D/2D tiling 手写难度大，且对"应用/融合算子"
+> 岗位非必需（用 cuBLAS/CUTLASS 即可）。已掌握 naive + tiled 的核心（tiling 思想、
+> 2x 加速、Roofline memory-bound 分析）→ 算法层"会写即可"目标达成。
+>
+> **口述级结论（面试够用，不必手写）**：
+> ```text
+> register tiling = 一个线程算多个输出(TM×TN) → 把 A/B 读进寄存器复用
+>   → 减少 SMEM 访问、提升算术强度 → 再快几倍
+> 代价:寄存器用量↑ → occupancy↓,靠 ILP 弥补,要实测找平衡
+> ```
+> 详细教学见课程文档 §3.5（1D thread tiling 一步步）+ siboehm 教程
+> https://siboehm.com/articles/22/CUDA-MMM —— 以后回来啃。
+>
+> **下一步转向**：算子层（softmax/layernorm 等），复用 week03 的 reduction 技能，
+> 对"工程层 + 面试手写算子"性价比更高。
 
 ---
 

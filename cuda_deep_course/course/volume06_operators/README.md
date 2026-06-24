@@ -35,10 +35,12 @@
 
 1. [GEMM 数学、布局与性能上限](01_GEMM数学_布局与性能上限.md)
 2. [GEMM 优化阶梯：Tiling 与寄存器分块](02_GEMM优化阶梯_Tiling与寄存器分块.md)
-3. [向量化、双缓冲与 Tensor Core](03_向量化_双缓冲与Tensor_Core.md)
-4. [Softmax 数值稳定与多级归约](04_Softmax数值稳定与多级归约.md)
-5. [LayerNorm、RMSNorm 与融合](05_LayerNorm_RMSNorm与融合.md)
-6. [库的边界与算子工程化](06_库的边界与算子工程化.md)
+3. [GEMM 从零到 Tiling 小白版](02A_GEMM从零到Tiling小白版.md)
+4. [GEMM Register Tiling：外积视角小白版](02B_GEMM_Register_Tiling外积视角.md)
+5. [向量化、双缓冲与 Tensor Core](03_向量化_双缓冲与Tensor_Core.md)
+6. [Softmax 数值稳定与多级归约](04_Softmax数值稳定与多级归约.md)
+7. [LayerNorm、RMSNorm 与融合](05_LayerNorm_RMSNorm与融合.md)
+8. [库的边界与算子工程化](06_库的边界与算子工程化.md)
 
 ## 这一卷怎么承接前面
 
