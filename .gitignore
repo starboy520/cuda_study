@@ -48,3 +48,13 @@ week03_parallel/stream_overlap/stream_overlap
 # week04 练习编译产物(可执行文件,不含 .cu)
 week04_gemm/gemm_naive/gemm_naive
 week04_gemm/gemm_tiled/gemm_tiled
+
+# Profiler 产物(ncu/nsys 报告 + sqlite 导出,体积大,不入库)
+*.ncu-rep
+*.nsys-rep
+*.sqlite
+
+# bubble_demo 编译产物 + 临时 profiler 文本输出
+cuda_deep_course/labs/05_performance/bubble_demo/bubble_demo
+cuda_deep_course/labs/03_memory_system/transpose/1
+cuda_deep_course/labs/03_memory_system/transpose/2
