@@ -58,3 +58,6 @@ week04_gemm/gemm_tiled/gemm_tiled
 cuda_deep_course/labs/05_performance/bubble_demo/bubble_demo
 cuda_deep_course/labs/03_memory_system/transpose/1
 cuda_deep_course/labs/03_memory_system/transpose/2
+
+# week04 双 kernel 测试二进制
+week04_gemm/gemm_tiled/gemm_two

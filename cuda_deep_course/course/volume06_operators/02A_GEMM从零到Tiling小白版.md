@@ -22,7 +22,6 @@ grid 又怎么拼出完整 C？
   -> 一个 block 负责一个 C tile
   -> 很多 block 组成 grid 拼出完整 C
   -> shared memory tiling
-  -> 1D register tiling
   -> 2D register tiling 的直觉
 ```
 
@@ -990,239 +989,13 @@ Register tiling 的想法是：
 这样它从 shared 读来的某些数据，可以在自己的寄存器里复用多次。
 ```
 
-## 22. 1D Register Tiling：一个 thread 竖着算多个输出
+## 22. Register Tiling：一个 thread 算一个小矩形（2D 外积）
 
-先不要看 `4x4`。
+shared tiling 之后，瓶颈转移到 shared memory 读取。register tiling 让一个 thread
+算多个 C 输出，把数据读进寄存器后复用。最有用的是 **2D 外积**：一个 thread 负责一个
+小矩形（`TM×TN` 个输出），A 和 B 都在寄存器里复用。
 
-先看最简单的 1D register tiling：
-
-```text
-一个 thread 算同一列上的多个 C 输出。
-```
-
-例如一个 thread 算：
-
-```text
-C[row+0][col]
-C[row+1][col]
-C[row+2][col]
-C[row+3][col]
-```
-
-它们共同点是：
-
-```text
-列 col 相同。
-```
-
-在某个 K 上：
-
-```text
-C[row+0][col] += A[row+0][k] * B[k][col]
-C[row+1][col] += A[row+1][k] * B[k][col]
-C[row+2][col] += A[row+2][k] * B[k][col]
-C[row+3][col] += A[row+3][k] * B[k][col]
-```
-
-你会看到：
-
-```text
-B[k][col] 是同一个。
-```
-
-所以可以：
-
-```cpp
-float b = Bs[k][colLocal];  // 从 shared 读一次，放进寄存器
-
-acc0 += As[rowLocal + 0][k] * b;
-acc1 += As[rowLocal + 1][k] * b;
-acc2 += As[rowLocal + 2][k] * b;
-acc3 += As[rowLocal + 3][k] * b;
-```
-
-这就是 1D register tiling 的核心：
-
-```text
-B 读一次，用多次。
-```
-
-这些 `acc0/acc1/acc2/acc3` 通常都在寄存器里。
-
-如果写成数组：
-
-```cpp
-float acc[TM] = {0.0f};
-```
-
-其中：
-
-```text
-TM = Thread M
-```
-
-意思是：
-
-```text
-一个 thread 沿 M 方向，也就是行方向，算多少个输出。
-```
-
-## 23. 1D Register Tiling 怎么放回 Block
-
-这一步是最容易断掉的地方。
-
-shared tiling 里：
-
-```text
-一个 block 算 16x16 的 C tile
-一个 thread 算 1 个 C 输出
-所以需要 16x16 = 256 个 thread
-```
-
-1D register tiling 里，如果：
-
-```text
-一个 block 算 64x64 的 C tile
-一个 thread 竖着算 8 个输出
-```
-
-那么 block 需要多少 thread？
-
-```text
-C tile 有 64 x 64 = 4096 个输出
-每个 thread 算 8 个输出
-需要 4096 / 8 = 512 个 thread
-```
-
-可以这样摆：
-
-```text
-threadCol = 0..63       -> 负责哪一列
-threadRowGroup = 0..7   -> 负责哪一组 8 行
-```
-
-也就是：
-
-```text
-512 个 thread = 64 列 x 8 个行组
-```
-
-一个 thread 的计算任务是：
-
-```text
-列 = threadCol
-行 = threadRowGroup * 8 + 0..7
-```
-
-这就是：
-
-```cpp
-int threadCol = threadIdx.x % 64;
-int threadRowGroup = threadIdx.x / 64;
-```
-
-如果：
-
-```text
-threadIdx.x = 130
-```
-
-那么：
-
-```text
-threadCol = 130 % 64 = 2
-threadRowGroup = 130 / 64 = 2
-```
-
-它负责：
-
-```text
-C tile 内第 2 列
-第 2 组 8 行
-```
-
-也就是：
-
-```text
-C[16][2]
-C[17][2]
-C[18][2]
-C[19][2]
-C[20][2]
-C[21][2]
-C[22][2]
-C[23][2]
-```
-
-## 24. 1D Register Tiling 的计算核心
-
-假设：
-
-```text
-TM = 8
-BK = 8
-```
-
-其中：
-
-```text
-TM = 一个 thread 算 8 个输出
-BK = 当前 K 段厚度是 8
-```
-
-核心计算：
-
-```cpp
-float acc[TM] = {0.0f};
-
-for (int dotIdx = 0; dotIdx < BK; ++dotIdx) {
-  float b = Bs[dotIdx][threadCol];
-
-  for (int i = 0; i < TM; ++i) {
-    acc[i] += As[threadRowGroup * TM + i][dotIdx] * b;
-  }
-}
-```
-
-读法：
-
-```text
-dotIdx:
-  当前 K 段里的第几个 k。
-
-b:
-  当前 B[k][col]，读一次放进寄存器。
-
-i:
-  当前 thread 负责的第几个行输出。
-
-acc[i]:
-  当前 thread 第 i 个 C 输出的累加器。
-```
-
-关键收益：
-
-```text
-一个 b 被 TM 个 acc 复用。
-```
-
-所以 shared memory 的 B 读取压力下降。
-
-## 25. 2D Register Tiling 只先理解直觉
-
-1D register tiling：
-
-```text
-一个 thread 算同一列上的多个行。
-主要复用 B。
-```
-
-2D register tiling：
-
-```text
-一个 thread 算一个小矩形。
-同时复用 A 和 B。
-```
+下面用一个 `4x4` 的例子建立 2D 外积的直觉。
 
 例如一个 thread 算 `4x4` 个输出：
 
@@ -1259,9 +1032,7 @@ row3    acc30  acc31  acc32  acc33
 
 数据复用更强，但代码也更复杂。
 
-先把 1D register tiling 吃透，再看 2D。
-
-## 26. 三层 Tiling 的完整位置
+## 23. 三层 Tiling 的完整位置
 
 现在把所有层级放回一张图：
 
@@ -1296,7 +1067,7 @@ Block 负责 C block tile
 Thread 负责 C thread tile
 ```
 
-## 27. 最后用一句话串起来
+## 24. 最后用一句话串起来
 
 Naive GEMM：
 
@@ -1311,13 +1082,6 @@ Shared-memory tiled GEMM：
 再让 block 内很多 thread 复用这些数据。
 ```
 
-1D register tiled GEMM：
-
-```text
-一个 thread 算同一列上的多个 C，
-把一个 B 值读到寄存器后复用给多个输出。
-```
-
 2D register tiled GEMM：
 
 ```text
@@ -1325,7 +1089,7 @@ Shared-memory tiled GEMM：
 A 和 B 都在寄存器里复用。
 ```
 
-## 28. 你应该能回答的问题
+## 25. 你应该能回答的问题
 
 如果下面这些问题能说顺，这章就过了。
 
@@ -1340,7 +1104,7 @@ A 和 B 都在寄存器里复用。
 8. Grid.x 为什么覆盖 N，Grid.y 为什么覆盖 M？
 9. shared tiling 复用的是哪里的数据？
 10. register tiling 复用的是哪里的数据？
-11. 1D register tiling 为什么主要复用 B？
+11. 2D register tiling 为什么能同时复用 A 和 B？
 12. block tiling 和 thread tiling 分别处在哪一层？
 ```
 
@@ -1354,7 +1118,7 @@ Shared memory 让 block 复用 global 数据。
 Register 让 thread 复用 shared 数据。
 ```
 
-## 29. 配套实验
+## 26. 配套实验
 
 当前已有实验：
 
@@ -1381,7 +1145,7 @@ gemmTiled
 
 不要先看 timing、CPU 验证、GFLOPS 输出。那些是工程验证部分，等 kernel 看懂后再看。
 
-## 30. 下一步学习顺序
+## 27. 下一步学习顺序
 
 建议顺序：
 
@@ -1389,7 +1153,7 @@ gemmTiled
 1. 手算 TILE=2、K=4 的一个 C tile。
 2. 对照 gemmTiled 代码，标出 row、col、aCol、bRow。
 3. 运行 gemm_tiled 实验，看 naive 和 tiled 的 GFLOPS。
-4. 再回来看 1D register tiling。
+4. 再回来看 2D register tiling（外积）。
 5. 最后再看原来的 02 文档和下一章向量化、双缓冲、Tensor Core。
 ```
 
