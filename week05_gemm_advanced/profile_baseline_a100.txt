@@ -1,8 +1,0 @@
-==PROF== Connected to process 9314 (/home/qichengjie/workspace/cuda_study/week05_gemm_advanced/gemm_shared_baseline)
-==PROF== Profiling "gemm_shared_baseline" - 0 (1/1): 0%....50%....100% - 52 passes
-GEMM shape: M=1024 N=1024 K=1024
-gemm_shared_baseline cost: 83.409 ms, 25.75 GFLOPS
-gemm_shared_baseline cost: 3803.934 ms, 0.56 GFLOPS
-max abs error vs CPU: 1.525879e-05 -> PASS
-==PROF== Disconnected from process 9314
-==PROF== Report: /home/qichengjie/workspace/cuda_study/week05_gemm_advanced/ncu_baseline_a100.ncu-rep

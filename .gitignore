@@ -54,6 +54,9 @@ week04_gemm/gemm_tiled/gemm_tiled
 *.nsys-rep
 *.sqlite
 
+# week05 profiler 文本输出(ncu/程序计时记录,不入库)
+week05_gemm_advanced/profile*.txt
+
 # bubble_demo 编译产物 + 临时 profiler 文本输出
 cuda_deep_course/labs/05_performance/bubble_demo/bubble_demo
 cuda_deep_course/labs/03_memory_system/transpose/1
