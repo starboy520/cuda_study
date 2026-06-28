@@ -2,14 +2,34 @@
 
 ## 环境
 
-| 项目 | 值 |
-| --- | --- |
-| GPU | Tesla T4 (sm_75, 16 GB) |
-| CUDA | release 13.3, V13.3.33 |
-| 编译参数 | `nvcc -arch=sm_75 gemm_shared_baseline.cu -o gemm_shared_baseline` |
-| 数据类型 | FP32 |
-| 计时方式 | cudaEvent，warmup 1 次后取正式一次 |
-| GFLOPS 公式 | `2*M*N*K / time_s / 1e9` |
+| 项目 | T4 | A100 |
+| --- | --- | --- |
+| GPU | Tesla T4 (sm_75, 16 GB) | NVIDIA A100 80GB PCIe (sm_80) |
+| FP32 峰值 | ~8.1 TFLOPS | ~19.5 TFLOPS |
+| 显存带宽 | ~320 GB/s | ~1935 GB/s |
+| SM 数 | 40 | 108 |
+| CUDA | release 13.3 | release 13.3 |
+| 编译参数 | `-arch=sm_75` | `-arch=sm_80` |
+| 数据类型 | FP32 | FP32 |
+| 计时方式 | cudaEvent，warmup 1 次后取正式一次 | 同左 |
+| GFLOPS 公式 | `2*M*N*K / time_s / 1e9` | 同左 |
+
+> 注意：T4 与 A100 的 GFLOPS 不可直接同列比较，分别看「占各自峰值百分比」。
+
+---
+
+## A100 版本对比（sm_80, FP32, 实测）
+
+| 版本 | 512 | 1024 | 2048 | 2048 占峰值 |
+| --- | --- | --- | --- | --- |
+| shared baseline | 2979 | 3957 | 4200 | ~22% |
+| 2D + padding | 2703 | 7109 | **11305** | **~58%** |
+| 2D 相对 baseline | 0.91x | 1.80x | **2.69x** | |
+
+观察：
+- 2048 时 2D = 11305 GFLOPS，约 A100 FP32 峰值的 58%（T4 上同 kernel 仅 16%），register tiling 在 A100 上收益更大。
+- **512 时 2D 反而比 baseline 慢**：2D block 仅 64 线程，512 时 grid 只有 (512/64)²=64 个 block，连 A100 的 108 个 SM 都填不满；baseline 512 是 256 个 block ×1024 线程，反而喂得饱。
+- 结论：A100 并行资源多，小规模 GEMM 下 2D 的低 occupancy + 少 block 暴露不足 → Day 5 在 A100 上要试更大的 BM/BN 或更多线程。
 
 ---
 

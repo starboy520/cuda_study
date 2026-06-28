@@ -156,3 +156,61 @@ padding 后 shared load 请求数反而上升（5.24M → 8.39M）。推测：st
 ### 面试口述（Day 4）
 
 > 我给 2D tiling 做 profile，发现 L1/TEX 不降反升到 91%，一开始预测错了。但 Memory Workload Analysis 直接指出 shared load 有 4.8-way bank conflict，占 66% 的 wavefront。根因是 BK=32 让 shared 数组的列读取全部映射到同一个 bank。加了 +1 padding 把 stride 错开后，bank conflict 从 4.8 路降到 1.5 路，L1/TEX 降到 83%，compute throughput 翻倍，2048 从 884 涨到 1284 GFLOPS。这是一次完整的「假设→profile 发现真因→针对性修复→数据验证」闭环。
+
+---
+
+## Day 4（A100 复测）：迁移到 A100 后重新 profile
+
+> 硬件换成 **NVIDIA A100 80GB PCIe (sm_80, 108 SM)**，CUDA 13.3，kernel 用 `-arch=sm_80 -O3` 重新编译。ncu 权限已配好（无需 sudo）。
+> kernel：`gemm_2d_thread_tiling`（BM=BN=64, BK=32, TM=TN=8, 64 线程，已含 padding）。
+> 采集：`ncu --set full -s 1 -c 1 -o <报告> ./gemm_2d_thread_tiling <N>`。
+
+### 关键指标：512 vs 2048（A100）
+
+| 指标 | @512 | @2048 | 说明 |
+| --- | --- | --- | --- |
+| Grid (blocks) | 64 | 1024 | 512 填不满 108 SM |
+| Waves Per SM | <1 | 1.58 | 512 大量 SM 空转 |
+| Duration | 394.6 us | 2.19 ms | |
+| DRAM Throughput | 1.11% | 1.53% | 始终全闲，非 memory-bound |
+| Compute (SM) | 39.12% | 56.25% | 放大后利用率↑ |
+| L1/TEX Throughput | 49.32% | 73.96% | 放大后被压上来 |
+| L2 Throughput | 7.48% | 9.23% | |
+| Registers / thread | 168 | 168 | |
+| **Theoretical Occupancy** | 18.75% | 18.75% | 被 168 寄存器卡死 |
+| **Achieved Occupancy** | 6.46% | 14.53% | 放大后逼近理论上限 |
+| Active Warps / SM | 4.14 | 9.30 | |
+| shared load bank conflict | 1.5-way | 1.5-way | padding 在 A100 同样有效 |
+
+### A100 上的瓶颈画像（与 T4 不同）
+
+```text
+T4：  L1/TEX 满 + occupancy 满(100%) → shared/L1 bound
+A100：DRAM 全闲(1.5%) + L1/TEX 74% + occupancy 仅 14.5% → 寄存器卡死 occupancy
+```
+
+两层原因：
+
+1. **理论 occupancy 只有 18.75%**：168 寄存器/线程 → Block Limit Registers = 6，每 SM 最多驻留 6 个 block；block=64 线程=2 warp，6×2=12 warp = 64 上限的 18.75%。这是 register tiling 的固有代价。
+2. **小规模实测更低（512 → 6.46%）**：512 的 grid 只有 64 个 block，A100 有 108 个 SM，超过一半 SM 分不到 block；放大到 2048（1024 个 block，Waves/SM 1.58）后实测回到 14.53%，逼近理论上限。
+
+### 真实性能（无 profiling，A100）
+
+| 版本 | 2048 GFLOPS | 占 A100 峰值(~19.5T) |
+| --- | --- | --- |
+| shared baseline | ~4194 | ~21% |
+| 2D + padding | ~11313 | ~58% |
+
+> 对比 T4：同一个 2D kernel T4 只到峰值 16%，A100 到 58%。A100 SM 多、带宽大，register tiling 的并行度/带宽收益放得更开。
+
+### 下一步（Day 5 参数实验方向）
+
+```text
+A100 的天花板是寄存器卡死 occupancy(18.75%)，不是访存。
+→ 扫 TM/TN（8x8 → 4x4 降寄存器）、BK、BM/BN，
+  在「寄存器↓ occupancy↑」与「单线程复用↓」之间找 A100 最优点。
+```
+
+### 面试口述（A100）
+
+> 把同一个 2D tiling kernel 迁到 A100 后重新 profile，瓶颈画像完全变了。T4 上是 L1/TEX 和 occupancy 都打满、卡在 shared 带宽；A100 上 DRAM 只有 1.5%、occupancy 只有 14.5%。根因是每线程 168 个寄存器，把理论 occupancy 卡死在 18.75%。我还做了个规模对照：512 时 grid 只有 64 个 block，填不满 108 个 SM，实测 occupancy 掉到 6.5%；放大到 2048 后 grid 1024 个 block，occupancy 回到 14.5%、compute 利用率升到 56%。所以 A100 上的优化方向不是访存，而是降寄存器换 occupancy，这就是下一步参数实验要扫的。
