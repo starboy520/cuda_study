@@ -9,11 +9,27 @@
 //   思路：block 算 BM x BN 的 C tile，每个 thread 算 TM x TN 个元素，外积累加
 
 // ============================================================================
-constexpr int TM = 8;
-constexpr int TN = 8;
-constexpr int BM = 64;
-constexpr int BN = 64;
-constexpr int BK = 32;
+
+#ifndef TM
+#define TM 8
+#endif
+
+#ifndef TN
+#define TN 8
+#endif
+
+#ifndef BM
+#define BM 64
+#endif
+
+#ifndef BN
+#define BN 64
+#endif
+
+#ifndef BK
+#define BK 32
+#endif  
+
 
 __global__ void gemm_2d_thread_tiling(const float* a, const float* b,
         float* c, int M, int N, int K) {
@@ -22,7 +38,9 @@ __global__ void gemm_2d_thread_tiling(const float* a, const float* b,
     __shared__ float sb[BK][BN + 1];  // +1 避免 bank conflict
 
     float reg_c[TM][TN] = {0.0};
+    
     for (int step = 0; step < K; step += BK) {
+        /*  style1, 每个线程要算什么就搬什么数据
         // ---- 加载 sa[BM][BK]：每个线程 (x,y) 搬 TM * (BK/TM) 个元素 ----
         // row    = TM*threadIdx.y + i  ：i 从 0..TM-1，所以每个线程负责【连续的 TM 行】
         //                                （ty 0 -> 行 0..7，ty 1 -> 行 8..15 ...）
@@ -41,6 +59,47 @@ __global__ void gemm_2d_thread_tiling(const float* a, const float* b,
                 }
             }
         }
+        */
+
+
+        /**
+        线程是班运工,编号依次搬数据即可
+        1. 把 block 内线程拍平成 1D：tid = threadIdx.y * blockDim.x + threadIdx.x
+   总线程数 nthreads = blockDim.x * blockDim.y
+2. sa 要搬 BM*BK 个元素，用 grid-stride loop：
+   for (idx = tid; idx < BM*BK; idx += nthreads)
+       int r = idx / BK, col = idx % BK;   // sa[r][col]
+       int gr = blockIdx.y*BM + r, gc = step + col;
+       sa[r][col] = (gr<M && gc<K) ? a[gr*K+gc] : 0;
+3. sb 同理搬 BK*BN 个元素
+        */
+        int tid = threadIdx.y *blockDim.x + threadIdx.x;
+        int n_thread = blockDim.x * blockDim.y;
+        for (int i = tid; i < BM * BK; i += n_thread) {
+            int row = i / BK;
+            int col = i % BK;
+            int global_row = blockIdx.y * BM + row; // 一个block处理(bm*bn行), 这里逻辑不一样，相同
+            int global_column = step + col;
+            if (global_row < M && global_column < K) {
+                sa[row][col] = a[global_row * K +global_column];
+            } else {
+                sa[row][col] = 0;
+            }
+        }
+    
+        for (int i = tid; i < BK * BN; i += n_thread) {
+            int row = i / BN;
+            int col = i % BN;
+            int global_row = step + row;
+            int global_col = blockIdx.x * BN + col;
+            if (global_row < K && global_col < N) {
+                sb[row][col] = b[global_row *N + global_col];
+            } else {
+                sb[row][col] = 0.0;
+            }
+        }
+
+        /*
 
         // ---- 加载 sb[BK][BN]：模式和 sa 正好相反 ----
         // row    = i*TN + threadIdx.y  ：步长 blockDim.y(=TN=8)，所以行是【跳着取】的
@@ -60,6 +119,7 @@ __global__ void gemm_2d_thread_tiling(const float* a, const float* b,
                 }
             }
         }
+        */
         __syncthreads();
 
 

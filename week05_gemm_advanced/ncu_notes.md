@@ -214,3 +214,39 @@ A100 的天花板是寄存器卡死 occupancy(18.75%)，不是访存。
 ### 面试口述（A100）
 
 > 把同一个 2D tiling kernel 迁到 A100 后重新 profile，瓶颈画像完全变了。T4 上是 L1/TEX 和 occupancy 都打满、卡在 shared 带宽；A100 上 DRAM 只有 1.5%、occupancy 只有 14.5%。根因是每线程 168 个寄存器，把理论 occupancy 卡死在 18.75%。我还做了个规模对照：512 时 grid 只有 64 个 block，填不满 108 个 SM，实测 occupancy 掉到 6.5%；放大到 2048 后 grid 1024 个 block，occupancy 回到 14.5%、compute 利用率升到 56%。所以 A100 上的优化方向不是访存，而是降寄存器换 occupancy，这就是下一步参数实验要扫的。
+
+---
+
+## Day 5（A100）：参数实验验证「降寄存器换 occupancy」
+
+> 前置：加载改成通用 grid-stride 后（与计算解耦），用 `sweep.sh` 扫 TM/TN/BM/BN/BK。
+> 详细扫描表见 benchmark.md，这里记 ncu 对 8x8 基线 vs 8x4 赢家的对照。
+
+### 8x8 基线 vs 8x4 赢家（2048）
+
+| 指标 | 8x8 64x64 BK16 | **8x4 64x64 BK16** | 变化 |
+| --- | --- | --- | --- |
+| Registers / thread | 122 | **78** | -36% |
+| Achieved Occupancy | 14.53% | **30.10%** | 翻倍↑ |
+| SM Throughput | 56.25% | **66.28%** | ↑ |
+| GFLOPS (2048) | 9625 | **11382** | +18% |
+
+> 采集：`ncu -s 1 -c 1 --metrics sm__warps_active.avg.pct_of_peak_sustained_active,launch__registers_per_thread,sm__throughput.avg.pct_of_peak_sustained_elapsed ./gemm_best 2048`
+
+### 因果链（亲手测得）
+
+```text
+TN 8→4 → reg_c[8][4] 累加器减半 → 寄存器 122→78
+→ 每 SM 驻留 block 翻倍 → achieved occupancy 14.5%→30.1%
+→ 活跃 warp 增多，藏延迟更强 → SM throughput 56%→66%
+→ GFLOPS 9625→11382（+18%）
+```
+
+### 反例与边界（同样重要）
+
+- **甜点效应**：4x4（72 reg）= 9981 < 8x4（78 reg）= 11382。TM/TN 砍过头 → 单线程复用/ILP 不足 → occupancy 收益被抵消。**occupancy 不是越高越好**。
+- **启动失败边界**：`4x4 128x128` → block 1024 线程 × 72 reg = 73728 > 65536（每 SM 寄存器上限）→ "too many resources requested for launch"。约束：`线程数 × 寄存器/线程 ≤ 65536`。
+
+### 面试口述（Day 5）
+
+> 我在 A100 上做了 GEMM 的参数扫描，写了个脚本用 `-D` 编译不同 tile 配置，自动记录寄存器数、GFLOPS 和正确性。发现把 TN 从 8 降到 4（reg_c 累加器减半），寄存器从 122 降到 78，achieved occupancy 从 14.5% 翻倍到 30.1%，SM 利用率从 56% 升到 66%，2048 GEMM 快了 18%。但不是越激进越好：TM/TN 都砍到 4 反而更慢，因为单线程复用和 ILP 不够，occupancy 和复用之间存在甜点。我还撞到一个边界——4x4 配 128x128 时 block 要 1024 线程、每线程 72 寄存器，超过了每 SM 65536 的寄存器上限，直接启动失败。这套实验让我把「occupancy / 寄存器 / 单线程复用」三者的权衡用数据讲清楚了。

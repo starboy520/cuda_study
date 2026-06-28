@@ -64,3 +64,9 @@ cuda_deep_course/labs/03_memory_system/transpose/2
 
 # week04 双 kernel 测试二进制
 week04_gemm/gemm_tiled/gemm_two
+
+# week05 GEMM 编译产物(可执行文件,不含 .cu)
+week05_gemm_advanced/gemm_shared_baseline
+week05_gemm_advanced/gemm_2d_thread_tiling
+week05_gemm_advanced/gemm_best
+week05_gemm_advanced/gemm_test

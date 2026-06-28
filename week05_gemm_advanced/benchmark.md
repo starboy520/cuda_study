@@ -107,3 +107,41 @@ kernel：`gemm_2d_thread_tiling`
 | vectorized load | - | - | 待测 |
 | cuBLAS 参考 | - | - | 待测 |
 
+---
+
+## Day 5：参数实验（A100, sm_80, 2048, 通用 grid-stride 加载）
+
+> 前置：把加载从「位置驱动」改成「grid-stride 编号驱动」（详见 shared_load_patterns.md），
+> 加载与计算解耦后才能自由扫参数。重写后寄存器 168→122，仍全部 PASS。
+> 扫描脚本：`./sweep.sh`（`-D` 覆盖 TM/TN/BM/BN/BK，自动抓寄存器 + GFLOPS + 正确性）。
+
+### 扫描结果（2048）
+
+| TMxTN | BMxBN | BK | reg/thread | GFLOPS | 正确性 |
+| --- | --- | --- | --- | --- | --- |
+| **8x4** | 64x64 | 16 | **78** | **11382** | PASS 🥇 |
+| 8x8 | 128x64 | 16 | 127 | 10249 | PASS |
+| 4x4 | 64x64 | 16 | 72 | 9981 | PASS |
+| 8x8 | 64x64 | 32 | 122 | 9625 | PASS（基线） |
+| 8x8 | 64x64 | 16 | 122 | 9506 | PASS |
+| 8x8 | 128x128 | 16 | 122 | 8285 | PASS |
+| 4x4 | 128x128 | 16 | 72 | — | 启动失败 |
+
+### 关键观察
+
+- **最优 = `8x4 64x64 BK16`：11382 GFLOPS，78 寄存器**，比 8x8 基线（9625）快 **~18%**。
+- ncu 验证（详见 ncu_notes.md）：8x4 vs 8x8 → 寄存器 122→78，**achieved occupancy 14.5%→30.1%（翻倍）**，SM throughput 56%→66%。
+- **甜点效应**：4x4（72 reg）= 9981，反而比 8x4 慢 → TM/TN 太小，单线程复用/ILP 不够，occupancy 收益被抵消。occupancy 不是越高越好。
+- **128x128 变慢（8285）**：大 block → 2048 下只有 16×16=256 个 block，喂不饱 108 个 SM，occupancy 反降。
+- **`4x4 128x128` 启动失败**（非真实 GFLOPS）：block = 32×32 = 1024 线程，1024×72 = 73728 > 65536（A100 每 SM 寄存器上限）→ "too many resources requested for launch"。边界教训：`线程数 × 寄存器 ≤ 65536`。
+
+### 因果链
+
+```text
+TN 8→4 → reg_c[8][4] 累加器减半 → 寄存器 122→78
+→ 每 SM 驻留 block 翻倍 → occupancy 14.5%→30.1%
+→ 活跃 warp 增多，藏延迟更强 → SM throughput 56%→66%
+→ GFLOPS 9625→11382（+18%）
+但 TM/TN 砍过头(4x4) → 单线程复用不足 → 回落 → 存在甜点
+```
+
