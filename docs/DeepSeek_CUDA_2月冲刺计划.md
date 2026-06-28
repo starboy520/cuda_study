@@ -62,7 +62,7 @@ MoE 的通信瓶颈在哪里？
 ## 1. 8 周总览
 
 ```text
-Week 1  GEMM register tiling（一）：从 shared tiling 到 1D / 2D thread tiling
+Week 1  GEMM register tiling（一）：以 2D register tiling 为主，不再单独实现 1D
 Week 2  GEMM register tiling（二）：vectorized load、double buffering、CUTLASS 对照
 Week 3  Tensor Core 与混合精度：WMMA、TF32/FP16/BF16、FP8 思想
 Week 4  Attention 与 FlashAttention：online softmax、分块 attention、MLA
@@ -206,7 +206,8 @@ roof_at_AI = min(peak_compute, AI * bandwidth)
 
 ## Week 1：GEMM Register Tiling（一）
 
-> 本周是分水岭。你要真正理解 shared tiling 为什么还不够，以及 register tiling 到底在复用什么。
+> 本周是分水岭。你已经学过 2D register tiling，所以本周不再花时间单独实现 1D register tiling。  
+> 1D 只保留为概念对照：它能帮助解释“一个 thread 可以算多个输出”，但真正要打磨的是 2D register tiling、profiling 和参数实验。
 
 参考：
 
@@ -221,10 +222,10 @@ siboehm CUDA-MMM Kernel 4/5
 ```text
 week05_gemm_advanced/
   gemm_shared_baseline.cu
-  gemm_1d_thread_tiling.cu
   gemm_2d_thread_tiling.cu
   benchmark.md
   ncu_notes.md
+  roofline.md
 ```
 
 ### Day 1：复盘 shared memory GEMM
@@ -267,74 +268,74 @@ benchmark.md 中的 baseline 表格
 一段口述：shared tiling 解决了什么，没有解决什么
 ```
 
-### Day 2：1D thread tiling 的纸上推演
+### Day 2：1D 快速对照 + 2D 外积复盘
 
 目标：
 
 ```text
-先不写大代码，只把 1D thread tiling 的索引推清楚。
+不再实现 1D。
+只用 1D 帮你对照理解 2D register tiling。
 ```
 
-最小例子：
+1D 只需要知道：
 
 ```text
-BM = 4
-BN = 4
-BK = 2
-TM = 2
+一个 thread 计算 TM 个输出。
+它说明寄存器可以缓存部分数据，让一个 thread 复用 A 或 B。
 ```
 
-含义：
+但本计划不再要求：
 
 ```text
-一个 block 计算 4x4 的 C tile。
-每个 thread 不再只算 1 个 C 元素。
-每个 thread 算同一列上的 TM 个 C 元素。
+不写 gemm_1d_thread_tiling.cu。
+不单独 profile 1D。
+不把 1D 当作品重点。
 ```
 
-你要手推：
+真正要复盘的是 2D：
 
 ```text
-thread 0 算哪些 C 元素？
-thread 1 算哪些 C 元素？
-每个 thread 需要哪些 A 值？
-每个 thread 需要哪些 B 值？
-B 的一个值为什么可以复用 TM 次？
+每个 thread 计算 TM x TN 个 C 元素。
+regM[TM] 来自 A 的一小列。
+regN[TN] 来自 B 的一小行。
+acc[TM][TN] 是当前 thread 负责的小 C tile。
 ```
 
-重点直觉：
+外积核心：
 
 ```text
-普通 shared GEMM：
-  一个 thread 算一个 C。
+for k:
+  load regM[0..TM-1]
+  load regN[0..TN-1]
 
-1D thread tiling：
-  一个 thread 算多个 C。
-  B 的一个元素读进寄存器后，可以和多个 A 元素相乘。
+  for i in TM:
+    for j in TN:
+      acc[i][j] += regM[i] * regN[j]
 ```
 
 产出：
 
 ```text
-一张手推图或 Markdown 图。
-一段口述：1D thread tiling 到底复用了什么。
+一张 1D vs 2D 对照图。
+一段口述：为什么 1D 是过渡，2D 是主线。
 ```
 
-### Day 3：手写 1D thread tiling GEMM
+### Day 3：手写或整理 2D register tiling GEMM
 
 目标：
 
 ```text
-写出 gemm_1d_thread_tiling.cu，并跑通。
+写出或整理 gemm_2d_thread_tiling.cu，并跑通。
 ```
 
 建议参数：
 
 ```text
-BM = 64
-BN = 64
+BM = 64 或 128
+BN = 64 或 128
 BK = 8 或 16
-TM = 4 或 8
+TM = 4
+TN = 4
 ```
 
 最低要求：
@@ -352,7 +353,8 @@ TM = 4 或 8
 
 ```text
 索引正确。
-寄存器数组 acc[TM] 正确。
+regM[TM] / regN[TN] 正确。
+寄存器数组 acc[TM][TN] 正确。
 shared memory 加载正确。
 边界处理正确。
 ```
@@ -360,16 +362,16 @@ shared memory 加载正确。
 产出：
 
 ```text
-gemm_1d_thread_tiling.cu
-benchmark.md 增加 naive/shared/1D 对比
+gemm_2d_thread_tiling.cu
+benchmark.md 增加 naive/shared/2D 对比
 ```
 
-### Day 4：profile 1D thread tiling
+### Day 4：profile 2D register tiling
 
 目标：
 
 ```text
-用数据证明 1D thread tiling 为什么变快或为什么没变快。
+用数据证明 2D register tiling 为什么变快或为什么没变快。
 ```
 
 ncu 重点看：
@@ -386,7 +388,7 @@ stall reason
 要回答：
 
 ```text
-1D tiling 提高了哪些复用？
+2D tiling 提高了哪些复用？
 寄存器用量是否上升？
 occupancy 是否下降？
 如果 occupancy 下降了，为什么仍可能更快？
@@ -396,93 +398,55 @@ occupancy 是否下降？
 
 ```text
 ncu_notes.md
-一张 naive/shared/1D 的表格
+一张 naive/shared/2D 的表格
 一段口述：性能变化原因
 ```
 
-### Day 5：2D thread tiling 的外积视角
+### Day 5：2D 参数实验
 
 目标：
 
 ```text
-理解每个 thread 算 TM x TN 个 C 元素。
+理解 BM/BN/BK/TM/TN 对性能的影响。
 ```
 
-核心图像：
+实验维度：
 
 ```text
-regM[TM] 来自 A 的一小列
-regN[TN] 来自 B 的一小行
-acc[TM][TN] 是这个 thread 负责的小 C tile
+BM/BN:
+  block 负责的 C tile 大小。
 
-每一步 k：
-  acc[i][j] += regM[i] * regN[j]
-```
+BK:
+  每次 K 方向搬多少。
 
-这就是外积。
+TM/TN:
+  每个 thread 负责的小 C tile。
 
-必须手推一个小例子：
-
-```text
-TM = 2
-TN = 2
-
-regM = [a0, a1]
-regN = [b0, b1]
-
-更新：
-  acc00 += a0*b0
-  acc01 += a0*b1
-  acc10 += a1*b0
-  acc11 += a1*b1
+threads per block:
+  通常约等于 BM*BN/(TM*TN)。
 ```
 
 产出：
 
 ```text
-一张 2D register tile 图。
-一段口述：为什么 2D tiling 是外积。
+一张参数实验表。
+记录每组参数的 GFLOPS、registers/thread、occupancy。
 ```
 
-### Day 6：手写 2D thread tiling GEMM
+### Day 6：shared/register 访存账 + Roofline
 
 目标：
 
 ```text
-写出 gemm_2d_thread_tiling.cu。
-```
-
-建议参数：
-
-```text
-BM = 64 或 128
-BN = 64 或 128
-BK = 8 或 16
-TM = 4
-TN = 4
-```
-
-最低要求：
-
-```text
-1. 跑通 512/1024。
-2. correctness PASS。
-3. benchmark 对比 shared 和 1D。
-4. 记录寄存器数量和 occupancy。
-```
-
-注意：
-
-```text
-2D tiling 更容易写错索引。
-先保证正确，再追速度。
+从数据移动角度解释为什么 2D register tiling 有收益。
 ```
 
 产出：
 
 ```text
-gemm_2d_thread_tiling.cu
-benchmark.md 增加 2D 数据
+计算 naive/shared/2D 的 FLOP、bytes、AI。
+写一段 Roofline 判断。
+结合 ncu 解释瓶颈从 DRAM 转向 shared/register/compute 的可能性。
 ```
 
 ### Day 7：Week 1 复盘
@@ -490,7 +454,8 @@ benchmark.md 增加 2D 数据
 目标：
 
 ```text
-把 naive -> shared -> 1D -> 2D 讲成一条连续的优化链。
+把 naive -> shared -> 2D register tiling 讲成一条连续的优化链。
+1D 只作为中间概念对照，不作为重点实现版本。
 ```
 
 必须完成：
@@ -508,8 +473,8 @@ benchmark.md 增加 2D 数据
 naive GEMM 的问题是 global memory 重复读取 A/B，AI 很低。
 shared tiling 把 A/B tile 搬到 shared memory，提高了 global memory 复用。
 但 shared GEMM 中每个 thread 仍频繁从 shared memory 读数据。
-1D thread tiling 让一个 thread 计算多个输出，复用 B 或 A 到多个 acc。
-2D thread tiling 进一步让一个 thread 计算 TM x TN 小块，用 regM/regN 做外积，增加寄存器级复用。
+1D thread tiling 是过渡概念：它说明一个 thread 可以计算多个输出，并在寄存器里复用 A 或 B。
+2D thread tiling 才是本周主线：一个 thread 计算 TM x TN 小块，用 regM/regN 做外积，增加寄存器级复用。
 代价是寄存器更多、occupancy 可能下降，但如果减少了访存和指令瓶颈，整体仍可能更快。
 ```
 
@@ -517,10 +482,11 @@ shared tiling 把 A/B tile 搬到 shared memory，提高了 global memory 复用
 
 ```text
 [ ] gemm_shared_baseline.cu
-[ ] gemm_1d_thread_tiling.cu
+[ ] 1D vs 2D 概念对照图
 [ ] gemm_2d_thread_tiling.cu
 [ ] benchmark.md
 [ ] ncu_notes.md
+[ ] roofline.md
 [ ] 能闭卷讲 GEMM 优化阶梯
 ```
 
@@ -1117,7 +1083,6 @@ projects/gemm_optimization_ladder/
   src/
     gemm_naive.cu
     gemm_shared.cu
-    gemm_1d_thread_tiling.cu
     gemm_2d_thread_tiling.cu
     gemm_vectorized.cu
     wmma_fp16_gemm.cu
@@ -1204,7 +1169,7 @@ softmax warp/block
 
 ```text
 shared GEMM
-1D register tiling
+1D register tiling 概念对照
 2D register tiling 核心循环
 WMMA GEMM fragment 骨架
 ```
@@ -1397,7 +1362,8 @@ DualPipe 优化什么？
 第 2 周末：
 
 ```text
-能手写 1D / 2D register tiling。
+能手写 2D register tiling 核心循环。
+能讲 1D / 2D register tiling 的区别，但不要求单独实现 1D。
 能讲 naive -> shared -> register -> vectorized -> double buffering。
 有 GEMM benchmark 表和 ncu notes。
 ```

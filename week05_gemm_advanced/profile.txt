@@ -1,0 +1,80 @@
+==PROF== Connected to process 1125109 (/home/qichengjie/workspace/cuda_study/week05_gemm_advanced/gemm_shared_baseline)
+==PROF== Profiling "gemm_shared_baseline" - 0 (1/1): 0%....50%....100% - 9 passes
+GEMM shape: M=1024 N=1024 K=1024
+gemm_shared_baseline cost: 6.003 ms, 357.76 GFLOPS
+gemm_shared_baseline cost: 1139.417 ms, 1.88 GFLOPS
+max abs error vs CPU: 1.525879e-05 -> PASS
+==PROF== Disconnected from process 1125109
+[1125109] gemm_shared_baseline@127.0.0.1
+  gemm_shared_baseline(const float *, const float *, float *, int, int, int) (32, 32, 1)x(32, 32, 1), Context 1, Stream 7, Device 0, CC 7.5
+    Section: GPU Speed Of Light Throughput
+    ----------------------- ----------- ------------
+    Metric Name             Metric Unit Metric Value
+    ----------------------- ----------- ------------
+    DRAM Frequency                  Ghz         4.95
+    SM Frequency                    Ghz         1.58
+    Elapsed Cycles                cycle      4265406
+    Memory Throughput                 %        83.97
+    DRAM Throughput                   %        12.40
+    Duration                         ms         2.69
+    L1/TEX Cache Throughput           %        85.51
+    L2 Cache Throughput               %         6.57
+    SM Active Cycles              cycle   4174991.88
+    Compute (SM) Throughput           %        83.97
+    ----------------------- ----------- ------------
+
+    INF   This workload is utilizing greater than 80.0% of the available compute or memory performance of this device.  
+          To further improve performance, work will likely need to be shifted from the most utilized to another unit.   
+          Start by analyzing workloads in the Compute Workload Analysis section.                                        
+
+    Section: Launch Statistics
+    -------------------------------- --------------- ---------------
+    Metric Name                          Metric Unit    Metric Value
+    -------------------------------- --------------- ---------------
+    Block Size                                                  1024
+    Function Cache Configuration                     CachePreferNone
+    Grid Size                                                   1024
+    Registers Per Thread             register/thread              35
+    Shared Memory Configuration Size           Kbyte           32.77
+    Driver Shared Memory Per Block        byte/block               0
+    Dynamic Shared Memory Per Block       byte/block               0
+    Static Shared Memory Per Block       Kbyte/block            8.45
+    # SMs                                         SM              40
+    Stack Size                                                  1024
+    Threads                                   thread         1048576
+    # TPCs                                                        20
+    Enabled TPC IDs                                              all
+    Uses Green Context                                             0
+    Waves Per SM                                               25.60
+    -------------------------------- --------------- ---------------
+
+    Section: Occupancy
+    ------------------------------- ----------- ------------
+    Metric Name                     Metric Unit Metric Value
+    ------------------------------- ----------- ------------
+    Block Limit SM                        block           16
+    Block Limit Registers                 block            1
+    Block Limit Shared Mem                block            3
+    Block Limit Warps                     block            1
+    Theoretical Active Warps per SM        warp           32
+    Theoretical Occupancy                     %          100
+    Achieved Occupancy                        %       100.00
+    Achieved Active Warps Per SM           warp        32.00
+    ------------------------------- ----------- ------------
+
+    Section: GPU and Memory Workload Distribution
+    -------------------------- ----------- ------------
+    Metric Name                Metric Unit Metric Value
+    -------------------------- ----------- ------------
+    Average DRAM Active Cycles       cycle   1650949.50
+    Total DRAM Elapsed Cycles        cycle    106493952
+    Average L1 Active Cycles         cycle   4174991.88
+    Total L1 Elapsed Cycles          cycle    170073424
+    Average L2 Active Cycles         cycle   1753397.09
+    Total L2 Elapsed Cycles          cycle    129835776
+    Average SM Active Cycles         cycle   4174991.88
+    Total SM Elapsed Cycles          cycle    170073424
+    Average SMSP Active Cycles       cycle   4176266.91
+    Total SMSP Elapsed Cycles        cycle    680293696
+    -------------------------- ----------- ------------
+

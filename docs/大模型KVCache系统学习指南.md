@@ -54,23 +54,72 @@ KV Cache 的布局会影响 attention kernel 的访存效率。
 
 ## 1. 先复习 Transformer Attention
 
-Transformer 每层里有 attention。
+### 1.0 用一个生活类比理解 attention
 
-给定输入 hidden states：
+先别看公式。Attention（注意力）想解决的问题是：
+
+```text
+当模型读到当前这个词时，
+它应该“关注”前面哪些词，关注多少？
+```
+
+举个例子，句子：
+
+```text
+小明把书放在桌子上，然后他离开了。
+```
+
+当模型处理 “他” 这个词时，它需要知道 “他” 指的是 “小明”。
+
+attention 做的事就是：让 “他” 这个词，
+去看前面所有词，给每个词打一个“相关性分数”，
+然后按分数加权，把相关词的信息汇总过来。
+
+```text
+他 -> 小明: 分数高（很相关）
+他 -> 书:   分数低
+他 -> 桌子: 分数低
+```
+
+可以类比成查字典/搜索：
+
+```text
+Query  = 你要查的问题（“他”指谁？）
+Key    = 每个词的“索引标签”（用来被匹配）
+Value  = 每个词真正的“内容”（匹配上之后取出来的信息）
+```
+
+匹配过程：拿 Query 和每个词的 Key 比一比有多像（打分），
+分数越高，就从那个词的 Value 里取越多信息。
+
+记住这三件事，下面的公式就只是把这个过程数学化。
+
+### 1.1 Attention 的输入
+
+Transformer 每层里都有 attention。
+
+给定输入 hidden states（可以理解为“每个 token 当前的向量表示”）：
 
 ```text
 X: [batch, seq_len, hidden_size]
+
+batch:       一次处理几条句子
+seq_len:     句子里有几个 token
+hidden_size: 每个 token 用多长的向量表示
 ```
 
-通过线性层得到：
+通过三个不同的线性层（就是矩阵乘法 + 各自的权重）得到 Q、K、V：
 
 ```text
-Q = X * Wq
-K = X * Wk
-V = X * Wv
+Q = X * Wq   # Query
+K = X * Wk   # Key
+V = X * Wv   # Value
 ```
 
-然后 attention 大概是：
+也就是说：同一个 token，乘三套不同权重，
+得到“它的提问”、“它的索引标签”、“它的内容”三个向量。
+
+### 1.2 Attention 的核心公式
 
 ```text
 scores = Q * K^T / sqrt(head_dim)
@@ -78,32 +127,106 @@ prob   = softmax(scores)
 out    = prob * V
 ```
 
-其中：
+逐行解释：
 
 ```text
-Q = Query
-K = Key
-V = Value
+1) scores = Q * K^T
+   让每个 token 的 Query 和所有 token 的 Key 做点积。
+   点积越大 = 两个向量越“像” = 越相关。
+   结果是一个 [seq_len, seq_len] 的分数矩阵：
+   第 i 行第 j 列 = 第 i 个 token 对第 j 个 token 的关注分数。
+
+2) / sqrt(head_dim)
+   缩放。head_dim 越大，点积数值越大，
+   除以 sqrt(head_dim) 防止数值过大导致 softmax 梯度消失。
+
+3) softmax(scores)
+   把每一行的分数变成“加起来等于 1 的概率”。
+   分数高的变成大权重，分数低的变成小权重。
+
+4) out = prob * V
+   用这些权重，对所有 token 的 Value 做加权求和。
+   得到当前 token “汇总了相关信息后”的新表示。
 ```
 
-可以用一个很直观的说法：
+### 1.3 一个最小数字例子
+
+假设只有 3 个 token，head_dim = 2（向量很短，方便手算）。
+
+当前 token 的 Query：
 
 ```text
-Q:
-  当前 token 想问什么。
+Q_cur = [1, 0]
+```
 
-K:
-  每个历史 token 能被什么问题匹配到。
+三个历史 token 的 Key：
 
-V:
-  每个历史 token 真正携带的信息内容。
+```text
+K_1 = [1, 0]    # 和 Q 方向一致
+K_2 = [0, 1]    # 和 Q 垂直
+K_3 = [1, 0]    # 和 Q 方向一致
+```
+
+先算点积分数（先不除 sqrt 简化）：
+
+```text
+score_1 = 1*1 + 0*0 = 1
+score_2 = 1*0 + 0*1 = 0
+score_3 = 1*1 + 0*0 = 1
+```
+
+softmax 后（e^1≈2.718, e^0=1）：
+
+```text
+分母 = 2.718 + 1 + 2.718 = 6.436
+w_1 = 2.718 / 6.436 ≈ 0.42
+w_2 = 1     / 6.436 ≈ 0.16
+w_3 = 2.718 / 6.436 ≈ 0.42
+```
+
+可见 token 1 和 token 3（和 Query 像）拿到更大权重，
+token 2（不像）权重小。
+
+最后 out = 0.42*V_1 + 0.16*V_2 + 0.42*V_3，
+也就是主要把 token 1 和 token 3 的内容汇总过来。
+
+### 1.4 Multi-Head（多头）是什么意思
+
+上面只算了“一种关注方式”。实际模型会并行算很多套（多个 head）：
+
+```text
+head 1 可能关注“语法关系”
+head 2 可能关注“指代关系”
+head 3 可能关注“距离关系”
+...
+```
+
+每个 head 有自己的一套 Wq/Wk/Wv，独立做一遍上面的 attention，
+最后把所有 head 的输出拼接起来。
+
+```text
+num_heads:  有几套并行的注意力
+head_dim:   每套用的向量维度
+hidden_size ≈ num_heads * head_dim
+```
+
+这就是 Multi-Head Attention（MHA）。后面第 8 节讲的
+MQA/GQA/MLA，本质都是在“head 怎么共享 K/V”上做文章。
+
+### 1.5 直观总结
+
+```text
+Q:  当前 token 想问什么。
+K:  每个历史 token 能被什么问题匹配到。
+V:  每个历史 token 真正携带的信息内容。
 ```
 
 attention 做的事是：
 
 ```text
-当前 token 的 Q 和所有历史 token 的 K 做匹配。
-得到权重后，对所有历史 token 的 V 加权求和。
+当前 token 的 Q 和所有历史 token 的 K 做匹配（打分）。
+softmax 把分数变权重。
+对所有历史 token 的 V 加权求和。
 ```
 
 对单个 query token：
@@ -113,14 +236,15 @@ score_i = dot(Q_current, K_i)
 out = sum_i softmax(score_i) * V_i
 ```
 
-所以 decode 时，每生成一个新 token，它需要访问：
+关键点来了：**decode 时每生成一个新 token，它都要访问所有历史 token 的 K 和 V。**
 
 ```text
 所有历史 token 的 K
 所有历史 token 的 V
 ```
 
-这就是 KV Cache 重要的根源。
+历史 K/V 每步都要用，而且不会变，
+所以与其每步重算，不如缓存起来 —— 这就是 KV Cache 重要的根源。
 
 ---
 
@@ -676,55 +800,134 @@ kernel 访问逻辑简单。
 
 ## 12. Paged KV Cache / PagedAttention
 
-PagedAttention 的核心思想类似操作系统分页：
+### 12.0 先理解“连续分配”为什么浪费
+
+回顾第 11 节的问题：如果给每个请求预留一整块连续内存，
+就必须按“最坏情况（最大长度）”预留。
+
+举例：max_seq_len = 2048，但请求实际只生成了 40 个 token：
+
+```text
+[■■■ 已用 40 token ■■■][□□□□□□ 浪费 2008 token 的空间 □□□□□□]
+```
+
+成百上千个请求同时在线，浪费会非常惊人。
+而且请求长度事先不知道，进进出出还会造成内存碎片。
+
+### 12.1 PagedAttention 的核心思想
+
+它借用了操作系统“虚拟内存分页”的思路：
 
 ```text
 不要给每个请求分配一整块连续大内存。
-把 KV Cache 切成固定大小的 block/page。
+把 KV Cache 切成固定大小的 block/page（比如每块 16 个 token）。
 请求需要多少 token，就分配多少 block。
+这些 block 在物理显存里不需要连续。
 ```
 
-例如 block size 是 16 tokens。
-
-一个请求长度 40 tokens，需要：
+类比操作系统：
 
 ```text
-ceil(40 / 16) = 3 blocks
+OS 把内存切成固定大小的 page，
+进程看到的是“连续的虚拟地址”，
+但背后映射到不连续的物理 page。
+
+PagedAttention 把 KV Cache 切成固定大小的 block，
+请求看到的是“连续的 token 序列”，
+但背后映射到不连续的物理 block。
 ```
 
-这些 blocks 在物理显存里不一定连续。
+### 12.2 一个具体的分配例子
 
-系统维护一个 block table：
+假设 block size = 16 tokens。
+
+请求 A 当前长度 40 tokens，需要：
 
 ```text
-logical token positions -> physical KV blocks
+ceil(40 / 16) = 3 个 block
+  block 容纳 token 0..15
+  block 容纳 token 16..31
+  block 容纳 token 32..39（还剩 7 个空位，下一步 decode 继续填）
 ```
+
+系统有一个全局的“空闲 block 池”（free block pool），
+分配时随便挑 3 个物理 block，比如挑到物理编号 7、3、9：
+
+```text
+逻辑 token 位置  ->  物理 block 编号
+block 0 (token 0..15)   ->  物理 block 7
+block 1 (token 16..31)  ->  物理 block 3
+block 2 (token 32..39)  ->  物理 block 9
+```
+
+这张“逻辑到物理”的对照表就叫 **block table**：
+
+```text
+request A 的 block table = [7, 3, 9]
+```
+
+当请求 A 再生成一个新 token（第 40 个，从 0 数）时：
+
+```text
+第 40 个 token 落在 logical block 2（token 32..47）。
+查 block table -> 物理 block 9。
+写到物理 block 9 内部的第 (40 - 32) = 8 个槽位。
+```
+
+如果某个 logical block 写满了，就再从空闲池申请一个新物理 block，
+追加到 block table 末尾即可。请求结束时，把这些物理 block 还回空闲池。
+
+### 12.3 kernel 怎么读 paged KV
+
+普通连续 KV：kernel 知道起始地址，直接顺着往下读。
+
+paged KV：kernel 想读第 i 个历史 token 的 K/V，要多做一步地址翻译：
+
+```text
+1. logical_block = i / block_size      # 它在第几个逻辑块
+2. offset        = i % block_size      # 块内第几个槽位
+3. physical_block = block_table[logical_block]   # 查表得到物理块
+4. 真实地址 = physical_block 起始地址 + offset * 每 token 字节数
+```
+
+也就是每次访问多了一层“查 block table”的间接寻址。
+
+### 12.4 好处与代价
 
 好处：
 
 ```text
-减少显存浪费。
-支持请求动态增长。
-支持请求完成后回收 blocks。
-更适合 continuous batching。
+减少显存浪费（不用按最大长度预留）。
+支持请求动态增长（用多少分配多少）。
+支持请求完成后回收 block 给别人用。
+更适合 continuous batching（见第 13 节）。
 ```
 
 代价：
 
 ```text
-attention kernel 访问 KV 时多了一层地址映射。
-物理内存不连续，访存模式更复杂。
-kernel 需要针对 paged layout 优化。
+attention kernel 访问 KV 时多了一层地址映射（查 block table）。
+物理内存不连续，访存模式更复杂，coalescing 更难保证。
+kernel 需要针对 paged layout 专门优化。
 ```
 
-所以 PagedAttention 是系统和 CUDA kernel 的交界点：
+所以 PagedAttention 是“推理系统”和“CUDA kernel”的交界点：
 
 ```text
 系统层面：
-  管理 KV block。
+  管理 KV block 的分配、回收、block table。
 
 kernel 层面：
   按 block table 高效读取 K/V。
+```
+
+一句话总结面试版：
+
+```text
+PagedAttention 借鉴 OS 分页，把 KV Cache 切成固定大小 block，
+用 block table 把逻辑 token 映射到不连续的物理 block，
+从而按需分配、减少碎片和浪费、支持动态批处理，
+代价是 kernel 多了一层地址间接寻址。
 ```
 
 ---
