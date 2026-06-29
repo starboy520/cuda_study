@@ -33,6 +33,7 @@
 ### 3. 激活 / 逐元素类（Activation & Element-wise）
 | 算子 | 说明 | 关键技术 | 状态 |
 |------|------|----------|------|
+| ReLU | max(0,x) | element-wise、float4 读写双向量化 | ✅ |
 | GELU | 高斯误差线性单元 | element-wise、向量化 load (float4) | ⬜ |
 | SiLU / Swish | x * sigmoid(x) | 同上 | ⬜ |
 | fused element-wise | 多算子融合 | 减少 kernel launch 和访存 | ⬜ |
