@@ -59,3 +59,31 @@ __device__ __forceinline__ float blockReduceSumF(float value) {
     }
     return value;
 }
+
+__device__ __forceinline__ float warpReduceMaxF(float value) {
+    for (int offset = 16; offset > 0; offset /= 2) {
+        value = fmax(value, __shfl_down_sync(0xffffffffu, value, offset));
+    }
+    return value;
+}
+__device__ __forceinline__ float blockReduceMaxF(float value) {
+    __shared__ float s[MAX_WARP_NUM];
+    int lane = threadIdx.x % WARP_SIZE;
+    int warp = threadIdx.x / WARP_SIZE;
+    value = warpReduceMaxF(value);
+
+    if (lane == 0) {
+        s[warp] = value;
+    }
+    __syncthreads();
+
+    int num_warp = blockDim.x / WARP_SIZE;
+    value = -INFINITY;
+    if (lane < num_warp) {
+        value = s[lane];
+    }
+    if (warp == 0) {
+        value = warpReduceMaxF(value);
+    }
+    return value;
+}
