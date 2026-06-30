@@ -63,6 +63,43 @@
 
 ---
 
+## Week2 Day3：cp.async + pipeline 双缓冲（A100, 2048）
+
+kernel：`gemm_2d_double_buffering_tiling`，用 `cuda::memcpy_async` + `cuda::pipeline`（depth=2）+ 两块 shared buffer 做 ping-pong。
+
+| 版本 | 加载方式 | 2048 GFLOPS | 说明 |
+| --- | --- | --- | --- |
+| 2D + padding（基线） | 标量 load | 11305 | Week1 最优 |
+| float4 向量化 + padding | float4 读 global，标量写 shared | **12681** | 当前最快 🥇 |
+| cp.async 双缓冲 | 标量 cp.async（每次 1 float）+ padding | **7612** | 结构正确但偏慢 |
+
+512/1024/2048 三档均 PASS（max abs err 1.5e-05 ~ 3e-05）。
+
+### 为什么双缓冲反而慢
+```text
+1. 加载粒度太小：cp.async 每次只搬 sizeof(float)=4B → 一个 tile 发 BM*BK 条 memcpy_async
+   指令数是 float4 向量化版的 4 倍。
+2. 此 kernel 是 compute/occupancy-bound（Day6 已证 DRAM 只占 1.5%），
+   双缓冲"藏 global 延迟"的收益本就有限。
+```
+
+### padding vs float4 cp.async 的矛盾（关键认知）
+```text
+cp.async 直写 shared 16B（float4）→ 目标必须连续 16B 对齐 → 不能 padding → bank conflict
+当前选择：保留 padding + 标量 cp.async → 无 bank conflict，但加载指令多
+三种组合：
+  A 标量 cp.async + padding（当前双缓冲）：无冲突，指令多 → 慢
+  B float4 cp.async 直写（去 padding）   ：指令少，有 bank conflict
+  C float4 读 global + 标量写 padded shared（向量化版）：无冲突 + 加载少 → 最优(12681)
+要兼得"向量化 + 无冲突 + 异步重叠"，工业做法是 cp.async float4 + swizzle 布局（非 padding），
+即 cuBLAS/CUTLASS 的方案，索引复杂，留作进阶。
+```
+
+### 面试口述
+> 我用 cuda::pipeline + 两块 shared buffer 写了 cp.async 双缓冲 GEMM，ping-pong 结构正确，三档都 PASS，但 2048 只有 7612，反而比 float4 向量化版的 12681 慢。原因有两个：一是我的 cp.async 每次只搬一个 float，加载指令是向量化版的四倍；二是这个 kernel 本就 compute-bound，藏 global 延迟收益有限。想让双缓冲更快得用 float4 cp.async，但那要求 shared 连续对齐、不能 padding，会引入 bank conflict——工业上靠 swizzle 布局同时拿到向量化、无冲突和异步重叠，这是 CUTLASS 的做法。
+
+---
+
 ## Day 1：shared memory GEMM baseline
 
 kernel：`gemm_shared_baseline`
