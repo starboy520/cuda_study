@@ -33,6 +33,36 @@
 
 ---
 
+## Week2 Day1：float4 向量化 load（A100, 2048）
+
+| 版本 | global 读 | shared 布局 | 写 shared | 2048 GFLOPS | 说明 |
+| --- | --- | --- | --- | --- | --- |
+| 2D + padding（基线） | 标量 | `[BK+1]` padding | 标量 | 11305 | Week1 最优 |
+| 向量化 + 无 padding | float4 | 无 padding | 标量 | **8995** | ❌ 反而慢 |
+| 向量化 + padding | float4 | `[BK+1]` padding | 标量 | **12681** | ✅ 最快 🥇 |
+
+### ncu 定位（无 padding 向量化版，2048）
+| 指标 | 值 |
+| --- | --- |
+| shared **load** bank conflict | 134,288,803 |
+| shared **store** bank conflict | 26,453,941 |
+| registers/thread | 126 |
+| SM throughput | 53.12% |
+| achieved occupancy | 19.38% |
+
+### 结论（关键认知）
+- **盲目去 padding 换 float4 写 shared → 1.3 亿次 bank conflict**，把向量化省下的加载收益全吃掉，2048 反而从 11305 跌到 8995。
+- 正确组合：**float4 只用于读 global（连续、对齐），shared 仍保留 padding + 标量读写防冲突** → 兼得两个收益，2048 冲到 12681（约 A100 FP32 峰值 65%）。
+- 印证 Day6 Roofline 结论：此 kernel 瓶颈在 shared / occupancy，不在 global 加载；向量化要对症下药。
+
+### 面试口述
+> 我在 2D register tiling 上加 float4 向量化 global load，第一版顺手把 shared 的 padding 去了，结果 2048 反而从 11305 掉到 8995。用 ncu 一看 shared load bank conflict 高达 1.3 亿——去 padding 导致计算阶段读 shared 严重 bank 冲突。把 padding 加回、float4 只用于读 global、shared 仍标量读写，2048 提到 12681。教训是：向量化加速的是 global 读，shared 防冲突靠 padding，两者别混用。
+
+### 约束
+向量化 load 要求 **K%4==0 且 N%4==0**（A/B 的 float4 沿 K/N 方向，需行起址 16B 对齐），M 任意（已用非规整 M=100/200/300 验证 PASS）。
+
+---
+
 ## Day 1：shared memory GEMM baseline
 
 kernel：`gemm_shared_baseline`
