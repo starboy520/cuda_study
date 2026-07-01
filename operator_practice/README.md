@@ -72,6 +72,11 @@
 | softmax + sampling | 概率采样 | 累积分布 + 随机数 | ⬜ |
 | top-p (nucleus) | 核采样 | 排序/阈值截断 | ⬜ |
 
+### 9. 数据搬运类（Data Movement）
+| 算子 | 说明 | 关键技术 | 状态 |
+|------|------|----------|------|
+| transpose | 矩阵转置 | tile + shared 保持合并、padding 消 bank conflict | ✅ |
+
 ## 目录约定
 
 ```text
