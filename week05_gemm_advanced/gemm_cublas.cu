@@ -51,7 +51,7 @@ int main(int argc, char** argv) {
     cudaEventRecord(start);
     cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, N, M, K, &alpha, dB, N, dA, K, &beta, dC, N);
     cudaEventRecord(stop);
-        cudaEventSynchronize(stop);
+    cudaEventSynchronize(stop);
 
 
     float ms;

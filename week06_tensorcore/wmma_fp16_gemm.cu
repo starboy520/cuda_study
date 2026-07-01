@@ -63,11 +63,11 @@ __global__ void wmma_fp16_gemm(const half* A, const half* B, float* C,
     int tile_col = warp_id % tile_size_col;
 
     // a 处理 tile_row 这一tile（行）, b 处理   tile_col这一列（tile）
-
     wmma::fragment<wmma::matrix_a, WMMA_M, WMMA_N, WMMA_K, half, wmma::row_major> a_frag;
     wmma::fragment<wmma::matrix_b, WMMA_M, WMMA_N, WMMA_K, half, wmma::row_major> b_freg;
     wmma::fragment<wmma::accumulator, WMMA_M, WMMA_N, WMMA_K, float> c_frag;
     wmma::fill_fragment(c_frag, 0.0f);
+    
     for (int k = 0; k < K; k+=WMMA_K) {
         // tile_row *wmma_m 行， 每行K 个元素
         const half* a_tile = A + tile_row * WMMA_M * K + k;
@@ -109,8 +109,16 @@ static void cpu_reference_samples(const std::vector<half>& A,
 }
 
 int main(int argc, char** argv) {
-    const int size = argc > 1 ? std::atoi(argv[1]) : 256;
-    const int M = size, N = size, K = size;
+    int M = 256;
+    int N = 256;
+    int K = 256;
+    if (argc ==2) {
+        M = N = K = atoi(argv[1]);
+    } else if (argc >= 4) {
+        M = atoi(argv[1]);
+        N = atoi(argv[2]);
+        K = atoi(argv[3]);
+    }
     if (M <= 0 || M % 16 || N % 16 || K % 16) {
         std::fprintf(stderr, "size 必须是正的 16 倍数\n");
         return EXIT_FAILURE;
@@ -152,7 +160,7 @@ int main(int argc, char** argv) {
 
     CHECK_CUDA(cudaMemcpy(hC.data(), dC, hC.size() * sizeof(float), cudaMemcpyDeviceToHost));
     cpu_reference_samples(hA, hB, hC, M, N, K);
-    std::printf("M=N=K=%d, time=%.4f ms, %.2f GFLOPS\n", size, ms, gflops);
+    std::printf("M=%d N=%d K=%d, time=%.4f ms, %.2f GFLOPS\n", M, N, K, ms, gflops);
 
     CHECK_CUDA(cudaEventDestroy(s)); CHECK_CUDA(cudaEventDestroy(e));
     CHECK_CUDA(cudaFree(dA)); CHECK_CUDA(cudaFree(dB)); CHECK_CUDA(cudaFree(dC));
