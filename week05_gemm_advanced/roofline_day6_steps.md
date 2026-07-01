@@ -100,7 +100,7 @@ Roofline 分不出它们 —— 但它们实测速度可能差很多，
 
 【你来算】
 ```text
-FLOP = 2 * M * N * K = 2 * 2048^3 = _17179869184_____ FLOP
+FLOP = 2 * M * N * K = 2 * 2048^3 = ______ FLOP
 ```
 
 ---
@@ -118,8 +118,8 @@ FLOP = 2 * M * N * K = 2 * 2048^3 = _17179869184_____ FLOP
 
 【你来算】
 ```text
-naive bytes = 2*M*N*K * 4 = ___68719476736___ 字节
-naive AI    = FLOP / bytes = (2*M*N*K) / (2*M*N*K*4) = ___1/4___ FLOP/byte
+naive bytes = 2*M*N*K * 4 = ______ 字节
+naive AI    = FLOP / bytes = (2*M*N*K) / (2*M*N*K*4) = ______ FLOP/byte
 ```
 > 提示：这个 AI 是个很小的常数，和 M/N/K 无关。算出来你会明白 naive 为什么是重度 memory-bound。
 
@@ -138,17 +138,17 @@ B 的每个元素：复用给 BM 行
 
 【你来算】（BM=BN=64）
 ```text
-A 读取元素 = M*K*N/BN = ___16777216___
-B 读取元素 = M*N*K/BM = _16777216_____
-总元素     = ___16777216*2___
-shared bytes = 总元素 * 4 = ___16777216*2*4___ 字节
-shared AI    = FLOP / bytes = __16____ FLOP/byte
+A 读取元素 = M*K*N/BN = ______
+B 读取元素 = M*N*K/BM = ______
+总元素     = ______
+shared bytes = 总元素 * 4 = ______ 字节
+shared AI    = FLOP / bytes = ______ FLOP/byte
 ```
-> 提示：和 naive 比，bytes 应该小了约 __64__ 倍（提示：和 BM/BN 有关）。
+> 提示：和 naive 比，bytes 应该小了约 ____ 倍（提示：和 BM/BN 有关）。
 
 ---
 
- 
+## Step 3：2D register tiling 版本的 global 访存量（关键陷阱）
 
 【方法】注意这里有个反直觉点：**2D register tiling 在 global/DRAM 层面，读的 tile 和 shared 版本一模一样**（每个 block 还是把 A/B 的 tile 从 global 搬一次进 shared）。register tiling 省的是 **shared memory 的读取次数**，不是 global 的。
 
@@ -174,7 +174,7 @@ shared AI    = FLOP / bytes = __16____ FLOP/byte
 
 【你来算】
 ```text
-拐点 AI* = P / B = 19.5e12 / 1935e9 = __10____ FLOP/byte
+拐点 AI* = P / B = 19.5e12 / 1935e9 = ______ FLOP/byte
 ```
 
 ---
@@ -185,9 +185,9 @@ shared AI    = FLOP / bytes = __16____ FLOP/byte
 
 | 版本 | AI (FLOP/byte) | < 拐点? | bound 判断 | 实测 GFLOPS(2048) |
 | --- | --- | --- | --- | --- |
-| naive | ___1/4___ | ___10___ | __memory____ | （没测，可选） |
-| shared | ___16___ | ___10___ | __compute____ | ~4194 |
-| 2D+pad | ____16__ | ___10___ | ____compute__ | ~11313（8x8）/ 11382（8x4） |
+| naive | ______ | ______ | ______ | （没测，可选） |
+| shared | ______ | ______ | ______ | ~4194 |
+| 2D+pad | ______ | ______ | ______ | ~11313（8x8）/ 11382（8x4） |
 
 【你来判断】
 ```text
