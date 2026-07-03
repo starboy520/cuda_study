@@ -50,6 +50,30 @@ prefill / decode / KV cache / MQA / GQA / MLA / FlashMLA
 
 所以你不是从 CUDA 零开始。真正从零开始的是“这些 CUDA 原语在 Attention 里分别代表什么”。
 
+### 0.15 名词速查表（看不懂术语先查这里）
+
+| 术语 | 一句话解释 | 你熟悉的类比 |
+|---|---|---|
+| token | 文本切成的最小单位（词/子词），模型只认 token | 数组里的一个元素 |
+| embedding | 把 token 变成一个 D 维向量 | 查表得到一行 float |
+| D / hidden dim | 每个 token 向量的长度（如 768/4096） | 向量维度 |
+| N / seq len | 序列里 token 个数 | 数组长度 |
+| B / batch | 一次处理几条序列 | GEMM 的 batch |
+| 投影 projection | 乘一个可学习矩阵 Wq/Wk/Wv | 一次 GEMM |
+| Q/K/V | 由 X 投影出的三种向量（查询/键/值） | X·Wq 等三个 GEMM 结果 |
+| head 多头 | 把 D 切成 H 段，每段独立算 attention | 分组并行 |
+| Dh | 每个 head 的维度，`Dh=D/H` | 子向量长度 |
+| logits | softmax 之前的原始分数 | 归一化前的数值 |
+| softmax | 把一排分数变成和为 1 的概率 | 你练过的 stable softmax |
+| Transformer Block | LLM 的重复单元 = Attention+FFN+残差+Norm | 一层网络 |
+| FFN/MLP | 对每个 token 单独做的非线性变换 | 两个 Linear+激活 |
+| 残差 residual | `x + f(x)`，稳定训练 | 加回输入 |
+| 自回归 | 一次生成一个 token，循环往后接 | 逐元素输出 |
+| causal 因果 | 只能看自己和前面的 token，不能看未来 | 下三角 mask |
+| KV cache | 缓存历史 K/V，避免重复计算 | 缓存中间结果 |
+
+> 看不懂正文某个词时，回到这张表；下面预备章补充（4.5～4.8）会把大局观讲透。
+
 ### 0.2 五种代码标记
 
 - **【演示】**：完整提供，直接运行，用来建立直觉。
@@ -172,6 +196,49 @@ offset = ((1×4 + 2)×32 + 3)×16 + 4
        = 3124
 ```
 
+### 3.1 这个公式怎么来的（一层层数"全局编号"）
+
+第一次看到 `((b*H+h)*N+n)*Dh+d` 会懵。理解它的最好方法：**从外往里，每一层都先算出"到目前为止是第几个"，再拿它当下一层的起点。**
+
+内存永远是一维的，`[B,H,N,Dh]` 只是"解释"。约定最右维 `d` 变化最快（相邻的 `d` 在内存里挨着），也就是 C 数组 `arr[B][H][N][Dh]` 的排法：
+
+```text
+先把 d 排满(Dh 个) 凑成一个 n
+再把 n 排满(N 个)  凑成一个 h
+再把 h 排满(H 个)  凑成一个 b
+```
+
+一层层算"全局编号"：
+
+```text
+第1层 batch： 第 b 个 batch                    → 前面有 b 个 batch
+第2层 head：  第 b 个 batch 里的第 h 个 head    → b*H + h
+   (前面 b 个 batch，每个都有 H 个 head，共 b*H 个，再加当前的 h)
+   ★关键：算 head 全局编号时，要把前面 batch 里的 head 也数进去，所以是 b*H+h 而不是 h
+第3层 token： 当前 head 全局编号是 (b*H+h)，每个 head 有 N 个 token
+            → (b*H + h)*N + n
+第4层 维度：  当前 token 全局编号是 ((b*H+h)*N+n)，每个 token 有 Dh 个 float
+            → ((b*H + h)*N + n)*Dh + d
+```
+
+规律（口诀）：**每往里钻一层 = 当前编号 × 这一层的大小 + 这一层的坐标**
+
+```text
+  b
+  → b*H + h          (×head 数 H，加 h)
+  → ×N + n           (×token 数 N，加 n)
+  → ×Dh + d          (×维度 Dh，加 d)
+= ((b*H + h)*N + n)*Dh + d
+```
+
+它其实就是你手写 CUDA 里 `out[row*W + col]` 的多维版本：
+
+```text
+二维： row*W + col                    ← 你天天写
+四维： ((b*H+h)*N+n)*Dh + d           ← 同一套路多套几层
+你写 arr[b][h][n][d]，编译器背后算的就是这个公式。
+```
+
 `reshape` 有时只修改“如何解释同一段连续内存”的元数据，不一定搬数据；但 transpose 往往会改变 stride，若后续代码要求 contiguous，就可能触发真实拷贝。不要把“shape 变了”和“数据一定搬了”画等号。
 
 ## 4. 预备章自测
@@ -190,9 +257,134 @@ offset = ((1×4 + 2)×32 + 3)×16 + 4
 
 ---
 
+# 预备章补充：大模型是怎么运作的（零基础必看）
+
+> 这一节补上 Attention 之外的大局观：LLM 长什么样、"投影"是什么、模型怎么生成文字。
+> 懂了这些，再看 Q/K/V 才不会一头雾水。
+
+## 4.5 一个 LLM 长什么样（大局观）
+
+一个大语言模型（如 GPT/DeepSeek）本质是**一叠重复的 Transformer Block**：
+
+```text
+输入文本 → tokenizer → embedding → 
+  [Transformer Block] × L 层  →  输出层 → 预测下一个 token
+
+每个 Transformer Block 内部：
+  x → LayerNorm → Attention → 加回 x（残差）
+    → LayerNorm → FFN(前馈网络) → 加回 x（残差）
+```
+
+两个核心组件：
+```text
+1. Attention（本周主角）：让每个 token 从其他 token 读信息（token 之间"交流"）
+2. FFN/MLP（前馈网络）：对每个 token 单独做非线性变换（token 自己"思考"）
+   就是两个 Linear + 一个激活（GELU/SiLU），你练过的 GELU 就用在这
+```
+
+配套：
+```text
+残差连接（residual）：x + f(x)，让梯度好传、训练稳
+LayerNorm/RMSNorm：归一化，稳定训练（你练过 layernorm/rmsnorm）
+→ 所以你之前写的 layernorm/gelu 都是 Transformer Block 的零件！
+```
+
+## 4.6 "投影"到底是什么（Wq/Wk/Wv）
+
+文档里说 `Q = X·Wq`，这个 **Wq 就是一个可学习的矩阵**，`X·Wq` 就是**矩阵乘（GEMM）**。
+
+```text
+"线性投影 (linear projection)" = 乘一个矩阵 = 一次 GEMM
+  X [N,D] × Wq [D,Dh] → Q [N,Dh]
+
+Wq/Wk/Wv 是训练学出来的权重矩阵，作用是：
+  把同一个输入 X，变换成三个不同用途的向量（Q问什么/K能匹配什么/V贡献什么）
+"投影"这个词只是数学叫法，代码里就是矩阵乘，你早就会了。
+```
+
+对比你熟悉的：
+```text
+你写的 GEMM：C = A × B
+这里的投影：Q = X × Wq（一模一样，只是 B 换成学出来的权重 Wq）
+所以 Attention 里到处是 GEMM：投影是 GEMM、QK^T 是 GEMM、PV 是 GEMM
+```
+
+## 4.7 模型怎么生成文字（自回归）
+
+LLM 生成是**一个 token 一个 token 往外蹦**，叫**自回归 (autoregressive)**：
+
+```text
+输入 "我爱"
+  → 模型预测下一个 token "C"
+输入 "我爱C"
+  → 预测下一个 "U"
+输入 "我爱CU"
+  → 预测下一个 "DA"
+...每次把新 token 接到后面，再预测下一个，循环
+```
+
+怎么"预测下一个"：
+```text
+模型最后输出一个 logits 向量 [vocab_size]（每个词表 token 一个分数）
+  → softmax 变成概率
+  → 选概率最高的（或采样）作为下一个 token
+"logits" = 未归一化的分数，softmax 前的原始输出（你 softmax 练过）
+```
+
+这引出两个阶段（Day6 详讲）：
+```text
+prefill：一次处理完整 prompt（"我爱"）→ 并行度高
+decode ：逐个生成后续 token → 每步只有 1 个新 query，但要读全部历史 → KV cache
+```
+
+## 4.8 一句话把知识串起来
+```text
+LLM = 一叠 Transformer Block（Attention 让 token 交流 + FFN 让 token 思考 + 残差 + Norm）
+投影 = 乘可学习矩阵 = GEMM（Q=X·Wq）
+生成 = 自回归，一次蹦一个 token，靠 logits→softmax 选下一个
+你已会的零件：GEMM（投影/QK/PV）、softmax（注意力权重+选token）、
+             layernorm/rmsnorm/gelu（Block 里的归一化和 FFN）
+Attention 就是把这些零件按特定数据流组装起来。
+```
+
+---
+
 # Day 1：标准 Attention——先知道自己到底在算什么
 
 ## 5. 为什么需要 Attention
+
+### 5.0 "attention" 这个名字什么意思、为什么这么叫
+
+attention = **注意力**。名字来自**模仿人类的注意力**：
+
+```text
+人读句子 "小明把书放在桌上，然后他离开了"
+理解 "他" 指谁时 → 注意力自动"聚焦"到 "小明"，忽略 "书/桌"
+→ 不同的词对理解 "他" 重要性不同，你在给它们分配不同的"注意力"
+```
+
+Attention 机制把这件事变成数学：
+
+```text
+更新第 i 个 token 时：
+  对每个其他 token j 算一个"该关注多少"的分数  score = Qi·Kj
+  → softmax 变成一组权重（和为 1，就是"注意力分配比例"）
+  → 用这些权重加权汇总所有 token 的 V
+重要的 token 贡献大，不重要的贡献小 —— 这就是"注意力"
+```
+
+为什么恰好叫 attention：
+
+```text
+softmax 后的权重 [0.7, 0.2, 0.1] 天然像"注意力分配"：
+  70% 注意力给 token0，20% 给 token1，10% 给 token2
+这种"权重自适应聚焦、再加权求和"的模式 = 人类注意力的数学化
+2017 论文名就叫《Attention Is All You Need》，attention 从此成为标准术语
+```
+
+一句话：**每个 token 用一组 softmax 出来的自适应权重去"关注"其他 token，权重大=关注多，这组权重就是注意力。**
+
+### 5.1 三种角色 Q/K/V
 
 设一句话里有多个 token。更新第 `i` 个 token 的表示时，我们希望它能读取与自己有关的上下文，但不同 token 的重要程度不同。
 
@@ -242,6 +434,18 @@ S_raw[i,j] = Σ_d Q[i,d] × K[j,d]
 
 这正是 GEMM。区别只在于矩阵在模型里有了语义。
 
+**为什么"点积"能衡量相关性（零基础直觉）**：
+
+```text
+两个向量点积 = Σ 对应维相乘。方向越一致，点积越大：
+  a=[1,0], b=[1,0]  → 1×1+0×0 = 1   （方向相同 → 相关性高）
+  a=[1,0], b=[0,1]  → 1×0+0×1 = 0   （垂直    → 不相关）
+  a=[1,0], b=[-1,0] → 1×-1     = -1  （相反    → 负相关）
+所以 Qi·Kj 大 = query i 想找的东西 和 key j 提供的特征"方向一致"
+            = token j 对 token i 很相关 → 之后分到更大的注意力权重
+训练时模型就是在学 Wq/Wk，让"该相关的 token"点积大。
+```
+
 ### 第二步：除以 `sqrt(Dh)`
 
 ```text
@@ -288,6 +492,25 @@ O[i,d] = Σ_j P[i,j] × V[j,d]
 
 ```text
 Attention(Q,K,V) = softmax(QK^T / sqrt(Dh)) V
+```
+
+### 补充：为什么还需要"位置信息"（RoPE 的动机）
+
+上面的 attention 有个隐藏问题：**它本身分不清 token 的先后顺序。**
+
+```text
+把输入 token 的顺序打乱，QK^T 里每对 (i,j) 的点积值不变，
+只是行列跟着换位置 → 注意力"看谁"没变，只是编号换了。
+也就是说："我打了他" 和 "他打了我" 在纯 attention 眼里几乎一样！
+```
+
+但语言里顺序至关重要，所以要额外注入**位置信息**：
+
+```text
+方案A（早期）：给每个 token 的 embedding 加一个"位置向量"(position embedding)
+方案B（现在主流，含 DeepSeek）：RoPE —— 按位置把 Q/K 向量"旋转"一个角度
+  → 位置差越大，旋转差越大 → 点积自然带上"相对距离"信息
+细节见 Day6 第 51 节；这里只需记住：attention 要外挂位置信息，否则不懂顺序。
 ```
 
 ## 7. 用 `N=3,Dh=2` 真正手算一遍
@@ -364,6 +587,71 @@ V: [B,H,N,Dh]
 所有 head 输出拼成 `[B,N,H×Dh]=[B,N,D]`，再乘输出投影 `Wo`。
 
 不要把 head 和 CUDA warp 绑定。head 是模型数学维度；一个 head 可以由很多 block/warp 计算，一个 warp 也可能处理某个 head 的一小块。
+
+### 8.1 多头 reshape 一步步（小白必看）
+
+多头的本质：**把 D 维向量切成 H 段（每段 Dh 维），每段交给一个"头"独立做 attention。**
+
+为什么要多头：
+```text
+单头：每个 token 用一个 D 维向量，只能"从一个角度"找 token 关系
+多头：D 切成 H 段，每段独立找关系（一个头看语法、一个头看指代…打比方）
+     → 多角度并行，表达更丰富
+```
+
+用具体数字（`B=1, N=3, D=6, H=2, Dh=3`，满足 `D=H×Dh`）：
+
+**① reshape 前 `[B,N,D]=[1,3,6]`**
+```text
+token0: [a0 a1 a2 | a3 a4 a5]
+token1: [b0 b1 b2 | b3 b4 b5]
+token2: [c0 c1 c2 | c3 c4 c5]
+        └─ 头0 ─┘ └─ 头1 ─┘
+每个 token 的 6 维，前 3 维给头0，后 3 维给头1。
+```
+
+**② reshape `[B,N,D] → [B,N,H,Dh]=[1,3,2,3]`**
+```text
+只是"重新解释"：把最后 6 维看成 2×3，内存不动（同 GEMM 把一维看成二维）
+token0: 头0=[a0 a1 a2]  头1=[a3 a4 a5]
+token1: 头0=[b0 b1 b2]  头1=[b3 b4 b5]
+token2: 头0=[c0 c1 c2]  头1=[c3 c4 c5]
+```
+
+**③ transpose `[B,N,H,Dh] → [B,H,N,Dh]=[1,2,3,3]`**
+```text
+把"同一个头的所有 token"聚一起（这一步可能真搬数据）
+头0：token0=[a0 a1 a2], token1=[b0 b1 b2], token2=[c0 c1 c2]
+头1：token0=[a3 a4 a5], token1=[b3 b4 b5], token2=[c3 c4 c5]
+```
+
+**为什么要 `[B,H,N,Dh]` 这个顺序**：attention 是"每个 (batch,head) 独立做一次"，
+所以把 B、H 放前面当"批次维"，`[N,Dh]` 才是真正参与矩阵乘的部分。
+
+**完整流程**：
+```text
+1. X[B,N,D] 投影得 Q/K/V，都是 [B,N,D]
+2. reshape:   [B,N,D] → [B,N,H,Dh]     切头，不搬数据（D=H×Dh）
+3. transpose: [B,N,H,Dh] → [B,H,N,Dh]  分离头，把同头 token 聚一起（搬数据）
+4. 每个 (b,h) 做 attention: [N,Dh] → [N,Dh]
+5. transpose 回: [B,H,N,Dh] → [B,N,H,Dh]
+6. reshape 回:   [B,N,H,Dh] → [B,N,D]  拼头
+7. 乘输出投影 Wo → 最终输出
+```
+
+**用你熟悉的话**：
+```text
+reshape  = 你 GEMM 里"把一维内存看成二维矩阵"，只改解释不搬数据
+transpose = 你写的 transpose kernel，真换内存顺序，把"每 token 的多头"重排成"每头的多 token"
+```
+
+自测（`B=2,N=4,D=8,H=4`）：
+```text
+1. Dh=? → 8/4=2
+2. reshape 后 shape=? → [2,4,4,2]
+3. transpose 后=? → [2,4,4,2]（B,H,N,Dh，中间两维含义变了）
+4. 几个独立 attention？ → B×H=2×4=8 个
+```
 
 ## 9.【演示】完整 CPU Attention reference
 
