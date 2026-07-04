@@ -1182,7 +1182,7 @@ O = P0*V0 + P1*V1 + P2*V2 + P3*V3
 
 ## 22. 一个很自然但错误的分块方法
 
-假设 SRAM 一次只能放两个元素，于是把输入切成：
+FlashAttention 论文常用 **SRAM** 概括 GPU 芯片上的高速存储。映射到 CUDA 编程时，tile 通常由 shared memory 承载，各线程的局部状态和 accumulator 常放在 register file；二者是不同硬件资源，不应把 register 严格等同于 SRAM。为便于手算，假设当前可用的片上空间一次只能容纳两个元素，于是把输入切成：
 
 ```text
 tile A: scores=[2,1], V=[V0,V1]
@@ -1370,7 +1370,7 @@ HBM 写 O_i ←──────────────── 最后才归一�
 
 | 变量 | 典型生命周期 | 教学上的典型位置 | 工业实现差异 |
 |---|---|---|---|
-| `Q/K/V` | 整个算子输入 | HBM | 通过 L2、`cp.async`/异步流水分块进入 shared/register |
+| `Q/K/V` | 整个算子输入 | HBM | A100 的 `cp.async` 将 global memory 中的 tile 搬到 shared memory（通常经 L2）；随后线程用普通 load，或由 MMA 数据路径，从 shared 消费到 registers/fragment |
 | 当前 `Q` tile | 遍历多个 K/V tile 期间 | shared memory 或 registers | 常拆到各 warp 的 registers，布局服务于 MMA |
 | 当前 `K/V` tile | 当前内层迭代 | shared memory | 双缓冲、多 stage、swizzle，随后进入 registers/MMA fragment |
 | 当前 `S/P` tile | 只在当前 tile 更新期间 | registers/shared，随后丢弃 | 常不以完整矩阵形态存在，softmax 与矩阵乘流水融合 |
