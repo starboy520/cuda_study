@@ -1208,23 +1208,110 @@ tile B 的局部输出      = [1.4621172, 0.5378828]
 
 ## 23. 先不考虑稳定性：Attention 本来就是分子除以分母
 
-暂时忽略 `exp(4)` 可能溢出，把一行 Attention 改写为：
+这一节先不讨论溢出，只回答一个问题：**如果 K/V 被切成多个 tile，怎样仍然算出同一个 Attention？**
+
+固定一个 query。它对第 `j` 个 key 的 score 记作 `s_j`。softmax 给出的权重是：
 
 ```text
-    Σ_j exp(score_j) V_j
-O = --------------------
-       Σ_j exp(score_j)
+      exp(s_j)
+p_j = ----------------
+      Σ_k exp(s_k)
 ```
 
-分块后，分母是可以累加的标量，分子是可以逐维累加的向量：
+Attention 输出是用这些权重对所有 value 做加权平均：
 
 ```text
-denominator += Σ_{j in tile} exp(score_j)
-numerator   += Σ_{j in tile} exp(score_j) V_j
-最终 O = numerator / denominator
+O = Σ_j p_j V_j
 ```
 
-这已经解决“两个局部分母”的逻辑错误。但直接计算 `exp(score)` 不稳定。stable softmax 会减去最大值；流式场景的问题是：读到下一个 tile 时，最大值可能变了。下面只需解决“最大值改变后，旧累计量怎样换到新尺度”。
+把 `p_j` 的定义代进去：
+
+```text
+        exp(s_0)                  exp(s_1)
+O = ---------------- V_0 + ---------------- V_1 + ...
+    Σ_k exp(s_k)              Σ_k exp(s_k)
+```
+
+每一项的分母都是同一个 `Σ_k exp(s_k)`，所以可以把共同分母提出来：
+
+```text
+    exp(s_0)V_0 + exp(s_1)V_1 + ...
+O = --------------------------------
+         exp(s_0) + exp(s_1) + ...
+
+    Σ_j exp(s_j)V_j
+  = ----------------
+       Σ_j exp(s_j)
+```
+
+这里有两个不同类型的累计量：
+
+- `denominator = Σ_j exp(s_j)`：一个**标量**，也就是 softmax 的分母；
+- `numerator = Σ_j exp(s_j)V_j`：一个**向量**，shape 与单个 `V_j` 相同。
+
+因为 `exp(s_j)` 是标量，所以 `exp(s_j)V_j` 只是把 `V_j` 的每个分量乘以同一个权重。最后的 `numerator / denominator` 也是向量除以标量，即 numerator 的每个分量都除以同一个 denominator。
+
+### 23.1 用两个 tile 真的加一次
+
+继续使用前面的例子：
+
+```text
+scores = [2,1,4,3]
+
+V_0 = [1,0]    V_1 = [0,1]
+V_2 = [2,0]    V_3 = [0,2]
+
+tile A = 下标 0、1
+tile B = 下标 2、3
+```
+
+先处理 tile A。注意这里只累计，**先不做除法**：
+
+```text
+den_A = exp(2) + exp(1)
+
+num_A = exp(2)[1,0] + exp(1)[0,1]
+      = [exp(2), exp(1)]
+```
+
+再处理 tile B，同样只累计：
+
+```text
+den_B = exp(4) + exp(3)
+
+num_B = exp(4)[2,0] + exp(3)[0,2]
+      = [2exp(4), 2exp(3)]
+```
+
+两个 tile 都处理完以后，把局部和合并成全局和：
+
+```text
+denominator = den_A + den_B
+            = exp(2) + exp(1) + exp(4) + exp(3)
+            ≈ 84.79102488
+
+numerator = num_A + num_B
+          = [exp(2)+2exp(4), exp(1)+2exp(3)]
+          ≈ [116.5853562, 42.8893557]
+
+O = numerator / denominator
+  ≈ [1.3749728, 0.5058242]
+```
+
+这正是第 21 节一次性计算普通 Attention 得到的结果。分块只改变了求和的先后顺序：
+
+```text
+全局分母 = 各 tile 的局部分母之和
+全局分子 = 各 tile 的局部分子之和
+```
+
+最重要的规则是：
+
+> **加法可以分批完成，除法不能提前。** 每个 tile 可以贡献一部分 numerator 和 denominator，但必须等所有 tile 的贡献都收齐，才能做唯一的一次全局除法。
+
+这就解释了为什么第 22 节“每个 tile 各自 softmax”会错：它在全局分子和全局分母还没收齐时，就提前做了两次局部除法。
+
+到这里，分块的数学逻辑已经正确。不过直接计算 `exp(score)` 仍可能上溢。stable softmax 会先减去最大值；而流式读取 tile 时，最大值还可能被后面的 tile 改写。第 24 节要解决的，就是**最大值改变后，已经累计的 numerator 和 denominator 怎样一起换到新的安全尺度**。
 
 ## 24. 加回稳定性：`m/l/O_acc` 是同一计量基准下的状态
 
