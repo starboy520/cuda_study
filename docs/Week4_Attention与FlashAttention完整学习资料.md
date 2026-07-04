@@ -1136,155 +1136,186 @@ __device__ Pair combine(Pair a, Pair b) {
 
 # Day 3：FlashAttention——优化的是数据搬运顺序
 
-## 21. 标准 Attention 的 IO 路径
+## 21. 先用同一个四元素例子算普通 Attention
 
-标准三 kernel 教学实现：
-
-```text
-HBM: Q,K
-   ↓ 读取
-Kernel 1: S = QK^T / sqrt(Dh)
-   ↓ 写回完整 S[N,N]
-HBM: S
-   ↓ 读取 + 写回
-Kernel 2: P = softmax(S)
-HBM: P[N,N]
-   ↓ 再读取 P,V
-Kernel 3: O = PV
-   ↓ 写回 O
-```
-
-虽然 `S/P` 只被短暂使用，却在 HBM 中物化（materialize）。长序列时它们是平方规模。
-
-FlashAttention 原始论文将问题明确为 GPU 内存层次之间的 IO 问题：通过 tiling，把工作放进片上 SRAM，减少 HBM 读写，同时保持 exact attention。[FlashAttention 论文](https://arxiv.org/abs/2205.14135)
-
-## 22. 分块后的数据流
+Day 2 已经用过 `scores=[2,1,4,3]`。Day 3 不换例子，只给四个 score 各配一个二维 value：
 
 ```text
-HBM                       片上 SRAM / registers
- Q_i  ────────────────→   固定一个 Q tile
- K_j,V_j ─────────────→   逐块加载 K/V tile
-                            ↓
-                         S_ij = Q_i K_j^T
-                            ↓
-                         局部 softmax 统计
-                            ↓
-                         更新 m / l / O_acc
-                            ↓
-HBM  ←────────────────   最终只写 O_i（及必要统计量）
+scores = [2, 1, 4, 3]
+V0 = [1,0]
+V1 = [0,1]
+V2 = [2,0]
+V3 = [0,2]
 ```
 
-关键不是“GPU 再也不读 K/V”。当 SRAM 容不下整个序列时，算法仍会按 tile 读取数据；关键是**不把完整 `S` 和 `P` 写回 HBM再读回来**。
-
-## 23. 三个 running state：`m`、`l`、`O_acc`
-
-对 Q tile 中每一行 query，保存：
-
-- `m`：目前看过的所有 score 的最大值；
-- `l`：相对 `m` 的指数和；
-- `O_acc[Dv]`：相对同一 `m` 的**未归一化输出分子**。
-
-对新的 K/V tile：
+这里先把 `scores` 当作 `QKᵀ/sqrt(Dh)` 已经算好的某一行。普通 Attention 对这一行做 stable softmax。全局最大值是 4：
 
 ```text
-S_ij = Q_i K_j^T / sqrt(Dh)          shape [Br,Bc]
-m_block = rowmax(S_ij)               shape [Br]
-m_new = max(m_old,m_block)           shape [Br]
-alpha = exp(m_old-m_new)             shape [Br]
-P_ij = exp(S_ij-m_new)               shape [Br,Bc]，尚未除分母
-l_new = alpha*l_old + rowsum(P_ij)   shape [Br]
-O_acc_new = alpha*O_acc_old + P_ij V_j   shape [Br,Dv]
+exp(scores-4) = [e^-2, e^-3, 1, e^-1]
+              ≈ [0.1353352832366127,
+                  0.04978706836786394,
+                  1,
+                  0.36787944117144233]
+
+l = e^-2 + e^-3 + 1 + e^-1
+  ≈ 1.553001792775919
 ```
 
-遍历所有 K/V tile 后：
+所以 softmax 权重约为：
 
 ```text
-O_i = O_acc / l
+P ≈ [0.08714431874203257,
+     0.03205860328008499,
+     0.6439142598879724,
+     0.23688281808991013]
 ```
 
-这里全文统一用“未归一化 `O_acc`”表示法。某些论文伪代码或实现会保存已经除过旧 `l` 的 O，那时更新公式长相不同；不要把两套表示法拼在一起。
-
-## 24. 为什么旧输出也必须乘 `alpha`
-
-设一个 query，`Dv=2`。
-
-第一块：
+最终输出是四个 value 的加权和：
 
 ```text
-scores_a = [2,1]
-V_a = [[1,0],
-       [0,1]]
-
-m_old = 2
-l_old = 1 + e^-1
-O_acc_old = 1×[1,0] + e^-1×[0,1]
-          = [1,e^-1]
+O = P0*V0 + P1*V1 + P2*V2 + P3*V3
+  = [P0 + 2*P2, P1 + 2*P3]
+  ≈ [1.3749728385179774, 0.5058242394599053]
 ```
 
-第二块：
+请记住这个结果。后面分成两个 tile 后，目标不是“得到一个差不多的向量”，而是仍得到这个普通 Attention 结果。
+
+## 22. 一个很自然但错误的分块方法
+
+假设 SRAM 一次只能放两个元素，于是把输入切成：
 
 ```text
-scores_b = [4,3]
-V_b = [[2,0],
-       [0,2]]
+tile A: scores=[2,1], V=[V0,V1]
+tile B: scores=[4,3], V=[V2,V3]
 ```
 
-新 max 是 4，因此旧贡献都要换成“相对 4”的尺度：
+错误做法是：两个 tile 各自做 softmax，各自得到一个输出，再直接相加或平均。
 
 ```text
-alpha = exp(2-4)=e^-2
+tile A 的局部 softmax = [0.7310586, 0.2689414]
+tile A 的局部输出      = [0.7310586, 0.2689414]
 
-l_new = e^-2(1+e^-1) + (1+e^-1)
+tile B 的局部 softmax = [0.7310586, 0.2689414]
+tile B 的局部输出      = [1.4621172, 0.5378828]
 
-O_acc_new
-= e^-2[1,e^-1] + 1×[2,0] + e^-1×[0,2]
+若简单平均两个局部输出 ≈ [1.0965879, 0.4034121]   // 错
+普通 Attention 输出    ≈ [1.3749728, 0.5058242]   // 对
 ```
 
-如果只缩放 `l_old` 而不缩放 `O_acc_old`，分母认为旧块贡献已变小，分子却仍保留旧尺度，最终输出必然错误。
+错因不是 tile 大小，而是制造了**两个局部分母**：tile A 除以 `exp(2)+exp(1)`，tile B 除以 `exp(4)+exp(3)`。每块归一化后都被强行赋予总权重 1，丢掉了“tile B 的 score 整体比 tile A 大很多”这条信息。直接相加同样错误，因为总权重又变成了 2。
 
-一句话：
+因此不能先把每个 tile 单独归一化完再拼。我们必须保留一个能跨 tile 累计的全局分子和全局分母。
 
-> `l` 是 softmax 分母，`O_acc` 是同一指数权重下的向量分子；换 max 基准时二者必须一起换单位。
+## 23. 先不考虑稳定性：Attention 本来就是分子除以分母
 
-## 25. 为什么 FlashAttention 仍是 exact
-
-它没有：
-
-- 删除某些 key；
-- 把 softmax 换成线性函数；
-- 做低秩近似；
-- 改变 `QK^T` 或 `PV` 的数学定义。
-
-它只利用分块与 online softmax 重排运算。从实数数学看结果与标准 Attention 相同；浮点下由于求和顺序不同，末位可能不同，所以工程上用容差对齐，而不是逐 bit 对齐。
-
-原始 FlashAttention forward 的主导矩阵乘 FLOP 仍约：
+暂时忽略 `exp(4)` 可能溢出，把一行 Attention 改写为：
 
 ```text
-QK^T: 2N²Dh
-PV:   2N²Dv
-若 Dv=Dh，总计约 4N²Dh
+    Σ_j exp(score_j) V_j
+O = --------------------
+       Σ_j exp(score_j)
 ```
 
-它的主要胜利是减少 HBM IO 和中间存储。不能说“复杂度从 `O(N²)` 变成 `O(N)`”；精确 dense attention 的 score 交互数量仍是平方级。
+分块后，分母是可以累加的标量，分子是可以逐维累加的向量：
 
-## 26. causal 分块的三种情况
+```text
+denominator += Σ_{j in tile} exp(score_j)
+numerator   += Σ_{j in tile} exp(score_j) V_j
+最终 O = numerator / denominator
+```
 
-Q tile 覆盖 query `[q0,q1)`，K tile 覆盖 key `[k0,k1)`：
+这已经解决“两个局部分母”的逻辑错误。但直接计算 `exp(score)` 不稳定。stable softmax 会减去最大值；流式场景的问题是：读到下一个 tile 时，最大值可能变了。下面只需解决“最大值改变后，旧累计量怎样换到新尺度”。
 
-1. `k0 >= q1`：整块都在未来，直接跳过；
-2. `k1 <= q0+1`：对块中所有 query 都合法，可正常计算；
-3. tile 跨越因果对角线：算局部 score 后，对 `j>i` 的元素写 `-∞`。
+## 24. 加回稳定性：`m/l/O_acc` 是同一计量基准下的状态
 
-边界警告：如果某行在某个局部 tile 中全部被 mask，该 tile 的局部 row max 是 `-∞`。不能直接算 `-∞-(-∞)`；应让该块对 `l/O_acc` 的贡献为 0。标准 causal self-attention 的全局行至少有自身或过去 token 可见，但局部 tile 仍可能全 mask。
+对每个 query，维护三个 running state：
 
-## 27. Forward 伪代码
+- `m`：目前看过的 score 最大值；
+- `l = Σ exp(score-m)`：以 `m` 为基准的累计分母；
+- `O_acc = Σ exp(score-m)V`：以同一个 `m` 为基准的累计向量分子。
+
+`O_acc` 还没有除以 `l`。等所有 tile 处理完，才计算 `O=O_acc/l`。
+
+为什么需要 `alpha`？假设旧基准是 `m_old`，新 tile 让基准变成 `m_new`。同一个旧 score 的权重可写为：
+
+```text
+exp(score-m_new)
+= exp(score-m_old) * exp(m_old-m_new)
+```
+
+于是所有旧项都乘同一个：
+
+```text
+alpha = exp(m_old-m_new)
+```
+
+这只是**换计量基准**：像把旧累计量从“以 2 为零点”换算成“以 4 为零点”。分母 `l` 和向量分子 `O_acc` 使用同一批指数权重，所以必须一起乘 `alpha`。若只缩放 `l`，分子和分母就用了不同单位。
+
+## 25. 用两个 tile 完整走一遍数字
+
+初始化还没看任何 score：`m=-∞, l=0, O_acc=[0,0]`。约定第一次更新时 `alpha=0`，因为没有旧贡献。
+
+| 阶段 | `m_block` | `m_new` | `alpha=exp(m_old-m_new)` | `l` 更新后 | `O_acc` 更新后 |
+|---|---:|---:|---:|---:|---|
+| 初始 | — | `-∞` | — | `0` | `[0,0]` |
+| tile A: `[2,1]` | `2` | `2` | `0` | `1+e^-1 ≈ 1.3678794411714423` | `[1,e^-1] ≈ [1,0.36787944117144233]` |
+| tile B: `[4,3]` | `4` | `4` | `e^(2-4) ≈ 0.1353352832366127` | `e^-2(1+e^-1)+(1+e^-1) ≈ 1.553001792775919` | `e^-2[1,e^-1]+[2,2e^-1] ≈ [2.135335283236613,0.7855459507107487]` |
+
+第二行更新拆开看就是：
+
+```text
+旧 l 换基准：     0.1353352832366127 * 1.3678794411714423
+新 tile 分母：    1 + e^-1
+l_new：           1.553001792775919
+
+旧 O_acc 换基准： e^-2 * [1,e^-1] = [e^-2,e^-3]
+新 tile 分子：    1*[2,0] + e^-1*[0,2] = [2,2e^-1]
+O_acc_new：       [2.135335283236613,0.7855459507107487]
+```
+
+最终归一化：
+
+```text
+O = O_acc / l
+  ≈ [2.135335283236613,0.7855459507107487] / 1.553001792775919
+  ≈ [1.3749728385179774,0.5058242394599053]
+```
+
+它与第 21 节一次性普通 Attention 完全对齐。分块改变了求值顺序，没有改变数学定义。
+
+## 26. 从一行推广到矩阵 tile
+
+现在一次固定 `Br` 行 query，并流式读取每块 `Bc` 行 key/value：
+
+```text
+Q_i      shape [Br,Dh]
+K_j      shape [Bc,Dh]
+V_j      shape [Bc,Dv]
+S_ij     shape [Br,Bc]
+m,l      shape [Br]       // 每行一个独立状态
+O_acc    shape [Br,Dv]
+```
+
+每个 query 独立维护自己的 `m/l/O_acc`；不能让一个 query 的最大值或分母混入另一行。矩阵公式是：
+
+```text
+S_ij = Q_i K_j^T / sqrt(Dh)                    [Br,Bc]
+m_block = rowmax(S_ij)                         [Br]
+m_new = max(m_old,m_block)                     [Br]
+alpha = exp(m_old-m_new)                       [Br]
+P_ij = exp(S_ij-m_new[:,None])                 [Br,Bc]，未归一化
+l_new = alpha*l_old + rowsum(P_ij)             [Br]
+O_acc_new = alpha[:,None]*O_acc_old + P_ij V_j [Br,Dv]
+```
+
+对应伪代码：
 
 ```text
 for each Q tile i:
     load Q_i
     m = -∞ for each query row
-    l = 0
-    O_acc = 0
+    l = 0 for each query row
+    O_acc = 0 for each query row and output feature
 
     for each legal K/V tile j:
         load K_j, V_j
@@ -1294,37 +1325,97 @@ for each Q tile i:
         m_block = rowmax(S)
         m_new = max(m, m_block)
         alpha = exp(m-m_new)
-        P = exp(S-m_new)       // 未归一化
+        P = exp(S-m_new[:,None])       // 未归一化
 
         l = alpha*l + rowsum(P)
-        O_acc = alpha*O_acc + P V_j
+        O_acc = alpha[:,None]*O_acc + P V_j
         m = m_new
 
-    O_i = O_acc / l
+    O_i = O_acc / l[:,None]
     store O_i
 ```
 
-## 28. 五个常见误解
+本文统一使用“未归一化 `O_acc`”表示。某些论文伪代码会保存已经除过旧 `l` 的输出，公式会不同；不要把两种状态定义拼在一起。
+
+## 27. 朴素实现与 FlashAttention 的张量生命周期
+
+标准三 kernel 教学实现会把短命中间量物化到 HBM：
+
+```text
+HBM 读 Q,K → Kernel 1 → HBM 写完整 S[N,N]
+HBM 读 S   → Kernel 2 → HBM 写完整 P[N,N]
+HBM 读 P,V → Kernel 3 → HBM 写 O[N,Dv]
+```
+
+FlashAttention 固定 Q tile、流式读取 K/V tile，局部 score 与未归一化概率只活在当前 tile：
+
+```text
+HBM 读 Q_i ───────────────→ 片上保留 Q_i
+HBM 读 K_j,V_j ───────────→ 当前 tile 的 S_ij/P_ij
+                              ↓ 当场更新 m/l/O_acc
+                              ↓ tile 用完即覆盖，不落完整 S/P
+HBM 写 O_i ←──────────────── 最后才归一化并写回
+```
+
+关键不是“K/V 只读一次”，也不是“完全不访问 HBM”。片上容量有限时 K/V 仍会按调度反复加载。关键是避免将完整 `S/P` 写到 HBM 后又读回。
+
+在 A100 上可以先用下面的教学落点理解变量；真实工业 kernel 会因 tile、warp 分工、寄存器压力和 shared-memory swizzle 而改变具体位置：
+
+| 变量 | 典型生命周期 | 教学上的典型位置 | 工业实现差异 |
+|---|---|---|---|
+| `Q/K/V` | 整个算子输入 | HBM | 通过 L2、`cp.async`/异步流水分块进入 shared/register |
+| 当前 `Q` tile | 遍历多个 K/V tile 期间 | shared memory 或 registers | 常拆到各 warp 的 registers，布局服务于 MMA |
+| 当前 `K/V` tile | 当前内层迭代 | shared memory | 双缓冲、多 stage、swizzle，随后进入 registers/MMA fragment |
+| 当前 `S/P` tile | 只在当前 tile 更新期间 | registers/shared，随后丢弃 | 常不以完整矩阵形态存在，softmax 与矩阵乘流水融合 |
+| `m/l` | 一个 query 行处理完整个序列 | register；教学简化可用 shared 标量 | 每线程/每 warp 持有部分行状态并做归约 |
+| `O_acc` | 一个 query 行处理完整个序列 | registers 或 shared accumulator | 通常分散在寄存器 accumulator，避免 shared 往返 |
+| 最终 `O` | 归一化之后 | 写回 HBM | 可能先经 shared 做布局转换再合并写回 |
+
+## 28. FlashAttention 优化了什么、没有优化什么
+
+FlashAttention 没有删除 key、没有把 softmax 换成线性函数，也没有做低秩近似。它用 tiling 与 online softmax 重排 exact dense attention。
+
+三件事必须分开：
+
+1. **FLOP 仍然是 `O(N²)`**：`QKᵀ` 约 `2N²Dh`，`PV` 约 `2N²Dv`；当 `Dv=Dh` 时主导项约 `4N²Dh`。
+2. **显式 `S/P` 存储被消除**：不会在 HBM 中保存两个完整 `N×N` 中间矩阵，但局部 tile 仍会短暂存在。
+3. **HBM IO 显著减少**：省掉完整 `S/P` 的写回与重读，使更多工作在高带宽片上存储完成。
+
+所以不能说“计算复杂度从 `O(N²)` 变成 `O(N)`”。结果在实数数学上与标准 Attention 相同；浮点求和顺序不同会造成末位差异，工程验证应使用容差而不是逐 bit 比较。
+
+## 29. causal 分块、exact 与常见边界
+
+Q tile 覆盖 query `[q0,q1)`，K tile 覆盖 key `[k0,k1)`，causal 时有三种 tile：
+
+1. `k0 >= q1`：**全未来 tile**，整块跳过；
+2. `k1 <= q0+1`：**全合法 tile**，无需逐元素 mask；
+3. 其余情况：**跨因果对角线 tile**，计算局部 score 后将 `key_index > query_index` 的元素置为 `-∞`。
+
+必须处理全 mask 边界：某一 query 在某个局部 tile 可能没有任何合法 key，此时 `m_block=-∞`。不能直接计算 `-∞-(-∞)`，否则得到 NaN；应让这个 tile 对该行 `l/O_acc` 的贡献为 0，并保持旧状态。标准 causal self-attention 的全局行通常至少能看到自身，但局部 tile 仍可能全 mask。
+
+常见误解：
 
 | 误解 | 修正 |
 |---|---|
-| FlashAttention 是近似算法 | dense FlashAttention 是 exact，分块稀疏扩展另说 |
-| 把 `O(N²)` 计算变成 `O(N)` | dense score 交互仍为平方级，主要减少 IO/存储 |
-| 只是把三个 kernel fusion | fusion 是表象，关键是 tiling + online softmax 让 `S/P` 不落 HBM |
-| online softmax 只缩放分母 | `l` 和未归一化 `O_acc` 都要缩放 |
-| 有 shared memory 就自动快 | tile、bank conflict、寄存器、occupancy、同步和并行度都要权衡 |
+| FlashAttention 是近似算法 | dense FlashAttention 是 exact；稀疏或近似扩展另说 |
+| FLOP 从 `O(N²)` 变成 `O(N)` | score 交互仍是平方级，主要减少显式存储与 HBM IO |
+| 两块各自 softmax 再平均即可 | 两个局部分母破坏跨 tile 的相对权重 |
+| online softmax 只缩放分母 | `l` 和同一基准下的 `O_acc` 必须一起缩放 |
+| 只是把三个 kernel fusion | fusion 是表象，tiling + online 状态使完整 `S/P` 不落 HBM |
+| 放进 shared memory 就自动快 | tile、bank conflict、寄存器、occupancy、同步都要权衡 |
 
-## 29. Day 3 自测与口述
+## 30. Day 3 自测与口述
 
-1. `m/l/O_acc` 分别是什么 shape？
-2. `P_ij=exp(S_ij-m_new)` 为什么暂时不除 `l_new`？
-3. FlashAttention 为什么不保存完整 P？
-4. 什么情况下一个 causal K tile 可以整块跳过？
-5. 为什么结果 exact 但不保证逐 bit 相同？
+1. 用本日四元素例子写出普通 Attention 的稳定分母和最终输出。
+2. 为什么两个 tile 各自 softmax 后不能直接相加或平均？
+3. `m/l/O_acc` 分别表示什么？为什么 `l` 与 `O_acc` 必须一起乘 `alpha`？
+4. 矩阵 tile 中 `S_ij`、`m`、`O_acc` 分别是什么 shape？
+5. 哪三件事分别对应 FLOP、显式 `S/P` 存储和 HBM IO？
+6. causal 的三类 tile 是什么？全 mask 的局部行怎样避免 NaN？
 
 闭卷口述：
 
-> FlashAttention 是 IO-aware 的精确 Attention。标准实现会把 `N×N` 的 score 和 probability 写入 HBM，softmax 和 PV 又把它们读回来。FlashAttention 固定 Q tile，流式遍历 K/V tile，在片上计算局部 score，并为每个 query 行维护 running max `m`、相对 max 的指数和 `l`、以及同一尺度下的未归一化输出 `O_acc`。如果新 tile 提高最大值，旧 `l` 和旧 `O_acc` 都乘 `exp(m_old-m_new)`。最后只写归一化输出，因此减少 HBM IO；主导 dense FLOP 仍约 `4N²Dh`。
+> FlashAttention 是 IO-aware 的精确 Attention。它固定 Q tile 并流式遍历 K/V tile，不把完整 `S/P` 落到 HBM。每个 query 独立维护 running max `m`、同一基准下的分母 `l` 和未归一化向量分子 `O_acc`；新最大值出现时，旧 `l/O_acc` 一起乘 `exp(m_old-m_new)` 换计量基准。最后计算 `O_acc/l`。它消除显式平方中间存储并减少 HBM IO，但 exact dense attention 的 FLOP 仍是 `O(N²)`。
 
 ---
 
@@ -1349,6 +1440,18 @@ D≤128
 > 把不保存完整 `S/P` 的在线 Attention 数据流写正确，并让你能看见每个状态放在哪里。
 
 为什么先一个 block 一条 query，而不是立刻 `Br×Bc` 大 tile？因为后者会同时引入二维 warp 映射、跨 warp reduction、Tensor Core fragment、shared swizzle 和寄存器压力，容易让你在尚未掌握 `m/l/O_acc` 时被工程细节淹没。
+
+把 Day 3 的数学状态映射到本日 CUDA 骨架，就是下面五条：
+
+```text
+一行 query → 一个 block
+m/l         → shared 标量（教学版由线程 0 更新）
+O_acc[D]    → shared acc[D]
+K tile      → shared k_s[Bc][D]
+V tile      → shared v_s[Bc][D]
+```
+
+这不是工业 FlashAttention 的唯一映射，只是最容易看清状态生命周期的一版。接下来的“七个空位”要求你把这五条映射接起来，但此处不提前给出完整 CUDA 答案。
 
 ## 31. 线程与内存映射
 
