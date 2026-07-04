@@ -70,3 +70,38 @@ week05_gemm_advanced/gemm_shared_baseline
 week05_gemm_advanced/gemm_2d_thread_tiling
 week05_gemm_advanced/gemm_best
 week05_gemm_advanced/gemm_test
+
+# nvcc 中间编译产物(--keep 生成,全局忽略;不匹配 .cu 源文件)
+*.ptx
+*.cubin
+*.fatbin
+*.fatbin.c
+*.cudafe1.c
+*.cudafe1.cpp
+*.cudafe1.gpu
+*.cudafe1.stub.c
+*.module_id
+*.ii
+*.reg.c
+*_dlink.fatbin
+a_ptx
+
+# week04 attention 编译产物(可执行文件,不含 .cu)
+week04_attention/naive_attention
+week04_attention/online_softmax
+week04_attention/tiled_attention
+
+# operator_practice 编译产物(可执行文件)
+operator_practice/activation/relu
+operator_practice/argmax/argmax
+operator_practice/layernorm/layernorm
+operator_practice/reduce/reduce
+
+# week05/week06 其它编译产物
+week05_gemm_advanced/gem_db
+week05_gemm_advanced/gemm_cublas
+week05_gemm_advanced/gemm_vec
+week06_tensorcore/wmma
+
+# cuda_deep_course lab 编译产物
+cuda_deep_course/labs/02_programming_model/async_errors/async_errors
