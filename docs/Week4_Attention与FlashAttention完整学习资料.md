@@ -1322,14 +1322,21 @@ for each Q tile i:
         S = Q_i K_j^T / sqrt(Dh)
         apply causal mask if needed
 
-        m_block = rowmax(S)
-        m_new = max(m, m_block)
-        alpha = exp(m-m_new)
-        P = exp(S-m_new[:,None])       // 未归一化
+        对每个 query 行 r：
+            如果该行本 tile 无有效 score：
+                保持旧 m[r]/l[r]/O_acc[r,:]
+                本 tile 对该行贡献为 0
+                将该行标记为不参与下面的更新
 
-        l = alpha*l + rowsum(P)
-        O_acc = alpha[:,None]*O_acc + P V_j
-        m = m_new
+        对每个仍有效的 query 行：
+            m_block = rowmax(S)
+            m_new = max(m, m_block)
+            alpha = exp(m-m_new)
+            P = exp(S-m_new[:,None])       // 未归一化
+
+            l = alpha*l + rowsum(P)
+            O_acc = alpha[:,None]*O_acc + P V_j
+            m = m_new
 
     O_i = O_acc / l[:,None]
     store O_i
@@ -1421,7 +1428,7 @@ Q tile 覆盖 query `[q0,q1)`，K tile 覆盖 key `[k0,k1)`，causal 时有三�
 
 # Day 4：教学版 Tiled Attention——先把状态机写对
 
-## 30. 本日实现边界
+## 31. 本日实现边界
 
 第一版故意选择：
 
@@ -1453,7 +1460,7 @@ V tile      → shared v_s[Bc][D]
 
 这不是工业 FlashAttention 的唯一映射，只是最容易看清状态生命周期的一版。接下来的“七个空位”要求你把这五条映射接起来，但此处不提前给出完整 CUDA 答案。
 
-## 31. 线程与内存映射
+## 32. 线程与内存映射
 
 ```text
 grid.x = N                 每个 block 负责 query i=blockIdx.x
@@ -1484,7 +1491,7 @@ m, l, alpha     每行在线状态
 
 这里局部 max/sum 串行是有意的。Day 5 会说明怎样换成 warp/block reduction。不要把“教学版串行一小段”误解为 FlashAttention 必须这么做。
 
-## 32.【必须手写】七个空位
+## 33.【必须手写】七个空位
 
 先只看下面数据流，自己建立 `week04_attention/tiled_attention.cu`：
 
@@ -1523,7 +1530,7 @@ for (int d=threadIdx.x; d<D; d+=blockDim.x)
 
 全局 key 下标为 `key=k0+j`。若 `causal && key>query`，令 `scores[j]=-INFINITY`。局部 tile 可能全部被 mask，此时其贡献应为 0，不能让 `exp(-∞-(-∞))` 产生 NaN。
 
-## 33.【参考实现】完整可运行教学版
+## 34.【参考实现】完整可运行教学版
 
 请先独立尝试，再看此程序。参考实现把局部 reduction 留在单线程，只用于教学正确性；真正优化方向见 Day 5。
 
@@ -1741,7 +1748,7 @@ nvcc -O3 -std=c++17 -arch=sm_80 -lineinfo \
 compute-sanitizer --tool memcheck /tmp/week4_attention/tiled_attention_reference
 ```
 
-## 34. 读懂参考实现的七个关键点
+## 35. 读懂参考实现的七个关键点
 
 1. **没有 `scores[N,N]`**：shared 中只有 `BC=16` 个局部分数。
 2. **Q 只加载一次**：一个 block 固定一行 Q，遍历全部 K/V tile。
@@ -1751,7 +1758,7 @@ compute-sanitizer --tool memcheck /tmp/week4_attention/tiled_attention_reference
 6. **causal 全 mask tile 不制造 NaN**：权重置零，状态不变。
 7. **非整除安全**：最后 tile 只处理 `valid=min(BC,n-k0)` 个 key。
 
-## 35. 这份教学代码慢在哪里
+## 36. 这份教学代码慢在哪里
 
 - 一个 block 只处理一条 query，Q tile 行复用不足；
 - 一个线程串行完成一个长度 D 的 dot；
@@ -1763,7 +1770,7 @@ compute-sanitizer --tool memcheck /tmp/week4_attention/tiled_attention_reference
 
 但它已经完成最重要的算法跨越：**不保存 `N²` 中间矩阵，同时得到与标准 Attention 对齐的结果。**
 
-## 36.【挑战】逐步优化，不要一步登天
+## 37.【挑战】逐步优化，不要一步登天
 
 按顺序选至少两项：
 
@@ -1776,7 +1783,7 @@ compute-sanitizer --tool memcheck /tmp/week4_attention/tiled_attention_reference
 
 每次只改一件事，并保留 correctness 与 benchmark 前后数据。
 
-## 37. Day 4 自测与口述
+## 38. Day 4 自测与口述
 
 1. 为什么 block 内 `acc[D]` 能跨 K tile 保留？
 2. 为什么覆盖 `k_s/v_s` 前要同步？
@@ -1791,7 +1798,7 @@ compute-sanitizer --tool memcheck /tmp/week4_attention/tiled_attention_reference
 
 # Day 5：A100 上怎样把 Attention 做快
 
-## 38. 先分清：Attention 里不是只有 GEMM
+## 39. 先分清：Attention 里不是只有 GEMM
 
 一轮 K/V tile 处理包含：
 
@@ -1813,7 +1820,7 @@ QK^T 矩阵乘
 
 回看已有实测：[Tensor Core Profile](../week06_tensorcore/tensor_core_profile.md)。你的教学 WMMA 已看到 HMMA 指令，但 Tensor pipe 活跃度低，说明“算得快”之后必须解决“怎样喂数据”。Attention 同样如此，只是流水中又插入 softmax。
 
-## 39. A100 上各精度负责什么
+## 40. A100 上各精度负责什么
 
 推荐的理解模型：
 
@@ -1830,7 +1837,7 @@ A100 支持 FP16、BF16、TF32 Tensor Core。你的 Attention 学习路径优先
 
 注意：FP32 累加无法恢复 Q/K/V 转成低精度时已经丢失的信息。验证低精度版本时应使用比纯 FP32 更宽的容差，并报告最大绝对误差和最大相对误差。
 
-## 40. 从教学版到 Tensor Core：映射发生在哪里
+## 41. 从教学版到 Tensor Core：映射发生在哪里
 
 教学版中：
 
@@ -1856,7 +1863,7 @@ O_delta[Br,Dv] = P_tile[Br,Bc] × V_tile[Bc,Dv]
 
 WMMA 的 fragment lane/register 映射不透明；softmax 又需要按 row 读取 scores。因此真正实现必须设计 score fragment 如何从 MMA accumulator 转换为可归约的行布局，这也是工业代码复杂的原因之一。
 
-## 41. `cp.async` 在这里做什么
+## 42. `cp.async` 在这里做什么
 
 Ampere 的异步拷贝可以把 global 数据搬到 shared，并与当前 tile 的计算形成 pipeline。你已有完整基础：[异步拷贝与 pipeline 文档](异步拷贝_pipeline_cooperative_groups学习文档.md)。
 
@@ -1886,7 +1893,7 @@ buffer[next] 接收下一块 K/V
 
 你在 GEMM 双缓冲中已经遇到“结构正确但逐 float 异步拷贝指令过多，反而变慢”。Attention 仍要用实际 benchmark 与 ncu 验证，不能因使用了高级指令就先宣布胜利。
 
-## 42. Tile 的资源账本
+## 43. Tile 的资源账本
 
 若片上保存 Q/K/V，并可选保存 score tile，粗略 shared memory：
 
@@ -1919,7 +1926,7 @@ score   64×64×2       = 8 KiB
 
 tile 变大通常增加复用，却也提高 shared/寄存器压力，降低可驻留 block/warp。和你 A100 GEMM 参数实验一样，存在甜点而不是“越大越好”。
 
-## 43. 从教学版到优化版的阶梯
+## 44. 从教学版到优化版的阶梯
 
 ```text
 Level 0  三 kernel naive：完整 S/P 落 HBM
@@ -1941,7 +1948,7 @@ Level 7  布局/swizzle/warp specialization/shape 专门化
 → 解释瓶颈是否按预期转移
 ```
 
-## 44. A100 与 Hopper 不要混用
+## 45. A100 与 Hopper 不要混用
 
 | 能力 | A100（SM80） | Hopper（SM90） |
 |---|---|---|
@@ -1954,7 +1961,7 @@ Level 7  布局/swizzle/warp specialization/shape 专门化
 
 关于异步数据搬运和 Ampere 特性，以 [CUDA Programming Guide](https://docs.nvidia.com/cuda/cuda-programming-guide/) 与 [Ampere Tuning Guide](https://docs.nvidia.com/cuda/pdf/NVIDIA_Ampere_Tuning_Guide.pdf) 为准。
 
-## 45.【挑战】Day 5 二选一
+## 46.【挑战】Day 5 二选一
 
 ### A. FP16 输入
 
@@ -1978,7 +1985,7 @@ Level 7  布局/swizzle/warp specialization/shape 专门化
 - ncu 检查 stall/SM busy；
 - 若变慢，必须解释指令粒度、计算量或流水未重叠，而不是隐去结果。
 
-## 46. Day 5 自测与口述
+## 47. Day 5 自测与口述
 
 1. Attention 中哪些部分适合 Tensor Core，哪些不适合？
 2. 为什么 FP32 `m/l` 仍有价值？
@@ -1990,7 +1997,7 @@ Level 7  布局/swizzle/warp specialization/shape 专门化
 
 # Day 6：从 KV Cache 到 MLA 与 FlashMLA
 
-## 47. 先分清 prefill 和 decode
+## 48. 先分清 prefill 和 decode
 
 大模型生成分两类阶段：
 
@@ -2016,7 +2023,7 @@ K/V length = 历史长度 + 1
 
 新 token 的 query 要读取全部历史 K/V。矩阵变“又矮又长”，并行度与数据复用较差，常受 KV cache 读取带宽约束。
 
-## 48. 为什么需要 KV cache
+## 49. 为什么需要 KV cache
 
 生成到第 `t` 步时，历史 token 的 K/V 不会因为新 token 到来而改变。若每一步都重新计算所有历史 K/V，会反复做相同投影。
 
@@ -2053,7 +2060,7 @@ bytes = 2 × B × N × Hkv × Dh × bytes_per_element
 
 这解释了为什么长上下文推理极其关心 KV cache。
 
-## 49. MHA、MQA、GQA 的区别
+## 50. MHA、MQA、GQA 的区别
 
 假设 query head `Hq=32`、`Dh=128`：
 
@@ -2067,7 +2074,7 @@ bytes = 2 × B × N × Hkv × Dh × bytes_per_element
 
 代价是共享更多 K/V 可能影响模型表达能力；具体质量取决于训练和模型设计，不能只看 cache 越小越好。
 
-## 50. MLA 的核心动机
+## 51. MLA 的核心动机
 
 Multi-head Latent Attention（MLA）由 DeepSeek-V2 系统性提出，目标之一是进一步压缩推理时需要缓存的表示。[DeepSeek-V2 论文](https://arxiv.org/abs/2405.04434)
 
@@ -2098,7 +2105,7 @@ v_t^C = W_UV c_t^KV
 
 这里的上标 C 表示内容部分，不是 CUDA C。
 
-## 51. RoPE 为什么让事情复杂一点
+## 52. RoPE 为什么让事情复杂一点
 
 RoPE（Rotary Position Embedding）把位置信息以旋转形式作用在 Q/K 上。若把所有 K 都完全吸收到一个与位置无关的 latent 投影里，位置相关部分不一定能直接复用同样的矩阵吸收技巧。
 
@@ -2111,7 +2118,7 @@ DeepSeek MLA 使用“解耦 RoPE”的思路，概念上把 key/query 分成：
 
 因此推理 cache 不是“只有一个 latent，其他什么都不存”，而通常还需缓存位置相关 key 分量。准确 shape 必须按具体模型配置和实现阅读。
 
-## 52. 矩阵吸收：不一定真的重建完整 K/V
+## 53. 矩阵吸收：不一定真的重建完整 K/V
 
 若直接每步从 `c^KV` 重建所有 head 的 K/V，可能用额外计算换 cache 带宽。MLA 的推理实现还可以利用线性代数结合律，把某些上投影权重吸收到 query 或输出投影中。
 
@@ -2128,7 +2135,7 @@ q^T (W_UK c)
 
 不要把矩阵吸收说成免费：它在存储、带宽、计算和 kernel 形状之间重新做权衡。
 
-## 53. MLA cache 账本怎么做
+## 54. MLA cache 账本怎么做
 
 普通 MHA 每 token、每层（忽略 batch）：
 
@@ -2161,7 +2168,7 @@ ratio = 576/8192 ≈ 7.03%
 
 这组数字与具体模型是否完全一致无关；真实报告必须读取模型配置，不能把练习数字冒充 DeepSeek 某版本参数。
 
-## 54. FlashMLA 是什么
+## 55. FlashMLA 是什么
 
 必须分开：
 
@@ -2176,7 +2183,7 @@ ratio = 576/8192 ≈ 7.03%
 
 这不是你的环境配置错误，而是 GPU 架构要求。看到 TMA、WGMMA 或 SM90 特化路径时，只做源码阅读，不在 A100 上强行移植。
 
-## 55. 阅读 FlashMLA README 的正确问题
+## 56. 阅读 FlashMLA README 的正确问题
 
 不要从模板元编程第一行硬啃。先回答：
 
@@ -2191,7 +2198,7 @@ ratio = 576/8192 ≈ 7.03%
 
 先画数据流，再定位到对应源码目录；不要只因为文件名有 `flash` 就假定它与原始 FlashAttention v1 的调度完全相同。
 
-## 56. Day 6 自测
+## 57. Day 6 自测
 
 1. prefill 与 decode 的 query length 通常有什么不同？
 2. 为什么 decode 特别关心 KV cache 带宽？
@@ -2208,7 +2215,7 @@ ratio = 576/8192 ≈ 7.03%
 
 # Day 7：Benchmark、Nsight Compute 与闭卷复盘
 
-## 57. 正确测量比“跑出一个毫秒数”难
+## 58. 正确测量比“跑出一个毫秒数”难
 
 建议 benchmark 规则：
 
@@ -2235,7 +2242,7 @@ causal 或 non-causal
 
 你已经在 A100 GEMM 学过：ncu 会重放 kernel、插桩或锁频，因此 **ncu 下程序自己打印的 CUDA Event 时间不能当真实性能**。真实性能脱离 ncu 测；ncu 用来读指标。
 
-## 58. 建议的结果表
+## 59. 建议的结果表
 
 | 版本 | B/H/N/Dh | dtype | causal | ms | 是否保存 S/P | max abs | reg/thread | occ | DRAM | shared | Tensor pipe |
 |---|---|---|---|---:|---|---:|---:|---:|---:|---:|---:|
@@ -2245,7 +2252,7 @@ causal 或 non-causal
 
 不要先填“应该更快”。小 N 下教学 tiled 可能因同步和串行归约更慢，但仍能证明不保存平方中间量。
 
-## 59. ncu 命令
+## 60. ncu 命令
 
 先找到真实 kernel 名和 launch：
 
@@ -2291,7 +2298,7 @@ ncu --section SpeedOfLight \
 ncu --query-metrics | rg -i 'dram|l2|shared|occupancy|tensor|hmma'
 ```
 
-## 60. 你希望看到什么证据
+## 61. 你希望看到什么证据
 
 ### naive → tiled
 
@@ -2324,7 +2331,7 @@ ncu --query-metrics | rg -i 'dram|l2|shared|occupancy|tensor|hmma'
 
 只看到 HMMA 不等于 Tensor Core 已吃饱；你已经在 Week 3 见过 5.71% pipe 的反例。
 
-## 61. Prefill 与 decode 不应共用一句瓶颈结论
+## 62. Prefill 与 decode 不应共用一句瓶颈结论
 
 ### Prefill
 
@@ -2342,7 +2349,7 @@ ncu --query-metrics | rg -i 'dram|l2|shared|occupancy|tensor|hmma'
 
 同一个 kernel 在 `N=128` 与 `N=8192`，或 prefill 与 decode，瓶颈画像可以完全不同。结论必须带 shape。
 
-## 62. 常见错误诊断表
+## 63. 常见错误诊断表
 
 | 症状 | 优先检查 |
 |---|---|
@@ -2356,7 +2363,7 @@ ncu --query-metrics | rg -i 'dram|l2|shared|occupancy|tensor|hmma'
 | occupancy 很低 | registers、shared、block size、grid 是否填满 SM |
 | DRAM 不高但很慢 | shared/依赖延迟/同步/低并行度/指令吞吐 |
 
-## 63. 最终闭卷自测
+## 64. 最终闭卷自测
 
 ### 概念题
 
@@ -2390,7 +2397,7 @@ ncu --query-metrics | rg -i 'dram|l2|shared|occupancy|tensor|hmma'
 2. 在部分线程提前 `return` 后执行 `__syncthreads()`，为什么危险？
 3. 把 causal 被 mask 的 score 写 0，softmax 后为什么仍会关注未来？
 
-## 64. 自测答案
+## 65. 自测答案
 
 ### 计算题答案
 
@@ -2406,7 +2413,7 @@ ncu --query-metrics | rg -i 'dram|l2|shared|occupancy|tensor|hmma'
 2. block barrier 要求 block 内所有未退出线程按一致控制流到达；部分退出可能导致死锁或未定义行为。
 3. `exp(0)>0`，0 只是普通有限 logit；mask 应使对应指数贡献为 0，通常写 `-∞` 或在指数阶段显式置零。
 
-## 65. 三段面试口述
+## 66. 三段面试口述
 
 ### 3 分钟：Attention
 
