@@ -68,47 +68,47 @@
 
 最简单的线性模型是：
 
-\[
+$$
 \hat y = f(x;w,b)=wx+b
-\]
+$$
 
-- \(x\)：输入；
-- \(\hat y\)（读作“y hat”）：模型的预测；
-- \(w\)：权重，控制直线斜率；
-- \(b\)：偏置，控制直线与纵轴的交点；
-- 分号只是提醒我们：\(x\) 是数据，\(w,b\) 是要学习的参数。
+- $x$：输入；
+- $\hat y$（读作“y hat”）：模型的预测；
+- $w$：权重，控制直线斜率；
+- $b$：偏置，控制直线与纵轴的交点；
+- 分号只是提醒我们：$x$ 是数据，$w,b$ 是要学习的参数。
 
-训练不是让程序凭空“理解”数据，而是反复修改 \(w,b\)，让预测 \(\hat y\) 更接近正确答案 \(y\)。
+训练不是让程序凭空“理解”数据，而是反复修改 $w,b$，让预测 $\hat y$ 更接近正确答案 $y$。
 
 ### 2.1 固定例子：一次完整训练更新
 
 这一卷反复使用同一个例子：
 
-\[
+$$
 x=2,\quad y=5,\quad w=1,\quad b=0
-\]
+$$
 
 **前向传播（forward）**是从输入到预测、再到损失的计算过程。
 
 第一步，预测：
 
-\[
+$$
 \hat y=wx+b=1\times2+0=2
-\]
+$$
 
 第二步，误差：
 
-\[
+$$
 e=\hat y-y=2-5=-3
-\]
+$$
 
 第三步，使用平方误差作为**损失（loss）**。损失是一个标量，用来衡量预测有多差：
 
-\[
+$$
 L=(\hat y-y)^2=e^2=(-3)^2=9
-\]
+$$
 
-损失越小越好。接下来要回答：怎样改 \(w,b\) 才会让损失下降？答案由梯度给出。
+损失越小越好。接下来要回答：怎样改 $w,b$ 才会让损失下降？答案由梯度给出。
 
 ---
 
@@ -116,13 +116,13 @@ L=(\hat y-y)^2=e^2=(-3)^2=9
 
 ### 3.1 从斜率到导数
 
-直线的斜率是“输出变化量除以输入变化量”。曲线的斜率会随位置变化，因此我们在某个位置给输入一个很小的改变量 \(h\)：
+直线的斜率是“输出变化量除以输入变化量”。曲线的斜率会随位置变化，因此我们在某个位置给输入一个很小的改变量 $h$：
 
-\[
+$$
 \frac{g(z+h)-g(z)}{h}
-\]
+$$
 
-当 \(h\) 趋近于 0，这个局部斜率叫作 \(g\) 对 \(z\) 的**导数（derivative）**，写作 \(dg/dz\)。例如 \(g(z)=z^2\)，其导数是 \(2z\)。在 \(z=-3\) 处，斜率是 \(-6\)：把 \(z\) 稍微增大，\(z^2\) 会减小。
+当 $h$ 趋近于 0，这个局部斜率叫作 $g$ 对 $z$ 的**导数（derivative）**，写作 $dg/dz$。例如 $g(z)=z^2$，其导数是 $2z$。在 $z=-3$ 处，斜率是 $-6$：把 $z$ 稍微增大，$z^2$ 会减小。
 
 导数的符号给方向，绝对值给敏感程度：
 
@@ -133,87 +133,87 @@ L=(\hat y-y)^2=e^2=(-3)^2=9
 
 ### 3.2 偏导与 gradient
 
-当函数有多个输入，例如 \(L(w,b)\)，我们只改变一个变量、固定其他变量，得到**偏导数（partial derivative）**：
+当函数有多个输入，例如 $L(w,b)$，我们只改变一个变量、固定其他变量，得到**偏导数（partial derivative）**：
 
-\[
+$$
 \frac{\partial L}{\partial w},\qquad \frac{\partial L}{\partial b}
-\]
+$$
 
 把损失对所有参数的偏导按顺序收集起来，就得到**梯度（gradient）**：
 
-\[
+$$
 \nabla L=\left[\frac{\partial L}{\partial w},\frac{\partial L}{\partial b}\right]
-\]
+$$
 
 梯度指向损失局部上升最快的方向，所以训练要朝它的反方向走。
 
 ### 3.3 链式法则：沿计算路径乘局部斜率
 
-我们的损失不是直接由 \(w\) 算出，而是连续几步：
+我们的损失不是直接由 $w$ 算出，而是连续几步：
 
-\[
+$$
 w\longrightarrow \hat y=wx+b\longrightarrow e=\hat y-y\longrightarrow L=e^2
-\]
+$$
 
 这叫**计算图（computation graph）**：节点是中间数值，边表示依赖关系。每一步只需知道自己的局部导数：
 
-\[
+$$
 \frac{\partial L}{\partial e}=2e,
 \quad \frac{\partial e}{\partial \hat y}=1,
 \quad \frac{\partial \hat y}{\partial w}=x,
 \quad \frac{\partial \hat y}{\partial b}=1
-\]
+$$
 
 **链式法则（chain rule）**说：一条路径上的总影响等于沿路局部导数相乘。因此：
 
-\[
+$$
 \frac{\partial L}{\partial w}
 =\frac{\partial L}{\partial e}
  \frac{\partial e}{\partial \hat y}
  \frac{\partial \hat y}{\partial w}
 =2ex
-\]
+$$
 
-\[
+$$
 \frac{\partial L}{\partial b}
 =\frac{\partial L}{\partial e}
  \frac{\partial e}{\partial \hat y}
  \frac{\partial \hat y}{\partial b}
 =2e
-\]
+$$
 
-代入固定例子的 \(e=-3,x=2\)：
+代入固定例子的 $e=-3,x=2$：
 
-\[
+$$
 \frac{\partial L}{\partial w}=2\times(-3)\times2=-12
-\]
+$$
 
-\[
+$$
 \frac{\partial L}{\partial b}=2\times(-3)=-6
-\]
+$$
 
-所以梯度是 \([-12,-6]\)。这段从最终损失反向计算每个参数影响的过程叫**反向传播（backward 或 backpropagation）**。反向传播不是另一套数学，它只是高效复用链式法则。
+所以梯度是 $[-12,-6]$。这段从最终损失反向计算每个参数影响的过程叫**反向传播（backward 或 backpropagation）**。反向传播不是另一套数学，它只是高效复用链式法则。
 
 ### 3.4 一次 SGD 更新
 
 **SGD（stochastic gradient descent，随机梯度下降）**按照负梯度方向更新参数：
 
-\[
+$$
 w\leftarrow w-\eta\frac{\partial L}{\partial w},\qquad
 b\leftarrow b-\eta\frac{\partial L}{\partial b}
-\]
+$$
 
-\(\eta\) 是**学习率（learning rate）**，控制每步走多远。取 \(\eta=0.1\)：
+$\eta$ 是**学习率（learning rate）**，控制每步走多远。取 $\eta=0.1$：
 
-\[
+$$
 w\leftarrow1-0.1\times(-12)=2.2
-\]
+$$
 
-\[
+$$
 b\leftarrow0-0.1\times(-6)=0.6
-\]
+$$
 
-更新后的预测为 \(2.2\times2+0.6=5\)，损失从 9 降为 0。这个例子恰好一步命中，并不表示一般训练也会如此；学习率太大还可能越过最低点并发散。
+更新后的预测为 $2.2\times2+0.6=5$，损失从 9 降为 0。这个例子恰好一步命中，并不表示一般训练也会如此；学习率太大还可能越过最低点并发散。
 
 ---
 
@@ -221,18 +221,18 @@ b\leftarrow0-0.1\times(-6)=0.6
 
 手推公式可能写错。**有限差分（finite difference）**通过轻微扰动参数来近似导数。更准确、误差通常更对称的**中心有限差分（central finite difference）**是：
 
-\[
+$$
 g'(z)\approx\frac{g(z+h)-g(z-h)}{2h}
-\]
+$$
 
-其中 \(h\) 是很小的正数，例如 \(10^{-6}\)。检查 \(w\) 时固定 \(b\)：
+其中 $h$ 是很小的正数，例如 $10^{-6}$。检查 $w$ 时固定 $b$：
 
-\[
+$$
 \frac{\partial L}{\partial w}\approx
 \frac{L(w+h,b)-L(w-h,b)}{2h}
-\]
+$$
 
-同理可检查 \(b\)。这叫**梯度检查（gradient check）**。它慢：每个参数至少多做两次 forward，所以只适合小例子和调试，不用于正常训练。\(h\) 也不是越小越好；过小会受浮点舍入误差影响。
+同理可检查 $b$。这叫**梯度检查（gradient check）**。它慢：每个参数至少多做两次 forward，所以只适合小例子和调试，不用于正常训练。$h$ 也不是越小越好；过小会受浮点舍入误差影响。
 
 ---
 
@@ -240,42 +240,42 @@ g'(z)\approx\frac{g(z+h)-g(z-h)}{2h}
 
 真实模型通常一次处理许多样本，每个样本也有多个特征。先约定形状：
 
-- \(B\)：batch size，一批样本数；
-- \(I\)：输入特征数（input features）；
-- \(O\)：输出特征数（output features）。
+- $B$：batch size，一批样本数；
+- $I$：输入特征数（input features）；
+- $O$：输出特征数（output features）。
 
 **Linear 层（线性层，也常叫全连接层）**的矩阵形式为：
 
-\[
+$$
 Y=XW+b
-\]
+$$
 
 形状是：
 
 | 张量 | 含义 | shape |
 |---|---|---|
-| \(X\) | 一批输入 | \([B,I]\) |
-| \(W\) | 权重 | \([I,O]\) |
-| \(b\) | 每个输出通道一个偏置 | \([O]\) |
-| \(Y\) | 一批输出 | \([B,O]\) |
+| $X$ | 一批输入 | $[B,I]$ |
+| $W$ | 权重 | $[I,O]$ |
+| $b$ | 每个输出通道一个偏置 | $[O]$ |
+| $Y$ | 一批输出 | $[B,O]$ |
 
-这里 \(b\) 会被加到每一行，这种自动扩展叫**广播（broadcasting）**。矩阵乘法要求内部维度 \(I\) 相同，输出保留外部维度 \(B,O\)。
+这里 $b$ 会被加到每一行，这种自动扩展叫**广播（broadcasting）**。矩阵乘法要求内部维度 $I$ 相同，输出保留外部维度 $B,O$。
 
-反向传播时，上游给来 \(dY=\partial L/\partial Y\)，形状仍是 \([B,O]\)。Linear 的三个结果是：
+反向传播时，上游给来 $dY=\partial L/\partial Y$，形状仍是 $[B,O]$。Linear 的三个结果是：
 
-\[
+$$
 dX=dY W^T \quad [B,O][O,I]\to[B,I]
-\]
+$$
 
-\[
+$$
 dW=X^T dY \quad [I,B][B,O]\to[I,O]
-\]
+$$
 
-\[
+$$
 db=\sum_{n=1}^{B}dY_n \quad [B,O]\to[O]
-\]
+$$
 
-注意 \(db\) 沿 batch 维归约，因为同一个 \(b\) 被一批中的所有样本共用。若 loss 定义为 batch 均值，上游 \(dY\) 中还会带有 \(1/B\)。矩阵布局约定可能不同，但只要 forward 公式和 shape 前后一致，数学等价。
+注意 $db$ 沿 batch 维归约，因为同一个 $b$ 被一批中的所有样本共用。若 loss 定义为 batch 均值，上游 $dY$ 中还会带有 $1/B$。矩阵布局约定可能不同，但只要 forward 公式和 shape 前后一致，数学等价。
 
 ---
 
@@ -285,31 +285,31 @@ db=\sum_{n=1}^{B}dY_n \quad [B,O]\to[O]
 
 最常用的一个是 **ReLU（Rectified Linear Unit，修正线性单元）**：
 
-\[
+$$
 \operatorname{ReLU}(z)=\max(0,z)
-\]
+$$
 
-其导数在 \(z>0\) 时为 1，在 \(z<0\) 时为 0。\(z=0\) 处数学上不可导，软件通常约定梯度为 0。ReLU backward 就是把上游梯度乘以一个掩码 \(z>0\)。
+其导数在 $z>0$ 时为 1，在 $z<0$ 时为 0。$z=0$ 处数学上不可导，软件通常约定梯度为 0。ReLU backward 就是把上游梯度乘以一个掩码 $z>0$。
 
 **MLP（multilayer perceptron，多层感知机）**是由 Linear 和激活函数堆叠而成的网络。一个两层 MLP 可写为：
 
-\[
+$$
 Z_1=XW_1+b_1
-\]
+$$
 
-\[
+$$
 H=\operatorname{ReLU}(Z_1)
-\]
+$$
 
-\[
+$$
 Y=HW_2+b_2
-\]
+$$
 
-若隐藏特征数为 \(H_d\)，形状依次是：
+若隐藏特征数为 $H_d$，形状依次是：
 
-- \(X:[B,I]\)，\(W_1:[I,H_d]\)，\(b_1:[H_d]\)；
-- \(Z_1,H:[B,H_d]\)；
-- \(W_2:[H_d,O]\)，\(b_2:[O]\)，\(Y:[B,O]\)。
+- $X:[B,I]$，$W_1:[I,H_d]$，$b_1:[H_d]$；
+- $Z_1,H:[B,H_d]$；
+- $W_2:[H_d,O]$，$b_2:[O]$，$Y:[B,O]$。
 
 backward 按 forward 的逆序执行：先对第二个 Linear 求导，再穿过 ReLU 掩码，最后对第一个 Linear 求导。每一步只接收上游梯度，乘自己的局部导数，再把梯度传给更早的节点。
 
@@ -319,7 +319,7 @@ backward 按 forward 的逆序执行：先对第二个 Linear 求导，再穿过
 
 这些词容易混淆，先给出精确定义。
 
-**sample（样本）**是一条独立训练数据，例如一对 \((x,y)\)。
+**sample（样本）**是一条独立训练数据，例如一对 $(x,y)$。
 
 **batch（批）**是一次共同计算 loss 和梯度的一组样本。**batch size** 是其中样本数。例如 1000 个样本，batch size 为 100，就有 10 个 batch。
 
@@ -346,7 +346,7 @@ backward 按 forward 的逆序执行：先对第二个 Linear 求导，再穿过
 
 ## 8. 完整程序：标量训练与梯度检查
 
-下面的文件可以直接复制运行。它先复现固定例子的解析梯度并用中心有限差分检查；再用多条样本训练 \(y=2x+1\)，确认均方损失下降；全部满足后打印 `PASS`。
+下面的文件可以直接复制运行。它先复现固定例子的解析梯度并用中心有限差分检查；再用多条样本训练 $y=2x+1$，确认均方损失下降；全部满足后打印 `PASS`。
 
 **【演示】完整程序 `scalar_training.py`**：先原样运行，观察解析梯度、有限差分与训练损失。
 
@@ -476,7 +476,7 @@ if __name__ == "__main__":
 - **【提示 2】** 链式法则先求平方对 `error` 的导数，再乘 `error` 对参数的导数。
 - **【提示 3】** 更新方向是梯度的反方向：参数减去 `learning_rate * gradient`。
 - **【参考实现】** 完成后只对照上方程序中的 `analytic_gradients` 和训练循环。
-- **【挑战】** 加入第三个参数 \(c\)，令模型变为 \(wx^2+bx+c\)，并同时做有限差分检查。
+- **【挑战】** 加入第三个参数 $c$，令模型变为 $wx^2+bx+c$，并同时做有限差分检查。
 
 运行方法：
 
@@ -484,7 +484,7 @@ if __name__ == "__main__":
 python3 scalar_training.py
 ```
 
-观察重点不是 300 这个数字，而是三项事实：解析梯度与数值梯度非常接近；loss 从大变小；参数逼近 \(w=2,b=1\)。
+观察重点不是 300 这个数字，而是三项事实：解析梯度与数值梯度非常接近；loss 从大变小；参数逼近 $w=2,b=1$。
 
 ---
 
@@ -495,11 +495,11 @@ python3 scalar_training.py
 | 训练概念 | 典型数值操作 | CUDA 视角 |
 |---|---|---|
 | 标量/逐元素 forward | 加、乘、max | elementwise kernel，每线程处理一个或多个元素 |
-| Linear forward | \(XW+b\) | GEMM（常由 cuBLAS 提供）加 bias kernel，或融合 epilogue |
+| Linear forward | $XW+b$ | GEMM（常由 cuBLAS 提供）加 bias kernel，或融合 epilogue |
 | ReLU forward/backward | `max(0,z)`、掩码乘法 | 分支或谓词化的 elementwise kernel |
 | batch loss | 每样本损失再求和/平均 | map 后 reduction |
-| \(dW=X^TdY\) | 矩阵乘法 | 另一轮 GEMM，不是“神秘反向指令” |
-| \(db=\sum_B dY\) | 沿 batch 维求和 | reduction kernel |
+| $dW=X^TdY$ | 矩阵乘法 | 另一轮 GEMM，不是“神秘反向指令” |
+| $db=\sum_B dY$ | 沿 batch 维求和 | reduction kernel |
 | SGD 更新 | `p -= lr * grad` | elementwise 参数更新 kernel |
 | 计算图 | 记录操作与依赖 | host 侧调度，或编译/融合后形成更少 kernel |
 
@@ -513,13 +513,13 @@ shape 不只是数学记号，它决定线程如何映射数据、访存是否�
 
 ## 10. 常见误区
 
-1. **预测与标签混为一谈。** \(\hat y\) 是模型算出的，\(y\) 是数据给出的正确答案。
+1. **预测与标签混为一谈。** $\hat y$ 是模型算出的，$y$ 是数据给出的正确答案。
 2. **把梯度当作参数改变量。** 梯度是损失的局部斜率；真正改变量还要乘负学习率。
 3. **忘记 loss 是和还是均值。** 两者梯度相差 batch size 倍，学习率表现也会不同。
 4. **认为 backward 是 forward 的数值逆运算。** backward 不是恢复输入，而是用链式法则传播损失敏感度。
 5. **有限差分通过就代表训练一定成功。** 它只支持“局部梯度实现正确”，数据、优化器和学习率仍可能有问题。
 6. **gradient accumulation 后每个 microbatch 都更新。** 那会变成多个小 batch step，不再等价于一个大有效 batch。
-7. **只检查元素数量，不检查轴含义。** 同样的元素数不表示 \([B,I]\) 与 \([I,B]\) 可以互换。
+7. **只检查元素数量，不检查轴含义。** 同样的元素数不表示 $[B,I]$ 与 $[I,B]$ 可以互换。
 
 ---
 
@@ -527,29 +527,29 @@ shape 不只是数学记号，它决定线程如何映射数据、访存是否�
 
 先独立完成，再看答案。
 
-1. 模型 \(\hat y=wx+b\) 中，哪些是参数，哪个是输入？训练直接修改哪个量？
-2. 对固定例 \(x=2,y=5,w=1,b=0\)，写出预测、误差和平方损失。
-3. 为什么 \(\partial L/\partial w=-12\) 时，SGD 会增大 \(w\)？
-4. 若学习率改为 0.01，固定例一次更新后的 \(w,b\) 是多少？
-5. 链式法则为何是路径上的局部导数相乘？用 \(w\to\hat y\to e\to L\) 写出式子。
+1. 模型 $\hat y=wx+b$ 中，哪些是参数，哪个是输入？训练直接修改哪个量？
+2. 对固定例 $x=2,y=5,w=1,b=0$，写出预测、误差和平方损失。
+3. 为什么 $\partial L/\partial w=-12$ 时，SGD 会增大 $w$？
+4. 若学习率改为 0.01，固定例一次更新后的 $w,b$ 是多少？
+5. 链式法则为何是路径上的局部导数相乘？用 $w\to\hat y\to e\to L$ 写出式子。
 6. 中心有限差分为何需要两次额外 forward？它适合日常完整训练吗？
-7. \(X:[32,128]\)，\(W:[128,64]\)，\(b:[64]\)，求 \(Y,dY,dX,dW,db\) 的 shape。
+7. $X:[32,128]$，$W:[128,64]$，$b:[64]$，求 $Y,dY,dX,dW,db$ 的 shape。
 8. 为什么没有 ReLU 的两层 Linear 仍等价于一层 Linear？
 9. 1024 个样本，microbatch size 32，累积 4 次更新，忽略最后不足批的情况：有效 batch size 和每 epoch 的 optimizer step 各是多少？
 10. Linear backward 中，哪两个梯度主要由 GEMM 得到，哪个梯度需要沿 batch 维 reduction？
 
 ## 12. 自测答案
 
-1. \(w,b\) 是参数，\(x\) 是输入。训练算法直接修改参数；数据通常不被 SGD 修改。
-2. \(\hat y=2\)，\(e=-3\)，\(L=9\)。
-3. 更新式是 \(w\leftarrow w-\eta\partial L/\partial w\)。减去负数等于加正数，所以 \(w\) 增大。
-4. \(w=1-0.01(-12)=1.12\)，\(b=0-0.01(-6)=0.06\)。
-5. 每个中间变量的微小变化会按局部斜率缩放，连续缩放的总倍率相乘：\(\partial L/\partial w=(\partial L/\partial e)(\partial e/\partial\hat y)(\partial\hat y/\partial w)=2e\cdot1\cdot x\)。
-6. 分别计算 \(L(z+h)\) 和 \(L(z-h)\)，因此每个待查参数至少需要两次 forward。它太慢，只适合小规模调试。
-7. \(Y:[32,64]\)，\(dY:[32,64]\)，\(dX:[32,128]\)，\(dW:[128,64]\)，\(db:[64]\)。
-8. 仿射变换的复合仍是仿射变换：\((XW_1+b_1)W_2+b_2=X(W_1W_2)+(b_1W_2+b_2)\)。ReLU 打破这种可合并性。
-9. 有效 batch size 为 \(32\times4=128\)，每 epoch 为 \(1024/128=8\) 个 optimizer step。
-10. \(dX=dYW^T\) 与 \(dW=X^TdY\) 是 GEMM；\(db=\sum_BdY\) 是沿 batch 维 reduction。
+1. $w,b$ 是参数，$x$ 是输入。训练算法直接修改参数；数据通常不被 SGD 修改。
+2. $\hat y=2$，$e=-3$，$L=9$。
+3. 更新式是 $w\leftarrow w-\eta\partial L/\partial w$。减去负数等于加正数，所以 $w$ 增大。
+4. $w=1-0.01(-12)=1.12$，$b=0-0.01(-6)=0.06$。
+5. 每个中间变量的微小变化会按局部斜率缩放，连续缩放的总倍率相乘：$\partial L/\partial w=(\partial L/\partial e)(\partial e/\partial\hat y)(\partial\hat y/\partial w)=2e\cdot1\cdot x$。
+6. 分别计算 $L(z+h)$ 和 $L(z-h)$，因此每个待查参数至少需要两次 forward。它太慢，只适合小规模调试。
+7. $Y:[32,64]$，$dY:[32,64]$，$dX:[32,128]$，$dW:[128,64]$，$db:[64]$。
+8. 仿射变换的复合仍是仿射变换：$(XW_1+b_1)W_2+b_2=X(W_1W_2)+(b_1W_2+b_2)$。ReLU 打破这种可合并性。
+9. 有效 batch size 为 $32\times4=128$，每 epoch 为 $1024/128=8$ 个 optimizer step。
+10. $dX=dYW^T$ 与 $dW=X^TdY$ 是 GEMM；$db=\sum_BdY$ 是沿 batch 维 reduction。
 
 ---
 
@@ -984,9 +984,9 @@ forward 是一次 kernel/DAG 调度，autograd 根据已记录的算子生成反
 
 模型最后一层不直接输出概率，而输出任意实数 logits。设词表为 `['a','b','c']`，某位置 logits 为 `[2,1,0]`。直接 softmax 是
 
-\[
+$$
 p_i=\frac{e^{z_i}}{\sum_j e^{z_j}}.
-\]
+$$
 
 稳定实现先减最大值（不改变比值）：`[0,-1,-2]`，指数约为 `[1,.3679,.1353]`，和为 `1.5032`，概率约 `[.6652,.2447,.0900]`。若真值是 `b`，负对数似然 NLL 为 `-log(.2447)=1.4076`。交叉熵对单个 one-hot 标签正是这个 NLL；批量交叉熵是各 token NLL 的均值。工程实现使用 log-sum-exp：`-z_y + logsumexp(z)`，不要先算概率再 `log`。
 
