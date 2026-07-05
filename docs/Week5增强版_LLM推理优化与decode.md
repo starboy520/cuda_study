@@ -1,365 +1,1083 @@
-# Week 5 增强版：LLM 推理优化（decode 主场 + 8 个补充点全嵌入）
+# Week 5：LLM 推理优化与 Decode——7 天自包含高强度教材
 
-> 对应：[DeepSeek CUDA 2 月冲刺计划](DeepSeek_CUDA_2月冲刺计划.md) Week 5（LLM 推理优化）。
-> 增强点：把原 Week5（KV cache / paged attention / 量化 / GEMV）与之前列的 8 个 CUDA 盲点
-> **合并成一条主线**，绝大多数补充点作为 decode 优化的"副产品"顺手拿下，不额外开天。
-> 硬件：A100 80GB PCIe（`sm_80`，108 SM，FP32 19.5 TFLOPS，HBM 带宽约 1935 GB/s）。
-> 前置：Week4 Attention / FlashAttention 已完成（online softmax、tiled attention、KV cache 概念）。
-> 本周核心认知：**decode 阶段是 memory-bound 的天下，优化逻辑和你练的 GEMM（compute-bound）相反。**
+> 面向：会一些 CUDA，但刚接触 LLM 推理。硬件以 A100 `sm_80` 为主。
+> 目标：不是背“decode memory-bound”，而是能从 shape、FLOP、bytes、launch 和状态生命周期推导瓶颈，并亲手写出核心 kernel。
 
----
+## 0. 学习规则
 
-## 0. 这一周到底在练什么
+每天建议 3–5 小时，固定流程：
 
 ```text
-prefill（处理 prompt）= 大矩阵、compute-bound → 你 Week1~4 的 GEMM/Attention 直接用
-decode（逐 token 生成）= M=1、memory-bound → 全新战场，本周主角
-面试区分度：会写 GEMM 的人很多；能讲清 decode 为什么吃不满 GPU、怎么救，才是加分项。
+理解今天在一次 token 生成中的位置
+→ 用小数字手算
+→ 看 CPU/reference
+→ 映射到 CUDA
+→ 完成 TODO
+→ 跑边界与正确性
+→ 用 ncu/nsys 找证据
+→ 闭卷口述
 ```
 
-本周产出（每天都要有代码/数据/口述，只看资料不算完成）：
+核心代码由你完成；正文提供外围框架、reference、测试方法和三级提示。
+
+### 统一符号
+
+| 符号 | 含义 |
+|---|---|
+| `B` | 同时处理的请求/序列数 |
+| `N` | 当前序列 token 数 |
+| `D` | hidden dimension |
+| `Hq` | query head 数 |
+| `Hkv` | key/value head 数 |
+| `Dh` | 每个 head 的维度 |
+| `L` | Transformer 层数 |
+| `M,N,K` | GEMM/GEMV 的矩阵维度，需结合上下文辨认 |
+
+### 7 天总览
+
+| Day | 主线 | 你要完成 |
+|---:|---|---|
+| 1 | token→prefill→decode→KV | 两组 KV 显存账 + 完整推理时间线 |
+| 2 | GEMV 数学→CPU→CUDA | 一线程/一 warp 一行 GEMV |
+| 3 | GEMV 性能工程 | 向量化、occupancy、ncu/nsys 对照 |
+| 4 | RMSNorm/Residual/SiLU 融合 | fused kernel + HBM 账本 + sanitizer |
+| 5 | CUDA Graph + grid sync | 伪 decode graph + cooperative reduction |
+| 6 | INT8 weight-only GEMV | 量化手算 + dequant GEMV |
+| 7 | Paged Attention/框架/Hopper | block table 手推 + 完整 decode 图 |
+
+建议目录：
 
 ```text
 week05_inference/
-  gemv.cu                  # M=1 矩阵向量乘（Day2）
-  fused_rmsnorm.cu         # 算子融合（Day3）
-  decode_graph.cu          # CUDA Graph 套 decode 循环（Day4）
-  grid_reduce.cu           # cooperative groups 网格级归约（Day4）
-  dequant_gemv.cu          # INT8 反量化 + GEMV（Day5）
-notes/week05.md            # 每天：目标/数据/问题/口述
-docs/
-  kv_cache_accounting.md   # KV cache 显存账
-  decode_step_dataflow.md  # 一次 decode step 的数据流与瓶颈
-```
-
-阅读标注：📖 精读 · 👀 扫读 · ✍️ 必须自己写 · ⏭️ 本周跳过。
-
----
-
-## 1. 本周总览（一张表看完 8 个补充点怎么嵌入）
-
-| Day | 主题 | 动手产出 | 嵌入的补充点 |
-|-----|------|----------|-------------|
-| 1 | 推理全景 + KV cache 显存账 | `kv_cache_accounting.md` | — |
-| 2 | ⭐ **GEMV 手写**（本周核心） | `gemv.cu` + 带宽利用率 | ①GEMV ⑦occupancy 定量 ⑤nsys vs ncu |
-| 3 | 算子融合 | `fused_rmsnorm.cu` | ②算子融合 ④compute-sanitizer |
-| 4 | CUDA Graph + 网格级同步 | `decode_graph.cu` `grid_reduce.cu` | ③CUDA Graph ⑥cooperative groups ⑤nsys 时间线 |
-| 5 | 量化推理 + Paged Attention | `dequant_gemv.cu` | （量化 GEMV，接 Day2） |
-| 6 | 框架地图 + Hopper 概念 | 框架对比笔记 | ⑧Hopper（TMA/wgmma/cluster）|
-| 7 | 复盘：decode 数据流 + 口述 | `decode_step_dataflow.md` | 全部串讲 |
-
-```text
-8 个补充点全部落位：①②③④⑤⑥⑦⑧
-真正"额外"花时间的只有 Day3 算子融合和 Day6 Hopper 概念，其余都嵌在主线里。
+  gemv.cu
+  fused_rmsnorm.cu
+  decode_graph.cu
+  grid_reduce.cu
+  dequant_gemv.cu
+notes/week05.md
 ```
 
 ---
 
-## Day 1：推理全景 + KV cache 显存账（打地基，不写 kernel）
+# Day 1：从文本到新 token——Prefill、Decode 与 KV Cache
 
-### 学什么
+## 1. 今天处在整条链的哪里
+
 ```text
-1. prefill vs decode：
-   prefill = 一次并行处理整个 prompt（N 个 token 一起）→ 大 GEMM，compute-bound
-   decode  = 每次只生成 1 个新 token（M=1）→ GEMV，memory-bound
-2. 为什么 decode 吃不满 GPU：
-   每步只有 1 个 query，算得少、读得多（要读全部权重 + 全部历史 KV）
-   → 算术强度(AI)极低 → 卡在 HBM 带宽，SM 大量空闲
-3. latency vs throughput：单请求延迟 vs 批量吞吐，decode 靠 batching 提吞吐
+文本
+→ tokenizer 变成 token id
+→ embedding 查表得到向量
+→ 多层 Transformer
+→ 最后一个位置得到 logits
+→ sampling/argmax 选出新 token id
+→ 把新 token 继续送回模型
 ```
 
-### 动手（算账，不写代码）
+这里先不研究 tokenizer 和 sampling 算法，只要知道它们是模型计算的输入和输出边界。
+
+## 2. 六个零基础概念
+
+### 2.1 Token 与 token id
+
+token 是模型处理的文本单位，token id 是词表中的整数编号：
+
 ```text
-推导 KV cache 显存公式并算一个真实例子：
-  KV cache 字节 = 2(K和V) × L层 × N(seq) × H_kv × Dh × dtype_bytes × batch
-拿一个配置手算（如 L=32, H_kv=8, Dh=128, N=4096, batch=1, fp16）：
-  = 2 × 32 × 4096 × 8 × 128 × 2 = 约 0.5 GB / 请求
-再算 batch=32、N=8192 时多大 → 体会为什么长上下文/大 batch 显存爆炸
-→ 这就是 MQA/GQA/MLA（Week4 学过）省 KV cache 的动机
+"CUDA 很快" → tokenizer → [317, 9281, 64]
 ```
 
-### 完成标准
+数字只是示意，不同 tokenizer 结果不同。
+
+### 2.2 Embedding
+
+embedding 表可以看成 `[vocab_size,D]` 矩阵。用 token id 选一行：
+
 ```text
-[ ] notes/week05.md 写清 prefill/decode 区别 + 为什么 decode memory-bound
-[ ] kv_cache_accounting.md 有公式 + 至少 2 组配置的显存数字
+id=317 → X[0,:]，shape [D]
 ```
 
-### 口述（面试风格）
+多个 token 得到 `[N,D]` hidden states。
+
+### 2.3 Hidden state
+
+它是模型对每个 token 当前信息的浮点表示。微型例子：
+
 ```text
-"decode 为什么难吃满 GPU？"
-→ 每步 M=1，计算量小但要读全部权重和历史 KV，算术强度极低，
-  瓶颈在 HBM 带宽而非算力，所以 SM 利用率低，只能靠 batching 摊薄。
+B=1, N=3, D=4
+X shape = [1,3,4]
 ```
+
+真实 `D` 可能几千，但 shape 推理完全相同。
+
+### 2.4 Transformer block
+
+本周只保留数据流：
+
+```text
+X
+→ RMSNorm
+→ Attention（读/写 KV）
+→ residual add
+→ RMSNorm
+→ MLP 线性层 + 激活 + 线性层
+→ residual add
+```
+
+Day 2/3 研究线性层，Day 4 研究 norm/residual/activation，Day 7 研究 KV 管理。
+
+### 2.5 Logits
+
+最后 hidden state 乘输出权重，得到 `[vocab_size]` 分数：
+
+```text
+hidden[D] × W_vocab[D,V] → logits[V]
+```
+
+### 2.6 Sampling
+
+argmax 选最高分；temperature/top-k/top-p 等会改变概率和选择。本周不实现 sampling，只把它当一次 decode step 的末端。
+
+## 3. Prefill 与 Decode 的真实时间线
+
+假设 prompt 有 3 个 token：
+
+```text
+Prefill：
+  输入 token [t0,t1,t2]
+  hidden shape [B=1,N=3,D]
+  每层同时计算 3 个位置，并建立 t0..t2 的 KV
+  输出最后位置 logits，选出 t3
+
+Decode step 1：
+  新输入只有 t3，hidden shape [1,1,D]
+  query 来自 t3，attention 读取 t0..t3 的 KV
+  写入 t3 的 K/V
+  选出 t4
+
+Decode step 2：
+  新输入 t4
+  attention 读取 t0..t4 的 KV
+  写入 t4 的 K/V
+```
+
+单请求时很多线性层可近似看成 `M=1`。线上 continuous batching 中，同一步可能有几十个 active sequences，新 token 行会被打包，所以有效 `M≈active_batch`，不应把 decode 永远写死为 M=1。
+
+## 4. 为什么需要 KV Cache
+
+在第 `t` 步，历史 token 的 K/V 只依赖历史 hidden state 和固定投影权重。没有 cache 时，为得到历史 K/V，会重复计算：
+
+```text
+step 1：重新算 t0,t1,t2
+step 2：重新算 t0,t1,t2,t3
+step 3：重新算 t0,t1,t2,t3,t4
+```
+
+有 cache 后：
+
+```text
+step 1：只算新 token t3 的 K/V，追加
+step 2：只算 t4 的 K/V，追加
+```
+
+代价是显存和读取带宽随缓存 token 增长。
+
+## 5. KV 显存公式
+
+对标准按 KV heads 存储的缓存：
+
+$$
+\text{KV bytes}=2\times L\times B\times N\times H_{kv}\times D_h\times \text{dtype bytes}
+$$
+
+- `2`：K 和 V 两份；
+- `Hkv` 不是一定等于 query heads；
+- 不含 block metadata、padding、workspace、fragmentation。
+
+### 5.1 手算一
+
+```text
+L=32, B=1, N=4096, Hkv=8, Dh=128, FP16=2 bytes
+
+bytes = 2×32×1×4096×8×128×2
+      = 536,870,912 bytes
+      = 512 MiB
+```
+
+### 5.2 手算二
+
+同模型，`B=16,N=8192`：
+
+```text
+512 MiB × 16 × 2 = 16 GiB
+```
+
+这还没算权重、activation/workspace 和碎片。
+
+### 5.3 MHA/MQA/GQA
+
+```text
+MHA：Hkv=Hq
+MQA：Hkv=1
+GQA：1 < Hkv < Hq
+```
+
+MLA 的缓存表示不同，不能机械套 `Hkv×Dh`；需要按潜在向量和位置部分实际 shape 算。
+
+## 6. 性能指标
+
+| 指标 | 含义 |
+|---|---|
+| TTFT | 请求进入到首 token 的时间，常受排队/prefill 影响 |
+| TPOT | 后续 token 之间时间，常关注 decode |
+| throughput | 单位时间生成 token/完成请求 |
+| latency | 单请求端到端或阶段耗时 |
+
+prefill 往往形成更大 GEMM，decode 低 batch 往往权重/KV bytes 相对 FLOP 高，但是否 compute/memory-bound 必须结合 shape、batch、dtype、kernel 和硬件实测。
+
+## 7. Day 1 练习与验收
+
+填写：
+
+```text
+模型：L=__, Hq=__, Hkv=__, Dh=__, dtype=__
+配置A：B=__, N=__ → KV=__ MiB
+配置B：B=__, N=__ → KV=__ GiB
+权重约=__ GiB
+剩余显存能放多少 cached tokens=__
+```
+
+闭卷回答：
+
+1. prefill 和 decode 的输入 shape 如何变化？
+2. KV cache 避免了什么重复计算？
+3. 为什么 cache 省 FLOP 却增加显存/带宽？
+4. 为什么 GQA 公式用 `Hkv`？
+5. 为什么不能无条件说所有 decode 都 memory-bound？
+
+口述：
+
+> Decode 每步只新增少量 token，但要读取模型权重和随上下文增长的 KV。低 batch 时算术强度往往低；batching、量化和融合会改变 shape 与 bytes，所以我会先做 FLOP/byte 账本再用 profiler 判断，而不是只凭阶段名称贴标签。
 
 ---
 
-## Day 2：⭐ GEMV 手写（本周核心，嵌入 ①⑤⑦）
+# Day 2：GEMV——从一行数学到一个 Warp
 
-### 学什么
+## 8. 今天在 decode 中的位置
+
+Transformer 的线性层本质是：
+
+$$Y=XW+b$$
+
+prefill 中 `X` 有多个 token 行，常是 GEMM；单请求 decode 中 `X` 只有一个新 token 行，可写成 GEMV：
+
+$$y=Wx+b$$
+
+## 9. 3×4 完整手算
+
 ```text
-GEMV：y = A · x，A 是 [N,K] 矩阵，x 是 [K] 向量，y 是 [N] 向量（M=1 的 GEMM）
-和 GEMM 的根本区别：
-  GEMM：每个元素被复用 O(N) 次 → 靠 tiling 提高复用 → compute-bound
-  GEMV：矩阵 A 每个元素只用 1 次 → 没有复用可榨 → 天生 memory-bound
-优化目标也变了：
-  GEMM 目标 = 逼近算力峰值(TFLOPS)
-  GEMV 目标 = 逼近带宽峰值(GB/s)，让读 A 的带宽打满就赢了
+W = [[1, 2, 0,-1],
+     [0, 1, 3, 2],
+     [2, 0, 1, 1]]       shape [N=3,K=4]
+
+x = [2,1,-1,3]           shape [K=4]
+b = [1,0,-2]             shape [N=3]
+
+y0 = 1×2 + 2×1 + 0×(-1) + (-1)×3 + 1 = 2
+y1 = 0×2 + 1×1 + 3×(-1) + 2×3 + 0 = 4
+y2 = 2×2 + 0×1 + 1×(-1) + 1×3 - 2 = 4
 ```
 
-### 动手 ✍️
+每个输出是一行点积，行之间独立。
+
+## 10. GEMV 的 FLOP 与 bytes
+
+约：
+
 ```text
-1. 写 baseline GEMV：每个线程/warp 负责 A 的一行，点积 x，输出 y[row]
-2. 关键优化（都是"喂饱带宽"导向，不是"提高复用"）：
-   - 合并访问：保证读 A 的相邻线程读相邻地址（行主序下按列切）
-   - 向量化：float4/half2 读 A 和 x（你 Week2 练过）
-   - warp 级归约：一个 warp 算一行的点积（你 Week3 的 warpReduceSum 直接复用）
-   - x 放 shared/常量内存（x 被所有行复用，是唯一能复用的东西）
-3. 测有效带宽：GB/s = 读写字节数 / 时间，对比 A100 峰值 ~1935 GB/s
+FLOP ≈ 2NK
+主要 bytes ≈ sizeof(W)=NK×dtype_bytes
+             + x/y/b（规模更低，缓存行为另算）
 ```
 
-### 嵌入 ⑦ occupancy 定量分析
-```text
-用 ncu 看 occupancy，并手算理论上限：
-  理论 occupancy = 受限于 [寄存器/线程, shared/block, block 数] 的最小者
-  A100 每 SM：65536 寄存器、最多 2048 线程、48KB(可配 164KB) shared
-练习：算你的 GEMV kernel 每线程用多少寄存器 → 反推每 SM 能驻留多少 warp
-结论对 GEMV：occupancy 高有助于隐藏访存延迟（memory-bound 尤其吃这个）
+单个 GEMV 中每个 `W` 元素通常只用于一次乘加；`x` 会被所有输出行复用。因此不是“完全没有复用”，而是矩阵权重的跨输出复用远弱于大 GEMM。
+
+## 11. CPU Reference
+
+```cpp
+void gemv_cpu(const float* W, const float* x, const float* b,
+              float* y, int N, int K) {
+    for (int row = 0; row < N; ++row) {
+        double sum = b ? b[row] : 0.0;
+        for (int k = 0; k < K; ++k)
+            sum += double(W[row*K+k]) * x[k];
+        y[row] = float(sum);
+    }
+}
 ```
 
-### 嵌入 ⑤ nsys vs ncu
-```text
-ncu（单 kernel 显微镜）：看 GEMV 的 SoL、Memory Throughput、occupancy、是否 memory-bound
-nsys（时间线望远镜）：跑一个"多次 GEMV 串起来"的循环，看 kernel 之间有没有空隙
-两者定位：ncu 回答"这个 kernel 好不好"，nsys 回答"整体流程哪里有气泡/能不能重叠"
+## 12. CUDA v0：一个线程一行
+
+```cpp
+__global__ void gemv_thread(const float* W, const float* x,
+                            const float* b, float* y, int N, int K) {
+    int row = blockIdx.x * blockDim.x + threadIdx.x;
+    if (row >= N) return;
+    float sum = b ? b[row] : 0.0f;
+    for (int k = 0; k < K; ++k)
+        sum = fmaf(W[row*K+k], x[k], sum);
+    y[row] = sum;
+}
 ```
 
-### 完成标准
-```text
-[ ] gemv.cu PASS（对 CPU 参考）
-[ ] 有效带宽记录，达到峰值合理比例（memory-bound kernel 目标 >70% 带宽）
-[ ] ncu 证明 memory-bound（Memory SoL 高、Compute SoL 低）
-[ ] 手算一次理论 occupancy
+它正确但同一时刻相邻线程在不同 row、同一个 k，地址 stride 为 `K`，大 K 时 warp 访问不连续。
+
+## 13. CUDA v1：一个 Warp 一行（你来写）
+
+```cpp
+__global__ void gemv_warp(const float* W, const float* x,
+                          const float* b, float* y, int N, int K) {
+    int lane = threadIdx.x & 31;
+    int warp_in_block = threadIdx.x >> 5;
+    int warps_per_block = blockDim.x >> 5;
+    int row = blockIdx.x * warps_per_block + warp_in_block;
+    if (row >= N) return;
+
+    float sum = 0.0f;
+    // TODO 1：lane-stride 遍历 k=lane; k<K; k+=32，累加 W[row,k]*x[k]。
+    // TODO 2：用正确 mask 做 warp reduction。
+    // TODO 3：lane 0 加 bias 并写 y[row]。
+}
 ```
 
-### 口述
+### 三级提示
+
+1. `W[row*K+k]` 中同一 warp 的 lane 在同轮访问连续 k；
+2. 对 `K<32` 或最后不完整迭代，mask 描述“哪些 lane 仍参与该次 collective”；更简单的教学方案可让所有 lane 始终参与、越界 lane 累加 0；
+3. reduction 使用偏移 `16,8,4,2,1`，每步把另一 lane 的部分和加回来。
+
+## 14. 统一测试框架要点
+
+你的 `main` 至少完成：
+
 ```text
-"为什么 decode 用 GEMV 而不是 GEMM 优化那套？"
-→ GEMV 矩阵元素零复用，tiling 无用武之地，瓶颈是读矩阵的带宽；
-  优化重点变成合并访问+向量化+打满带宽，目标是逼近 GB/s 峰值而非 TFLOPS。
+生成固定随机 W/x/b
+CPU reference
+cudaMalloc/cudaMemcpy
+warmup
+CUDA Event 重复计时
+复制 y
+max_abs/max_rel
+logical GB/s 和 GFLOPS
 ```
+
+计算：
+
+```text
+GB/s = logical_bytes / seconds / 1e9
+GFLOPS = 2*N*K / seconds / 1e9
+```
+
+logical bytes 是算法账本，不等于 DRAM 实际 transaction；ncu 用来观察后者。
+
+## 15. Day 2 测试
+
+```text
+N=3,    K=4      对齐手算
+N=37,   K=24     非 warp/向量整除
+N=4096, K=4096   典型大权重
+N=1,    K=4097   极少输出
+```
+
+验收：
+
+- [ ] CPU/GPU 误差合理；
+- [ ] memcheck 0 errors；
+- [ ] 能解释 v0/v1 的地址模式；
+- [ ] 不用“GEMV 完全没有复用”描述 `x`。
 
 ---
 
-## Day 3：算子融合（嵌入 ②④）
+# Day 3：GEMV 性能深化——向量化、Occupancy、ncu 与 nsys
 
-### 学什么
+## 16. 优化顺序
+
 ```text
-未融合：norm kernel 写回 HBM → 激活 kernel 再读回来 → ... 每个算子一次 HBM 往返
-融合：把 RMSNorm + 残差 + 激活 合进一个 kernel，中间结果留在寄存器/shared，不落 HBM
-为什么对 LLM 关键：推理里有大量 elementwise/norm 小算子，全是 memory-bound，
-  融合直接砍掉 HBM 往返次数 = 直接省带宽 = 直接提速
+先保证地址连续
+→ 减少 load/地址指令
+→ 利用 x 的缓存/shared 复用
+→ 保持足够 warps 隐藏延迟
+→ 才讨论更复杂的多行 tile
 ```
 
-### 动手 ✍️
-```text
-1. 拿你 Week 练过的 rmsnorm + 一个激活(SiLU/GELU)
-2. 先写"未融合"两个 kernel 版本，测 HBM 流量（ncu 的 dram__bytes）
-3. 再写"融合"单 kernel 版本：一次读入、算完 norm 直接接激活、一次写出
-4. 对比两版的 HBM 读写字节数和耗时 → 用数据证明融合省了多少往返
+## 17. float4/half2
+
+`float4` 可让每 lane 每轮加载 4 个连续值，但要求：
+
+- 基地址和行首满足 16-byte 对齐；
+- `K` 尾部单独处理；
+- `x` 同样安全；
+- 用 SASS 验证最终宽 load，而不是只看源码类型。
+
+练习框架：
+
+```cpp
+// TODO 1：当 K/地址满足条件时读取 float4 W4 和 x4。
+// TODO 2：把四个分量分别 FMA 到 local sum。
+// TODO 3：处理 K%4 尾部，不读越界。
 ```
 
-### 嵌入 ④ compute-sanitizer
-```text
-融合 kernel 容易出越界/竞争（多算子塞一个 kernel，索引更复杂）
-用 compute-sanitizer 验证正确性：
-  compute-sanitizer --tool memcheck ./fused_rmsnorm   # 查越界/非法访问
-  compute-sanitizer --tool racecheck ./fused_rmsnorm  # 查 shared memory race
-拿你之前的 race.cu 也跑一遍，体会它怎么定位数据竞争
-```
+## 18. `x` 放哪里
 
-### 完成标准
-```text
-[ ] fused_rmsnorm.cu PASS
-[ ] ncu 数据：融合版 HBM 字节数明显低于未融合版
-[ ] compute-sanitizer 无 error
-```
-
-### 口述
-```text
-"算子融合为什么能提速？"
-→ 推理里 norm/激活/残差都是 memory-bound，未融合时每个算子都要往返 HBM；
-  融合后中间结果留在片上，HBM 往返次数减少，直接省带宽，对 memory-bound 算子收益大。
-```
-
----
-
-## Day 4：CUDA Graph + 网格级同步（嵌入 ③⑥⑤）
-
-### 学什么（③ CUDA Graph）
-```text
-问题：decode 每生成 1 token 要 launch 几百个小 kernel，每次 launch ~5μs，
-     kernel 本身又小 → launch 开销占比大，GPU 在等 CPU（气泡）
-CUDA Graph：把这串 kernel 录成一张图，之后一条 cudaGraphLaunch 重放，
-           CPU 只发一次，GPU 连续跑完，消除 kernel 间气泡
-适用前提：每步 kernel 序列/形状固定（decode 完美契合）
-```
-
-### 动手 ✍️
-```text
-1. 用 stream capture 把"几个 GEMV/融合 kernel 串成的伪 decode step"录成 graph：
-   cudaStreamBeginCapture → 一串 kernel → cudaStreamEndCapture
-   cudaGraphInstantiate → 循环里 cudaGraphLaunch
-2. 对比"逐个 launch"vs"graph 重放"的耗时（尤其 kernel 多而小的时候）
-```
-
-### 嵌入 ⑤ nsys 看气泡
-```text
-用 nsys 抓两版时间线：
-  逐个 launch 版：kernel 之间有 CPU 发起的空隙（气泡）
-  graph 版：kernel 紧挨着，气泡消失
-→ 这是"nsys 看整体流程/重叠"的最佳实战，和 Day2 的 ncu 形成互补
-```
-
-### 嵌入 ⑥ cooperative groups / grid sync
-```text
-学什么：普通 kernel 只能 block 内 __syncthreads()，跨 block 不能同步；
-       cooperative groups 的 grid.sync() 能做全网格同步（需 cooperative launch）
-动手：写一个 grid-level reduction（一个 kernel 内跨所有 block 归约完，不用二次 launch）
-      对比你 Week3 的"两次 launch 归约"，体会 persistent kernel 思路
-注意：cooperative launch 有 occupancy 限制（所有 block 要同时驻留），了解约束即可
-```
-
-### 完成标准
-```text
-[ ] decode_graph.cu：graph 版比逐个 launch 版快（记录数字）
-[ ] nsys 时间线截图/描述，能指出气泡消失
-[ ] grid_reduce.cu PASS，能说清 grid.sync() 和 __syncthreads() 区别
-```
-
-### 口述
-```text
-"decode 逐 token 慢，除了 kernel 本身还能怎么救？"
-→ 用 CUDA Graph 把每步固定的 kernel 序列录成图重放，消除几百次 launch 的 CPU 开销和气泡；
-  nsys 能直接看到气泡从有到无。
-```
-
----
-
-## Day 5：量化推理 + Paged Attention（接 Day2 的 GEMV）
-
-### 学什么（量化）
-```text
-为什么量化：decode memory-bound，瓶颈是读权重的带宽；
-          把权重从 fp16 压到 int8/int4 → 读的字节数减半/减到 1/4 → 直接提速
-per-tensor vs per-channel：整个张量一个 scale vs 每列一个 scale（精度/开销权衡）
-GPTQ/AWQ：只需知道是"更聪明地选 scale/保护重要权重"的后训练量化方法（概念）
-```
-
-### 动手 ✍️
-```text
-写 dequant_gemv.cu：权重存 INT8 + scale，kernel 里"边读边反量化"再做 GEMV
-  y = (int8_weight × scale) · x
-对比 fp16 GEMV：读权重字节数减半 → 有效带宽压力下降 → 应更快
-用 ncu 确认 dram__bytes 降了
-```
-
-### 学什么（Paged Attention，概念为主）
-```text
-问题：KV cache 长度不定、请求来去，连续大块显存会碎片化、浪费
-Paged Attention（vLLM 核心）：像操作系统虚拟内存，把 KV cache 切成固定大小 block，
-  用 block table 映射逻辑位置→物理 block → 消除碎片、支持共享前缀
-本周只需讲清"解决什么问题、类比 OS 分页"，不要求手写完整 kernel
-```
-
-### 完成标准
-```text
-[ ] dequant_gemv.cu PASS，ncu 显示读权重字节数下降
-[ ] notes 写清 paged attention 解决的碎片问题（类比 OS 分页）
-```
-
-### 口述
-```text
-"量化为什么能加速 decode？" → decode 卡在读权重带宽，量化减少权重字节数，直接缓解带宽瓶颈。
-"Paged Attention 解决什么？" → KV cache 显存碎片，用分页+block table 管理，提高显存利用率、支持前缀共享。
-```
-
----
-
-## Day 6：框架地图 + Hopper 概念（嵌入 ⑧）
-
-### 学什么（框架地图，扫读）
-```text
-vLLM：Paged Attention + continuous batching，主打高吞吐服务
-TensorRT-LLM：NVIDIA 官方，kernel 高度优化 + 图编译，主打极致性能
-SGLang：结构化生成 + RadixAttention（前缀缓存），主打复杂调度
-记住"各自解决什么"即可，不深入源码
-```
-
-### 嵌入 ⑧ Hopper 新特性（概念，不写代码）
-```text
-DeepSeek 用 H800(Hopper)，面试可能问，了解概念即可：
-  TMA(Tensor Memory Accelerator)：硬件异步搬大块数据，比 cp.async 更强，
-    地址计算交给硬件，SM 更专注计算（你 Week2 的 cp.async 的进化版）
-  wgmma：warp-group 级的 Tensor Core 矩阵乘，比 Ampere 的 wmma 吞吐更高
-    （你 Week3 写的 wmma 的 Hopper 升级版）
-  Thread Block Cluster + 分布式 shared memory：多个 block 组成 cluster，
-    能互相访问对方的 shared memory，扩大片上数据复用范围
-一句话：A100(你的硬件) → Hopper 的每个新特性，都是你已学东西的加强版。
-```
-
-### 完成标准
-```text
-[ ] 一段话说清 vLLM/TRT-LLM/SGLang 各自定位
-[ ] 能把 TMA/wgmma/cluster 各对应到你在 A100 上学过的哪个东西
-```
-
-### 口述
-```text
-"Hopper 比 Ampere 强在哪（和你会的东西对应）？"
-→ TMA 是 cp.async 的硬件加强版，wgmma 是 wmma 的升级，cluster 让 shared memory 跨 block 复用；
-  本质都是把我在 A100 上手写优化的那些点，用硬件做得更彻底。
-```
-
----
-
-## Day 7：复盘——画出一次 decode step 的数据流 + 口述
-
-### 动手
-```text
-1. 画一次 decode step 的完整数据流（decode_step_dataflow.md）：
-   输入 1 个 token → embedding → [每层: QKV投影(GEMV) → attention(读KV cache)
-   → O投影(GEMV) → FFN(GEMV) → norm(融合)] × L → logits → 采样 → 新 token
-   在每一步标注：这步是 GEMV 还是 attention？memory-bound 还是 compute-bound？
-2. 整理本周 benchmark 表：GEMV 带宽、融合前后 HBM、graph 前后耗时、量化前后
-3. 写 3 段面试口述：decode 瓶颈 / decode 优化手段全家桶 / prefill vs decode 差异
-```
-
-### 本周验收（闭卷能答）
-```text
-[ ] 为什么 decode 比 prefill 难吃满 GPU？
-[ ] GEMV 和 GEMM 优化策略为什么相反？
-[ ] 算子融合、CUDA Graph、量化 各自解决 decode 的什么瓶颈？
-[ ] KV cache 显存怎么估？MQA/GQA/MLA/Paged Attention 各解决什么？
-[ ] nsys 和 ncu 分别什么时候用？
-[ ] Hopper 的 TMA/wgmma/cluster 对应你会的哪些 A100 技术？
-```
-
----
-
-## 附：8 个补充点落位速查
-
-| 补充点 | 落在哪天 | 形式 |
+| 方案 | 适用条件 | 代价 |
 |---|---|---|
-| ① GEMV/decode kernel ★★★ | Day2 | 手写主任务 |
-| ② 算子融合 ★★ | Day3 | 手写主任务 |
-| ③ CUDA Graph ★★ | Day4 | 手写主任务 |
-| ④ compute-sanitizer ★ | Day3 | 工具，验证融合 kernel |
-| ⑤ nsys vs ncu ★★ | Day2+Day4 | 工具，穿插使用 |
-| ⑥ cooperative groups ★ | Day4 | 手写 grid reduction |
-| ⑦ occupancy 定量 ★★ | Day2 | 分析 GEMV 时手算 |
-| ⑧ Hopper 特性 ★ | Day6 | 概念，对应已学技术 |
+| 依赖 cache | x 较小且反复访问 | 行为需实测 |
+| shared | 一个 block 多 warp 处理多行，共享 x tile | shared、同步、分 tile |
+| constant | warp 线程常读相同地址时广播好 | GEMV lane 常读不同 k，未必理想 |
+
+不要因为 constant 是只读就默认更快。
+
+## 19. Occupancy、ILP、TLP
 
 ```text
-真正"额外开天"的只有 Day3(融合) 和 Day6 半天(Hopper 概念)；
-其余 6 个点都是 decode 优化主线的副产品，顺手拿下。
+TLP：更多 ready warps 隐藏 load latency
+ILP：同一 warp 发起多个独立 load/accumulator
 ```
+
+理论 active blocks 受：
+
+```text
+registers/thread × threads/block
+shared/block
+threads/block
+blocks/SM 架构上限
+```
+
+编译：
+
+```bash
+nvcc -O3 -lineinfo -arch=sm_80 -Xptxas=-v gemv.cu -o gemv
+```
+
+观察 registers/spill。不要设“带宽必须 >70%”的固定及格线；小 `N`、启动开销、cache、指令和归约都可能限制有效比例。
+
+## 20. ncu 与 nsys
+
+```bash
+ncu --section SpeedOfLight --section LaunchStats \
+    --section Occupancy --section SchedulerStats \
+    --section MemoryWorkloadAnalysis --section SourceCounters \
+    ./gemv 4096 4096
+
+nsys profile --trace=cuda,nvtx -o /tmp/gemv_loop ./gemv_loop
+```
+
+`ncu` 回答单 kernel 的资源和管线；`nsys` 回答多次 GEMV/整个 decode 循环的 launch gap、同步和 CPU/GPU 时间线。
+
+## 21. 实验表
+
+| 版本 | N/K | time | logical GB/s | GFLOPS | reg | occupancy | 主要证据 |
+|---|---|---:|---:|---:|---:|---:|---|
+| thread/row | | | | | | | |
+| warp/row | | | | | | | |
+| vectorized | | | | | | | |
+| x tiled | | | | | | | |
+
+必须先写假设，例如：
+
+> warp/row 会改善 W 的合并访问；若成立，sector 利用率和时间应改善，但归约指令会增加。
+
+## 22. Day 3 自测
+
+1. GEMV 的主要 logical bytes 是什么？
+2. warp/row 为什么改善 coalescing？
+3. `x` 有什么复用，为什么 shared 不一定赢？
+4. occupancy 高为什么仍可能没有 eligible warps？
+5. nsys 与 ncu 各回答什么？
+6. 怎样证明 `float4` 真正落成宽指令？
+
+---
+
+# Day 4：Residual、RMSNorm、SiLU 与算子融合
+
+## 23. 今天在 decode 中的位置
+
+Transformer 层中有许多“小而频繁”的操作：
+
+```text
+输入 x + 子层输出 r → residual
+→ RMSNorm
+→ SiLU/GELU 等激活
+```
+
+这些算子 FLOP 少、读写 activation 多，常比 GEMM 更容易受 HBM/launch 影响。
+
+## 24. 三个数学组件
+
+### 24.1 Residual
+
+```text
+z_i = x_i + r_i
+```
+
+### 24.2 RMSNorm
+
+$$
+\mathrm{rms}=\sqrt{\frac{1}{D}\sum_i z_i^2+\epsilon},\qquad
+o_i=\frac{z_i}{\mathrm{rms}}\gamma_i
+$$
+
+它不减均值；LayerNorm 还会计算均值和方差。
+
+### 24.3 SiLU
+
+$$
+\mathrm{SiLU}(x)=x\,\sigma(x)=\frac{x}{1+e^{-x}}
+$$
+
+## 25. 四元素手算
+
+```text
+x=[1,2,-1,0], r=[0,1,1,2]
+z=x+r=[1,3,0,2]
+mean_square=(1+9+0+4)/4=3.5
+epsilon 暂忽略，rms=sqrt(3.5)≈1.8708
+gamma=[1,1,1,1]
+norm≈[0.5345,1.6036,0,1.0690]
+再逐元素做 SiLU
+```
+
+真实代码保留 epsilon，累加建议 FP32。
+
+## 26. CPU Reference
+
+```cpp
+void residual_rms_silu_cpu(const float* x, const float* r,
+                           const float* gamma, float* out,
+                           int rows, int D, float eps) {
+    for (int row=0; row<rows; ++row) {
+        double ss=0;
+        for (int d=0; d<D; ++d) {
+            double z=double(x[row*D+d])+r[row*D+d];
+            ss += z*z;
+        }
+        float inv=rsqrtf(float(ss/D)+eps);
+        for (int d=0; d<D; ++d) {
+            float z=x[row*D+d]+r[row*D+d];
+            float n=z*inv*gamma[d];
+            out[row*D+d]=n/(1.0f+expf(-n));
+        }
+    }
+}
+```
+
+## 27. 未融合与融合 HBM 账本
+
+假设 FP32，每个中间结果都落 HBM：
+
+```text
+residual：读 x,r（8B/elem），写 z（4B）
+rmsnorm：读 z,gamma（8B），写 n（4B）
+silu：读 n（4B），写 out（4B）
+合计 logical ≈ 28B/element（忽略统计量）
+
+融合：读 x,r,gamma（12B），写 out（4B）
+≈16B/element
+```
+
+实际 transaction/cache 由 ncu 测；这个账本解释为什么值得尝试。
+
+## 28. Fused Kernel（你来完成）
+
+```cpp
+__global__ void fused_residual_rms_silu(
+    const float* x,const float* r,const float* gamma,
+    float* out,int rows,int D,float eps) {
+    int row=blockIdx.x;
+    if(row>=rows) return;
+    float local=0.0f;
+    for(int d=threadIdx.x;d<D;d+=blockDim.x){
+        float z=x[row*D+d]+r[row*D+d];
+        local += z*z;
+    }
+    // TODO 1：block reduction 得到 sum of squares。
+    // TODO 2：计算 inv_rms，并让 block 所有线程可用。
+    // TODO 3：再次读 x/r 或保存合理状态，计算 norm、SiLU、写 out。
+}
+```
+
+### 三级提示
+
+1. 复用你已有的 warp reduction，再让 warp leaders 经 shared 合并；
+2. `inv_rms` 可由线程 0 写 shared，`__syncthreads()` 后读取；
+3. 把整行 `z` 存寄存器在大 D 时不可行；教学版第二遍重读 x/r，之后再分析是否值得缓存。
+
+## 29. 融合的代价
+
+- kernel 更复杂；
+- register/live range 变大；
+- 归约与逐元素阶段的并行需求不同；
+- 可能降低 occupancy；
+- 重读输入与保存中间量需权衡；
+- FP16/BF16 输入时仍建议 FP32 统计。
+
+## 30. 正确性与 Sanitizer
+
+测试：
+
+```text
+rows=1,D=4 对齐手算
+rows=3,D=37 非整除
+D=4096 常见维度
+全零、大值、正负混合、固定随机
+检查 NaN/Inf、max_abs/max_rel
+```
+
+```bash
+compute-sanitizer --tool memcheck ./fused_rmsnorm
+compute-sanitizer --tool initcheck ./fused_rmsnorm
+compute-sanitizer --tool racecheck ./fused_rmsnorm
+compute-sanitizer --tool synccheck ./fused_rmsnorm
+```
+
+工具无 error 不等于数值正确；仍须 CPU 对拍。
+
+## 31. Profiler 表
+
+| 版本 | logical bytes | time | DRAM bytes | reg | occupancy | error |
+|---|---:|---:|---:|---:|---:|---:|
+| 3 kernels | | | | | | |
+| fused | | | | | | |
+
+闭卷回答：RMSNorm 与 LayerNorm 差异、融合省了什么、为何可能变慢、四种 sanitizer 各查什么。
+
+---
+
+# Day 5：CUDA Graph 与 Cooperative Grid Sync
+
+## 32. 为什么短 kernel 会看到 launch 气泡
+
+CPU 要提交 kernel，GPU 才能执行。decode 每步包含许多短算子时：
+
+```text
+CPU: launch A | launch B | launch C | ...
+GPU:    A      gap   B      gap   C
+```
+
+kernel launch 通常是微秒量级，但具体数字取决于系统；不要背固定 `5μs`。
+
+## 33. Graph 生命周期
+
+```text
+BeginCapture
+→ 在 stream 发出代表性 kernel/memcpy 序列
+→ EndCapture 得到 cudaGraph_t
+→ Instantiate 得到 cudaGraphExec_t
+→ 多次 cudaGraphLaunch 重放
+→ destroy exec/graph
+```
+
+Graph 主要减少重复提交开销，不改变单个 kernel 的 FLOP/bytes。
+
+## 34. 伪 Decode Graph（你来完成）
+
+```cpp
+cudaStream_t stream;
+cudaStreamCreate(&stream);
+cudaGraph_t graph=nullptr;
+cudaGraphExec_t exec=nullptr;
+
+// TODO 1：BeginCapture(stream, 合适 mode)。
+gemv_warp<<<grid,block,0,stream>>>(...);
+fused_residual_rms_silu<<<... ,stream>>>(...);
+tiny_update<<<... ,stream>>>(...);
+// TODO 2：cudaStreamEndCapture(stream,&graph)。
+// TODO 3：cudaGraphInstantiate(&exec,graph,...) 得到可执行图。
+
+for(int step=0;step<steps;++step){
+    // 更新的数据放在预先约定地址；动态参数需符合 graph 设计。
+    // TODO 4：cudaGraphLaunch(exec,stream)。
+}
+cudaStreamSynchronize(stream);
+// TODO 5：按逆生命周期销毁资源。
+```
+
+### 三级提示
+
+1. capture 期间不要调用不允许 capture 的同步/分配操作；
+2. instantiate 成本只付一次，benchmark 分开报告首次和稳态；
+3. `cudaGraphLaunch` 仍是异步的，最终测量需正确 event/stream 同步。
+
+## 35. Graph 的现实限制
+
+- dynamic batching 使 shape、节点参数和地址变化；
+- KV block table/active requests 每步变化；
+- 可用预分配、bucket、node update 或多 graph，但复杂度上升；
+- 大 kernel 主导时 launch 节省比例小；
+- Graph 不能消除数据依赖造成的 GPU wait。
+
+## 36. 怎样用 nsys 验证
+
+```bash
+nsys profile --trace=cuda,nvtx -o /tmp/decode_plain ./decode_plain
+nsys profile --trace=cuda,nvtx -o /tmp/decode_graph ./decode_graph
+```
+
+分别记录 CPU wall、稳态每 step、kernel gap 和 GPU 利用，不只截一张好看的时间线。
+
+## 37. 为什么普通 kernel 没有任意 grid barrier
+
+block 可按任意顺序调度。若已运行 blocks 自旋等待尚未调度 blocks，而它们占满 SM，可能死锁。
+
+普通全局阶段边界常用第二个 kernel：
+
+```text
+kernel1：每 block 归约到 partial[block]
+kernel2：归约 partial
+```
+
+## 38. Cooperative Launch
+
+cooperative kernel 可获得 `grid_group`：
+
+```cpp
+#include <cooperative_groups.h>
+namespace cg=cooperative_groups;
+
+__global__ void grid_reduce(const float* x,float* partial,float* out,int n){
+    cg::grid_group grid=cg::this_grid();
+    // TODO 1：每 block 归约并由 leader 写 partial[blockIdx.x]。
+    // TODO 2：grid.sync()，保证所有 partial 已写。
+    // TODO 3：一个 block/线程组归约 partial，写 out。
+}
+```
+
+必须：
+
+- 查询设备 cooperative launch 支持；
+- 用 `cudaLaunchCooperativeKernel`/对应 API；
+- grid block 数不能超过该 kernel 能同时驻留的范围；
+- 计算 active blocks/SM 时考虑 register/shared/block；
+- 所有 grid 线程一致到达 collective。
+
+## 39. Day 5 验收
+
+- [ ] plain vs graph 分开报告首次/稳态；
+- [ ] nsys 指出 gap 是否变化；
+- [ ] graph 结果与 plain 相同；
+- [ ] 两阶段 reduction 与 grid-sync 版本对拍；
+- [ ] 解释 cooperative 约束，不能声称单 kernel 一定更快。
+
+---
+
+# Day 6：INT8 Weight-only 量化 GEMV
+
+## 40. 量化为什么出现在 Decode
+
+低 batch GEMV 常需要读取大量权重。把权重从 FP16（2B）存成 INT8（1B）可降低存储和读取 bytes，但需要 scale、反量化与合适 kernel；字节减半不保证时间等比减半。
+
+## 41. 对称 INT8 手算
+
+给一行权重：
+
+```text
+w=[-1.0,-0.25,0.5,1.2]
+max_abs=1.2
+scale=max_abs/127≈0.0094488
+q=round(w/scale) 并 clamp 到 [-127,127]
+q≈[-106,-26,53,127]
+dequant=q×scale≈[-1.0016,-0.2457,0.5008,1.2]
+```
+
+量化误差是 `dequant-w`。若 `x=[1,2,-1,0.5]`，分别用原权重和反量化权重算 dot，比较输出误差。
+
+### 方案区别
+
+| 方案 | scale | 优点 | 代价 |
+|---|---|---|---|
+| per-tensor | 整个 W 一个 | metadata 少 | 不同通道范围差异大 |
+| per-channel | 每输出行一个 | 精度通常更好 | 多读 scale |
+| per-group | 每小组一个 | 精度/开销折中 | 索引更复杂 |
+
+非对称量化还引入 zero point；本日先实现对称 per-channel。
+
+```text
+weight-only：W int8，x/acc/out 浮点
+W8A8：W 与 activation 都低精度，需要不同硬件路径
+KV quant：压缩缓存，attention 内读取时反量化
+```
+
+## 42. CPU Quantize 与 Reference
+
+```cpp
+void quantize_per_row(const float* W,int8_t* Q,float* scales,int N,int K){
+  for(int r=0;r<N;++r){
+    float amax=0;
+    for(int k=0;k<K;++k) amax=fmaxf(amax,fabsf(W[r*K+k]));
+    float s=amax==0?1.0f:amax/127.0f;
+    scales[r]=s;
+    for(int k=0;k<K;++k){
+      int q=int(lrintf(W[r*K+k]/s));
+      Q[r*K+k]=int8_t(max(-127,min(127,q)));
+    }
+  }
+}
+
+void dequant_gemv_cpu(const int8_t* Q,const float* scales,
+                      const float* x,float* y,int N,int K){
+  for(int r=0;r<N;++r){
+    double sum=0;
+    for(int k=0;k<K;++k) sum+=double(Q[r*K+k])*scales[r]*x[k];
+    y[r]=float(sum);
+  }
+}
+```
+
+比较两种误差：
+
+```text
+GPU vs CPU dequant reference：验证 kernel 实现
+dequant result vs original FP result：衡量量化误差
+```
+
+不要把两者混在一个 tolerance 中。
+
+## 43. CUDA Kernel（你来完成）
+
+```cpp
+__global__ void dequant_gemv_warp(const int8_t* Q,const float* scales,
+                                  const float* x,float* y,int N,int K){
+  int lane=threadIdx.x&31;
+  int warp=(blockIdx.x*(blockDim.x/32))+(threadIdx.x/32);
+  if(warp>=N) return;
+  float scale=scales[warp];
+  float sum=0;
+  // TODO 1：lane-stride 读取 int8 Q 与 float x。
+  // TODO 2：反量化 q*scale，FMA 到 sum。
+  // TODO 3：warp reduction，lane0 写 y。
+}
+```
+
+### 三级提示
+
+1. 最简单版本先标量读取，正确后再尝试 `char4`/packed load；
+2. `int8_t` 转 float 要注意 signedness；
+3. scale 每行相同，可由各 lane 读取并依赖 cache，之后再尝试广播。
+
+## 44. 性能账本
+
+| 版本 | 权重 bytes/elem | 额外 scale | 转换计算 | 输出误差 | time | DRAM bytes |
+|---|---:|---:|---|---:|---:|---:|
+| FP32 | 4 | 0 | 无 | baseline | | |
+| FP16 | 2 | 0 | half→acc | | | |
+| INT8 per-row | 1 | `4/K` 摊销 | q×scale | | | |
+
+若 INT8 不快，检查：
+
+- kernel 是否仍用低效标量 load；
+- 反量化/转换吞吐；
+- x 读取和归约是否主导；
+- shape 太小是否 launch-bound；
+- 是否真的比较相同精度/工作量。
+
+## 45. Day 6 验收
+
+```text
+N=3,K=4 手算
+N=37,K=29 非整除
+N=4096,K=4096 性能
+全零行、极端范围、固定随机
+```
+
+- [ ] kernel 对齐 CPU dequant reference；
+- [ ] 单独报告量化误差；
+- [ ] ncu 比较 bytes/指令/occupancy；
+- [ ] 不把权重 bytes 减半直接说成端到端 2×。
+
+---
+
+# Day 7：Paged Attention、推理框架与 Hopper
+
+## 46. 连续 KV Buffer 的问题
+
+若每个请求预留最大长度：短请求浪费；若按当前长度连续扩容：后面可能无连续空间，需要搬迁；请求随时完成又会留下孔洞。
+
+```text
+时间0：A 需要2 token，B需要2 token
+时间1：A增长，B结束，C到达
+连续大块方案：预留/搬迁/碎片三者难兼顾
+```
+
+Paged Attention 将 KV 分成固定 token block：请求看到逻辑连续序列，物理块可分散。
+
+## 47. Block Table 手推
+
+设 block size=2 tokens，物理 blocks `P0..P3`：
+
+```text
+请求 A 有 token 0..4，需要逻辑块 L0,L1,L2
+block_table_A=[P2,P0,P3]
+
+token t：
+logical_block=t/2
+offset=t%2
+physical_block=block_table_A[logical_block]
+```
+
+因此：
+
+| token | logical block | offset | physical |
+|---:|---:|---:|---|
+| 0 | 0 | 0 | P2 |
+| 1 | 0 | 1 | P2 |
+| 2 | 1 | 0 | P0 |
+| 3 | 1 | 1 | P0 |
+| 4 | 2 | 0 | P3 |
+
+地址还要乘 layer/KV head/head dimension/dtype stride。block table 解决映射，不减少每个有效 KV 元素本身。
+
+### Block size 权衡
+
+```text
+太大：最后块内部浪费、调度粒度粗
+太小：metadata/查表更多，连续访问和 kernel 效率可能变差
+```
+
+Paged Attention 改善 KV 管理和 kernel 访问组织，不自动把 dense attention FLOP 从平方变线性。
+
+## 48. Continuous Batching
+
+每一步 scheduler 重新选择 active requests：
+
+```text
+step0：[A,B,C]
+step1：B完成，加入D → [A,C,D]
+step2：A的KV容量不足，可能暂停/抢占/换出
+```
+
+目标同时包括 throughput、TTFT、TPOT、P99、公平性和 KV capacity。大 batch 提吞吐可能恶化排队/延迟；chunked prefill 可限制一次占用，但增加调度复杂度。
+
+## 49. 框架地图（以当前官方文档为准）
+
+| 框架 | 回答时抓住的职责 |
+|---|---|
+| vLLM | 高吞吐 serving、PagedAttention/KV 管理与调度生态 |
+| TensorRT-LLM | NVIDIA GPU kernel、量化、编译/runtime 与服务组件 |
+| SGLang | serving/runtime、结构化生成和缓存/调度机制 |
+
+不要背永久“功能支持排行榜”；版本变化快，应按模型、硬件、精度、SLA 和当前版本 benchmark 选择。
+
+官方入口：[vLLM](https://docs.vllm.ai/)、[TensorRT-LLM](https://nvidia.github.io/TensorRT-LLM/latest/)、[SGLang](https://docs.sglang.ai/)。
+
+## 50. A100 到 Hopper
+
+先回忆 A100：
+
+```text
+多个线程发 cp.async：global→shared
+warp 用 ldmatrix/mma.sync
+CTA 内 shared + barrier
+```
+
+Hopper：
+
+| A100 | Hopper | 变化 |
+|---|---|---|
+| `cp.async` | TMA | descriptor+坐标发 bulk 多维搬运，减少 per-thread 地址/copy 指令 |
+| warp `mma.sync` | WGMMA | 4-warp group 异步矩阵计算 |
+| CTA | Thread Block Cluster | 一组 CTA 在同一 GPC 协同调度 |
+| 本 CTA shared | DSM | cluster 内访问其他 CTA shared 分区 |
+| 普通阶段同步 | mbarrier/transaction | 将异步事务完成纳入 stage 状态 |
+
+这促成 producer/consumer warp specialization：少量 producer 发 TMA，consumer warp-group 发 WGMMA，stage barrier 管生命周期。
+
+没有 H100 时，你能做架构和源码阅读，不能声称性能实测。深入见 [CUDA 深水区教材](CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md)。
+
+## 51. 完整 Decode 数据流
+
+```mermaid
+flowchart LR
+  A["Prompt tokens"] --> B["Prefill: 大批 token"]
+  B --> C["建立 KV blocks"]
+  C --> D["Scheduler 选择 active requests"]
+  D --> E["每层: RMSNorm"]
+  E --> F["QKV / GEMV或skinny GEMM"]
+  F --> G["读取历史 KV / Attention"]
+  G --> H["MLP + fused ops"]
+  H --> I["logits / sampling"]
+  I --> J{"结束?"}
+  J -->|否| K["追加新 KV，下一 step"]
+  K --> D
+  J -->|是| L["释放/复用 KV blocks"]
+```
+
+标注瓶颈时写条件：
+
+```text
+低 batch GEMV：权重 bytes 可能主导
+长上下文 decode attention：KV 读取增长
+大量短算子：launch 与中间 HBM 往返
+大 batch/chunked prefill：计算利用率提高但调度/延迟改变
+多 GPU：collective/KV transfer 可能进入 critical path
+```
+
+## 52. Day 7 与全周验收
+
+闭卷：
+
+1. 从 token 到下一个 token 画完整流程；
+2. 手算两组 KV bytes；
+3. 解释 GEMV 一线程/一 warp 一行的访存差异；
+4. 用 HBM 账本解释融合；
+5. Graph 降低什么、不降低什么；
+6. cooperative grid sync 为什么有驻留约束；
+7. INT8 weight-only 的 scale、误差和性能条件；
+8. block table 如何把 token 映射到 physical KV；
+9. continuous batching 如何改变有效 M；
+10. TMA/WGMMA/cluster/DSM 分别解决什么。
+
+最终产出：
+
+```text
+week05_inference/gemv.cu
+week05_inference/fused_rmsnorm.cu
+week05_inference/decode_graph.cu
+week05_inference/grid_reduce.cu
+week05_inference/dequant_gemv.cu
+notes/week05.md
+```
+
+---
+
+# 附录 A：工具命令
+
+```bash
+# 编译
+nvcc -O3 -lineinfo -arch=sm_80 source.cu -o app
+
+# 资源
+nvcc -O3 -lineinfo -arch=sm_80 -Xptxas=-v source.cu -o app
+
+# 正确性
+compute-sanitizer --tool memcheck ./app
+compute-sanitizer --tool racecheck ./app
+compute-sanitizer --tool initcheck ./app
+compute-sanitizer --tool synccheck ./app
+
+# 单 kernel
+ncu --set full -o /tmp/report ./app
+
+# 系统时间线
+nsys profile --trace=cuda,nvtx -o /tmp/timeline ./app
+```
+
+# 附录 B：继续深挖
+
+- [Week4 Attention 与 FlashAttention](Week4_Attention与FlashAttention完整学习资料.md)
+- [AI Infra 面试八股](AI_Infra面试八股全集.md)
+- [KV Cache 专项](大模型KVCache系统学习指南.md)
+- [Occupancy 详解](Occupancy详解_从入门到调优.md)
+- [Nsight Compute 详解](Nsight_Compute_ncu详解.md)
+- [CUDA 深水区：PTX/SASS/MMA/流水/Hopper](CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md)
+- [CUDA Graph 教材](../cuda_deep_course/course/volume07_async_system/04_CUDA_Graph.md)
+- [NVIDIA Hopper Tuning Guide](https://docs.nvidia.com/cuda/hopper-tuning-guide/)
+
+> 链接用于深挖；完成本周主线不要求先通读这些长文档。
