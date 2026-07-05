@@ -127,10 +127,57 @@ ALL PASS（误差 ~1e-7）
 
 ---
 
+## Day 5（2026-07-05）：cp.async 双缓冲 + ncu 验证
+
+### 交付
+- `week04_attention/tiled_attention_pipelined.cu` —— 在 Day4 tiled 上加 cp.async 双缓冲，**ALL PASS**
+  - `cuda::pipeline<thread_scope_block>` + `pipeline_shared_state<...,2>` 双缓冲
+  - `k_s[2][BC][MAX_D]` / `v_s[2][BC][MAX_D]` 乒乓，`stage ^= 1`
+  - 序幕预取 tile0 → 循环内「预取下一块 + 计算当前块」重叠
+- `week04_attention/ncu_pipeline_notes.md` —— Day4 vs pipelined 的 ncu stall 对比
+
+### 修掉的 bug（迭代记录）
+1. `isinf(block_m && block_m<0)` 括号错位 → 传 bool 给 isinf → 选中 host-only constexpr 重载
+   → 「__global__ 里调用 __host__ constexpr」编译报错。修：`isinf(block_m) && block_m<0`
+2. `load_title_async` 三连错：row_base 多乘 d、列索引 `i%tileH`（应 tileW）、写地址 `+r`（应 +c）
+3. m/l 未初始化（同 Day4 老坑）、dot 用 `=` 而非 `+=`
+4. **双缓冲记账**：`last_valid = valid` 慢一拍，末块（N=37）用成上一块的行数 → 多算垃圾行。
+   修：删 last_valid，计算用 `valid=min(BC,n-tile_step)`，预取用 `next=min(BC,n-(tile_step+valid))`
+   诊断信号：N=37 causal=1 PASS 但 causal=0 FAIL → 垃圾 key 被 causal 恰好 mask 掉
+
+### ncu 对比（N=128 D=64 causal=0，同一 launch）
+| 指标 | Day4 | Pipelined | 变化 |
+|------|------|-----------|------|
+| long_scoreboard stall（等 global） | 6.40 | 0.03 | ↓99.5% |
+| short_scoreboard stall（等 shared） | 0.60 | 0.59 | ≈不变 |
+| warp latency / inst | 15.15 cyc | 6.46 cyc | ↓57% |
+| SM throughput | 7.47% | 16.79% | ↑2.25× |
+
+### 概念（从零掌握）
+- double buffering = 2 个 buffer，一边算一边预取，`buf = t & 1` 乒乓
+- `cuda::pipeline` 三段式：producer_acquire/commit（发起+提交异步拷贝）、consumer_wait/release（等+释放）
+- pipeline 块作用域保证跨线程可见：多线程分工搬 K/V，consumer_wait 后都能读到
+- buffer 覆盖安全：同 buffer 2 轮后才重用，producer_acquire 会等它的 consumer_release
+- 预取行数要按「下一块起点」算，不是当前块（否则慢一拍）
+
+### 自己悟出的洞察
+- cp.async 藏的是 **global 访存延迟**（long_scoreboard），不动 shared 延迟（short_scoreboard）
+  → 「一降一稳」的对照正好证明藏对了东西
+- 小 N（128 block，0.13~0.30 wave）填不满 A100 → 墙钟没大加速，瓶颈转成占用率；
+  但 stall 组成变化真实，证明机制有效。大加速要靠「多 query tile 填满 GPU」
+
+### 闭卷口述（已过）
+cp.async 预取下一块 K/V 到另一个 shared buffer，与当前块计算重叠 → 藏 global 访存延迟。
+ncu 看 long_scoreboard 从每指令 6.4 cycle 降到 0.03，short_scoreboard 不变，证明藏的是 global
+而非 shared 延迟；warp 平均等待 15→6.5 cycle，SM 吞吐翻倍。小 N 墙钟没大改是 grid 填不满 GPU。
+
+---
+
 ## 下一步（TODO）
 - [x] Day2：online softmax 写成 CUDA（running m/l + 新 max 重缩放）
 - [x] Day3–4：tiled_attention.cu 教学版，ALL PASS
-- [ ] Day5：A100 优化二选一（FP16+Tensor Core 或 K/V 双缓冲 cp.async），精度+性能分开验证
+- [x] Day5：K/V 双缓冲 cp.async（tiled_attention_pipelined.cu）+ ncu stall 对比验证
 - [ ] Day6：KV cache 与 MLA（字节账本、MHA/GQA/MLA shape）
 - [ ] Day7：profiling（benchmark 表 + ncu 证据）
+- [ ] 进阶：FP16 + Tensor Core（多 query tile + mma.sync），留作 CUDA 深度专项
 - [ ] `fused_attention.cu` 三个 TODO（如需补 Day1 融合版）

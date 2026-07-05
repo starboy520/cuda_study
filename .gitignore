@@ -90,6 +90,7 @@ a_ptx
 week04_attention/naive_attention
 week04_attention/online_softmax
 week04_attention/tiled_attention
+week04_attention/tiled_attention_pipelined
 
 # operator_practice 编译产物(可执行文件)
 operator_practice/activation/relu
