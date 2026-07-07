@@ -452,10 +452,10 @@ prefill 往往形成更大 GEMM，decode 低 batch 往往权重/KV bytes 相对 
 
 闭卷回答：
 
-1. prefill 和 decode 的输入 shape 如何变化？
-2. KV cache 避免了什么重复计算？
+1. prefill 和 decode 的输入 shape 如何变化？ prefill阶段[B,N,D] decode阶段，[1,1,D]
+2. KV cache 避免了什么重复计算？ 历史token的k和v的重复计算，
 3. 为什么 cache 省 FLOP 却增加显存/带宽？
-4. 为什么 GQA 公式用 `Hkv`？
+4. 为什么 GQA 公式用 `Hkv`？ 多个ATTENTION复用投影向量
 5. 为什么不能无条件说所有 decode 都 memory-bound？
 
 口述：

@@ -106,3 +106,10 @@ week06_tensorcore/wmma
 
 # cuda_deep_course lab 编译产物
 cuda_deep_course/labs/02_programming_model/async_errors/async_errors
+
+# week05 inference 编译产物
+week05_inference/gemv
+week05_inference/fused_rmsnorm
+week05_inference/decode_graph
+week05_inference/grid_reduce
+week05_inference/dequant_gemv
