@@ -110,17 +110,222 @@ X shape = [1,3,4]
 
 ### 2.4 Transformer block
 
-本周只保留数据流：
+一个 Transformer block 可以先理解为：**让每个 token 先和上下文交换信息，再独立加工自己的特征，同时用 residual 保留原来的表示。**
+
+模型会连续经过 `L` 个结构相似、参数不同的 block。每个 block 的输入和输出 shape 都是 `[B,N,D]`，这样上一层输出才能直接交给下一层。“shape 不变”不等于数值没变：hidden state 每经过一层都会融入新的上下文信息。
+
+#### 2.4.1 一个 block 的完整数据流
+
+本周使用现代 decoder-only LLM 常见的 **Pre-Norm** 结构：
 
 ```text
-X
-→ RMSNorm
-→ Attention（读/写 KV）
-→ residual add
-→ RMSNorm
-→ MLP 线性层 + 激活 + 线性层
-→ residual add
+输入 X [B,N,D]
+│
+├──────────────────────────────────────┐  residual 支路保留 X
+│                                      │
+└→ RMSNorm → Q/K/V 投影 → Attention   │
+                          ├─ 写当前 K/V │
+                          └─ 读历史 K/V │
+                → 输出投影 → AttnOut   │
+                                        ▼
+                              H = X + AttnOut
+                              │
+                              ├──────────────────────┐
+                              └→ RMSNorm → MLP       │
+                                                     ▼
+                                           Y = H + MLPOut
+
+输出 Y [B,N,D]
 ```
+
+对应四行公式：
+
+$$
+X_{norm}=\operatorname{RMSNorm}(X)
+$$
+
+$$
+H=X+\operatorname{Attention}(X_{norm})
+$$
+
+$$
+H_{norm}=\operatorname{RMSNorm}(H)
+$$
+
+$$
+Y=H+\operatorname{MLP}(H_{norm})
+$$
+
+先抓住两个大分支：
+
+1. **Attention 子层**：让一个 token 根据需要读取其他 token 的信息；
+2. **MLP 子层**：每个 token 分别使用同一套小型神经网络加工自身特征。
+
+KV Cache 只属于 Attention 子层，不属于 RMSNorm、residual 或 MLP。
+
+#### 2.4.2 RMSNorm：先整理数值尺度
+
+`X[B,N,D]` 中每个 token 都有长度为 `D` 的向量。RMSNorm 分别处理每个 token 的这一行：
+
+```text
+X[b,n,0:D] → 计算均方根 → 归一化 → 乘可学习权重
+```
+
+$$
+\operatorname{RMSNorm}(x)
+=\frac{x}{\sqrt{\frac{1}{D}\sum_{d=0}^{D-1}x_d^2+\epsilon}}
+\odot\gamma
+$$
+
+- `x`：一个 token 的 hidden vector，长度为 `D`；
+- `epsilon`：防止分母过小；
+- `gamma[D]`：训练得到的逐元素缩放参数；
+- 输入和输出都是 `[B,N,D]`。
+
+直觉上，它先避免某层数值整体过大或过小，再送入后面的重计算。Pre-Norm 的关键是：**先 Norm 再进入 Attention/MLP，但 residual 支路保留 Norm 之前的输入。**
+
+#### 2.4.3 Attention：让 token 从上下文取信息
+
+归一化结果经过线性投影生成 Q、K、V：
+
+```text
+X_norm
+├─ × Wq → Q：当前 token 想查找什么
+├─ × Wk → K：每个 token 用什么“标签”被匹配
+└─ × Wv → V：匹配后真正取回的信息
+```
+
+概念流程：
+
+```text
+Q 与各位置 K 计算相关分数
+→ causal mask 禁止看到未来位置
+→ softmax 得到权重
+→ 用权重加权求和 V
+→ 输出投影 Wo
+→ AttentionOut [B,N,D]
+```
+
+为什么最后必须回到 `D`？因为接下来要做 `H=X+AttentionOut`。逐元素相加要求 shape 相同。因此，即使 Q/K/V 内部拆成多个 head，输出投影也会把结果整理回 `[B,N,D]`。
+
+完整 Attention 数学、head 和 FlashAttention 请看
+[Week4 Attention 与 FlashAttention 完整学习资料](./Week4_Attention与FlashAttention完整学习资料.md)。
+
+#### 2.4.4 KV Cache 在哪里读写
+
+K/V 是 Attention 内由 hidden state 投影得到的中间结果。历史 token 的 K/V 在推理时不会改变，因此可以缓存：
+
+```text
+Prefill，N=3：
+  为 t0、t1、t2 生成 Q/K/V
+  把 K0..K2、V0..V2 写入 KV Cache
+  每个位置按 causal 规则读取可见的历史 K/V
+
+Decode，新 token=t3：
+  只为 t3 生成 Q3、K3、V3
+  把 K3、V3 追加到 KV Cache
+  Q3 读取 K0..K3，并用权重加权 V0..V3
+```
+
+decode 虽然只新计算一个位置的 Q/K/V，但 Attention 读取范围会随上下文增长。这就是长上下文 decode 中 KV 读取带宽越来越重要的原因。
+
+#### 2.4.5 第一次 residual add：保留旧信息
+
+```text
+H = X + AttentionOut
+
+主支路：X → RMSNorm → Attention → 学习上下文改动
+直通路：X ─────────────────────→ 保留原表示
+最后：  原表示 + 新改动
+```
+
+它不是把两个 token 相加，而是对相同 `(b,n,d)` 位置逐元素相加：
+
+$$
+H[b,n,d]=X[b,n,d]+AttentionOut[b,n,d]
+$$
+
+所以 `X`、`AttentionOut` 和 `H` 都是 `[B,N,D]`。
+
+#### 2.4.6 第二个子层：RMSNorm、MLP、residual
+
+`H` 先经过第二次 RMSNorm，再进入 MLP。MLP 不负责 token 之间交流；它对每个 token 独立使用同一组权重：
+
+```text
+H_norm[b,0,:] ─→ 同一个 MLP ─→ MLPOut[b,0,:]
+H_norm[b,1,:] ─→ 同一个 MLP ─→ MLPOut[b,1,:]
+H_norm[b,2,:] ─→ 同一个 MLP ─→ MLPOut[b,2,:]
+```
+
+MLP 可先记成“升维—非线性—降维”：
+
+```text
+[D]
+→ 第一组线性层
+→ [Dff]，通常 Dff > D
+→ 激活函数或门控（如 SiLU/SwiGLU）
+→ 第二组线性层
+→ [D]
+```
+
+不同模型细节可能不同。例如门控 MLP 常有 gate/up 两个投影，但 shape 主线不变：中间扩到 `Dff`，最后降回 `D`。
+
+最终做 `Y=H+MLPOut`。第二次 residual 保留 Attention 之后的 `H`，同时叠加 MLP 的新变换。`Y[B,N,D]` 可直接送入下一个 block。
+
+#### 2.4.7 用微型 shape 走一遍
+
+假设 `B=1,N=3,D=4,Dff=8`：
+
+| 步骤 | 张量 | shape | 发生了什么 |
+|---|---|---|---|
+| block 输入 | `X` | `[1,3,4]` | 3 个 token，每个 4 个特征 |
+| 第一次归一化 | `X_norm` | `[1,3,4]` | 每个 token 沿 D 维归一化 |
+| Attention 内部 | `Q/K/V` | 内部 head shape | token 间交换信息，K/V 可缓存 |
+| 输出投影 | `AttentionOut` | `[1,3,4]` | 回到 D，准备 residual |
+| 第一次残差 | `H` | `[1,3,4]` | `X + AttentionOut` |
+| 第二次归一化 | `H_norm` | `[1,3,4]` | 为 MLP 整理尺度 |
+| MLP 中间 | activation | `[1,3,8]` | 每个 token 独立升维与激活 |
+| MLP 输出 | `MLPOut` | `[1,3,4]` | 降回 D |
+| 第二次残差 | `Y` | `[1,3,4]` | `H + MLPOut` |
+
+真实模型的 `D`、`Dff` 和 head 数大得多，但 shape 推理方法相同。
+
+#### 2.4.8 Prefill 与 Decode 经过同一个 block
+
+| 阶段 | block 输入 | 线性层视角 | Attention 的 KV 行为 |
+|---|---|---|---|
+| Prefill | `[B,N,D]`，N 可较大 | 常形成较大 GEMM | 为 prompt 各位置生成并写入 K/V |
+| Decode | `[B,1,D]`（单请求） | 低 batch 时接近 GEMV | 追加新 K/V，并读取历史 K/V |
+
+结构和权重没有更换，变化的是 shape 与状态：
+
+```text
+Prefill：一次处理许多 token，建立初始 KV Cache
+Decode ：每步处理新 token，复用并扩展 KV Cache
+```
+
+continuous batching 会将多条请求的新 token 打包，输入可近似为 `[active_batch,1,D]`；所以 decode 不应永远机械等同于单条 GEMV。
+
+#### 2.4.9 与本周 CUDA 任务的对应
+
+```text
+Q/K/V、Wo、MLP 投影 → Day 2/3：GEMV/GEMM
+RMSNorm + residual + activation → Day 4：融合 kernel
+每步重复执行许多小 kernel → Day 5：CUDA Graph
+Attention 读写历史 K/V → Day 7：Paged Attention 与 KV 管理
+```
+
+#### 2.4.10 常见误区与闭卷口述
+
+1. **Attention 就是整个 Transformer。** 不对；block 还有 Norm、residual 和 MLP，模型又由许多 block 堆叠。
+2. **MLP 也混合不同 token。** 标准 MLP 对各 token 独立，token 间交流主要发生在 Attention。
+3. **KV Cache 缓存 Q/K/V。** 常规缓存的是每层历史 K/V；新 token 的 Q 用后不必作为历史查询对象缓存。
+4. **residual add 改变 shape。** 它是同 shape 逐元素相加，输出 shape 不变。
+5. **decode 使用另一套模型层。** 它经过同一组 block 和权重，只是 `N`、batch 组织和 KV 状态不同。
+
+闭卷口述：
+
+> 一个 Pre-Norm Transformer block 有 Attention 和 MLP 两个主子层。输入 `X[B,N,D]` 先做 RMSNorm，再生成 Q/K/V；Attention 让 token 从可见上下文读取信息，输出投影回 D 后与原 X 做第一次 residual。结果再 RMSNorm，经过逐 token 的升维、激活或门控、降维 MLP，然后做第二次 residual，输出仍是 `[B,N,D]`。Prefill 与 decode 使用同一结构；prefill 一次处理多个 token 并建立 KV Cache，decode 每步只新增少量 token 的 K/V，但 Attention 要读取历史 K/V。
 
 Day 2/3 研究线性层，Day 4 研究 norm/residual/activation，Day 7 研究 KV 管理。
 
