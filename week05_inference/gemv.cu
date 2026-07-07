@@ -71,6 +71,37 @@ __global__ void gemv_warp(const float* W, const float* x,
     }
 }
 
+__global__ void gemv_warp_vectorized(const float* W, const float* x, const float* b, float* y, int N, int K) {
+    int warp_id = threadIdx.x / 32;
+    int lane_id = threadIdx.x % 32;
+    int warp_num_per_block = blockDim.x /32;
+    int row = warp_num_per_block * blockIdx.x + warp_id;
+    if (row >= N) return;
+    const float* w_row = W + row  * K;
+
+    const float4* w_v = reinterpret_cast<const float4*>(w_row);
+    const float4* x_v = reinterpret_cast<const float4*>(x);
+    float sum = 0.0f;
+    for (int i = lane_id; i < K/4; i+=32) {
+        float4 w_cur = w_v[i];
+        float4 x_cur = x_v[i];
+        sum += (w_cur.x * x_cur.x + w_cur.y * x_cur.y + w_cur.z * x_cur.z + w_cur.w * x_cur.w);
+    }
+
+    if (K % 4 != 0 && lane_id == 0) {
+        for (int i = K/4*4; i < K; i++) {
+            sum += w_row[i] * x[i];
+        }
+    }
+
+    for (int offset = 16; offset; offset /=2) {
+        sum = sum + __shfl_down_sync(0xffffffffu, sum, offset); 
+    }
+    if (lane_id == 0) {
+        y[row] = sum + (b ? b[row] : 0.0);
+    }
+}
+
 // ===========================================================================
 // CPU 参考 + 测试框架（已写好，无需改动）
 // ===========================================================================
@@ -193,6 +224,14 @@ static void run_case(int N, int K) {
               gemv_warp<<<blocks, threads>>>(W, x, b, y, N, K);
           },
           dW, dx, db, dy, N, K, ref);
+
+    bench("warp/vectorized",
+    [](const float*W, const float* x, const float* b, float* y, int N, int K) {
+        int threads = 256;
+        int warps_per_block = threads/32;
+        int blocks = (N + warps_per_block - 1) / warps_per_block;
+        gemv_warp_vectorized<<<blocks, threads>>>(W, x, b, y,  N,K);
+    }, dW, dx, db, dy, N, K, ref);
 
     cudaFree(dW); cudaFree(dx); cudaFree(db); cudaFree(dy);
 }
