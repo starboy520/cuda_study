@@ -42,7 +42,7 @@
 | 算子 | 说明 | 关键技术 | 状态 |
 |------|------|----------|------|
 | softmax (warp/block) | 数值稳定 softmax | max 归约 + exp + sum 归约 | ✅ |
-| online softmax | 单遍 softmax | 流式更新 m / s | ⬜ |
+| online softmax | 单遍 softmax | 流式更新 m / s | ✅ |
 | RoPE | 旋转位置编码 | 逐元素复数旋转 | ⬜ |
 | FlashAttention-2 思路 | 分块 attention | online softmax + tiling | ⬜ |
 | GQA / MQA | 分组/多查询注意力 | KV 头共享 | ⬜ |

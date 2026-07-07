@@ -113,3 +113,5 @@ week05_inference/fused_rmsnorm
 week05_inference/decode_graph
 week05_inference/grid_reduce
 week05_inference/dequant_gemv
+
+operator_practice/softmax/online_softmax
