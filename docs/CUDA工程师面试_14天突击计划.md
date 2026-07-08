@@ -305,6 +305,8 @@ Day 12～14 薄弱项回补 → 限时编码与诊断 → 项目追问 → 完�
 
 **约 8 小时时间表**：
 
+正常模式（无 Day 5 补考，总计 8 小时）：
+
 | 时间 | 任务 | 到点产物 |
 | ---: | --- | --- |
 | 1 小时 | 阅读并分开画 raw PTX 与 `cuda::pipeline` 两层状态机 | 两张状态机与对应/不等价表 |
@@ -312,6 +314,19 @@ Day 12～14 薄弱项回补 → 限时编码与诊断 → 项目追问 → 完�
 | 4 小时 | 复用完整 sync/2-stage 基线，基于教材骨架实现并调通 3-stage | 三版 PASS、资源/SASS/计时/ncu |
 | 1 小时 | 边界 K 对拍与 Compute Sanitizer | 边界矩阵、memcheck 0 errors |
 | 1 小时 | 三版表格、闭卷和 5 分钟口述 | 对照表、答题纸、录音 |
+
+Day 5 补考模式（总计 8 小时）：
+
+| 时间 | 任务 | 到点产物 |
+| ---: | --- | --- |
+| 1.5 小时 | 只重做 Day 5 未通过的最小验收 | 补考结论与证据定位 |
+| 0.5 小时 | Day 6 概念定向阅读，快速重画 raw PTX/API 边界 | 两层对应与不等价速查表 |
+| 0.5 小时 | 复用教材 wrapper 完成 raw PTX microtest，不做扩展 | raw copy/commit/wait/consume PASS |
+| 4 小时 | 复用完整 sync/2-stage 基线，实现并调通正确的 3-stage | 三版 PASS、资源/SASS/计时/ncu |
+| 0.75 小时 | 边界 K 对拍与 Compute Sanitizer | 边界矩阵、memcheck 0 errors |
+| 0.75 小时 | 三版证据表、闭卷和压缩口述 | 对照表、答题纸、录音 |
+
+补考模式只压缩重复阅读、扩展实验和报告美化，不删除 raw PTX/API 区分、正确 3-stage、边界正确性或 sync/2-stage/3-stage 三版证据。压缩后任一硬验收仍未完成，Day 6 判定未通过并按通用补考规则处理。
 
 **必读仓库资料**：[主教材 9. Day 7：`cp.async` 状态机](CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md)、[10. Day 8：2-stage 与 3-stage](CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md)、[11. Day 9：流水性能证据](CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md)、[double buffering 模板](../week05_gemm_advanced/gem_double_buffering.cu)、[Attention 流水笔记](../week04_attention/ncu_pipeline_notes.md)。
 
@@ -330,7 +345,7 @@ Day 12～14 薄弱项回补 → 限时编码与诊断 → 项目追问 → 完�
 
 **面试口述主题**：5 分钟解释一次异步流水设计，先讲正确性协议，再讲重叠收益，最后给出资源/occupancy/小 grid 让更多 stage 失效的反例。
 
-**没通过时的降级/补救**：raw microtest、两层语义、正确 3-stage、边界/sanitizer 或三版比较任一缺失，Day 6 都判定未通过；Day 7 开场最多 90 分钟补考并计入 8 小时。若当天需要补考，先占用概念时段，超出 1 小时的部分从 4 小时实现时段扣除；不得把 3-stage 降级为口头完成，也不得从 2-stage 外推其正确性或性能。
+**没通过时的降级/补救**：raw microtest、两层语义、正确 3-stage、边界/sanitizer 或三版比较任一缺失，Day 6 都判定未通过；Day 7 开场最多 90 分钟补考并计入 8 小时。不得把 3-stage 降级为口头完成，也不得从 2-stage 外推其正确性或性能。
 
 ## Day 7：Hopper 对照与五层综合证据链
 
