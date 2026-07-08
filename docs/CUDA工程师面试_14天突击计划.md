@@ -102,12 +102,16 @@ compute-sanitizer --version
 
 ### 临时目录冒烟测试
 
+仍位于仓库根目录时先固定仓库绝对路径，再切换到临时目录：
+
 ```bash
+export REPO_ROOT="$(git rev-parse --show-toplevel)"
+test -d "$REPO_ROOT/week04_gemm"
 mkdir -p /tmp/cuda_interview_sprint
 cd /tmp/cuda_interview_sprint
 ```
 
-后续环境探测产生的可执行文件、profile 报告、PTX 和 SASS 文本都放在该目录。正式学习输出只有在每日任务明确指定时才进入仓库。
+后续环境探测产生的可执行文件、profile 报告、PTX 和 SASS 文本都放在该目录。新开 shell 后环境变量不会自动保留，必须回到仓库内重新执行上述 `export` 和 `test`，再进入临时目录。正式学习输出只有在每日任务明确指定时才进入仓库。
 
 开跑前逐项确认：
 
@@ -150,8 +154,8 @@ Day 12～14 薄弱项回补 → 限时编码与诊断 → 项目追问 → 完�
 **分步实验**：
 
 1. `mkdir -p /tmp/cuda_interview_sprint/day01 && cd /tmp/cuda_interview_sprint/day01`；执行 `nvidia-smi > environment.txt`、`nvcc --version >> environment.txt`、`ncu --version >> environment.txt`。`commands.sh` 只手工记录已经执行的命令，或用 `printf '%s\n' 'nvcc ...' >> commands.sh` 逐条写入安全的纯文字；不要把含 `$()`、反引号或未确认变量的命令通过 here-document 再执行。所有生成物留在此目录。
-2. 生成虚拟 ISA：`nvcc -O3 -lineinfo -arch=compute_80 -ptx "$OLDPWD/week04_gemm/gemm_naive/gemm_naive.cu" -o naive.compute_80.ptx`。
-3. 生成 A100 机器码路径并保留资源报告：`nvcc -O3 -lineinfo -arch=sm_80 -Xptxas=-v "$OLDPWD/week04_gemm/gemm_naive/gemm_naive.cu" -o naive.sm80 2> ptxas.log`。
+2. 生成虚拟 ISA：`nvcc -O3 -lineinfo -arch=compute_80 -ptx "$REPO_ROOT/week04_gemm/gemm_naive/gemm_naive.cu" -o naive.compute_80.ptx`。
+3. 生成 A100 机器码路径并保留资源报告：`nvcc -O3 -lineinfo -arch=sm_80 -Xptxas=-v "$REPO_ROOT/week04_gemm/gemm_naive/gemm_naive.cu" -o naive.sm80 2> ptxas.log`。
 4. 导出实际嵌入的机器指令：`cuobjdump --dump-sass ./naive.sm80 > naive.sm80.sass`；用 `cuobjdump --list-elf` 确认目标 code object。
 5. 运行 `./naive.sm80 257 259 263` 做非整齐 shape 正确性检查；标注 PTX 是虚拟 ISA，SASS 才是该 `sm_80` code object 的机器指令。若当前驱动将来从嵌入 PTX JIT，新架构生成的 SASS 可能不同。
 
