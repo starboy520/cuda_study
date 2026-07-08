@@ -8,6 +8,61 @@
 
 ---
 
+## 0. 极简速查(忘了就看这一页)
+
+> 心法:**不背 metric 名,背"问题 → section"。** 忘了名字用 `ncu --list-sections` 现查。
+
+### 判断瓶颈的固定流程(比记指标重要 100 倍)
+```
+① SpeedOfLight:看 Compute% vs Memory%,谁接近 100% 谁是瓶颈
+    ├─ Memory 高 → MemoryWorkloadAnalysis(带宽满?→减字节;sector/req 高?→改合并;命中低?→改复用)
+    ├─ Compute 高 → SchedulerStats / SourceCounters(找计算/stall)
+    └─ 都不高 → latency/occupancy 问题 → Occupancy section
+```
+
+### 5 个问题 → 5 个 section(记这 5 个名就够)
+| 我想知道… | section | 核心数字 |
+|---|---|---|
+| **谁是瓶颈?**(永远第一步) | `SpeedOfLight` | Compute% vs Memory% |
+| 访存好不好 | `MemoryWorkloadAnalysis` | sector/request、DRAM 带宽%、L2 命中率 |
+| 并行度够不够 | `Occupancy` | achieved occupancy、限制因素 |
+| launch 配置/资源 | `LaunchStats` | grid/block、寄存器、shared |
+| 卡在哪行代码 | `SourceCounters` | 哪行 stall 最多 |
+
+### 8 个真正常用的 metric(其余现查)
+```
+gpu__time_duration.sum                            耗时
+sm__throughput.avg.pct_of_peak_sustained_elapsed  Compute 利用率%
+dram__throughput.avg.pct_of_peak_sustained_elapsed 访存带宽利用率%
+dram__bytes_read.sum / dram__bytes_write.sum      真实显存读写字节
+l1tex__t_sectors_pipe_lsu_mem_global_op_ld.sum    L1层 sector(含 cache 命中)
+l1tex__average_t_sectors_per_request_..._ld.ratio 合并好不好(每请求几 sector)
+sm__warps_active.avg.pct_of_peak_sustained_active achieved occupancy
+launch__registers_per_thread                      寄存器/线程
+```
+
+### 常用命令
+```bash
+ncu --set basic ./app                  # 基础套餐(SpeedOfLight+Launch+Occupancy)
+ncu --set full  ./app                  # 全套(最全,慢)
+ncu --section SpeedOfLight ./app       # 只跑某个 section
+ncu --launch-skip N --launch-count M ./app   # 只测第 N 个起的 M 个 kernel
+ncu --list-sections / --list-sets      # 忘了名字一键查
+```
+
+### 两个层次别搞混(sector ≠ DRAM 流量)
+| 指标 | 层次 | 含义 |
+|---|---|---|
+| `l1tex__t_sectors...` | SM 访存管线 | 请求的 32B 块数(**含 cache 命中**) |
+| `dram__bytes_read.sum` | 显存 | **真正打到 DRAM** 的字节 |
+
+> sector 多 ≠ DRAM 流量大——小数据(如反复读的 x)可能全在 L2,请求计数高但显存流量小。判访存要两个一起看。
+
+### 一句话记忆
+> **先 `SpeedOfLight` 分流(算力 vs 访存),再钻对应 section。** sector 理论值 = 有用字节/32,实测≈理论 = 合并满载;sector 和 `dram__bytes` 分清"请求"与"真实显存流量"。
+
+---
+
 ## 目录
 
 1. [ncu 是什么、和 nsys 的分工](#1-ncu-是什么和-nsys-的分工)
