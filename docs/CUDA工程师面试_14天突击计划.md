@@ -703,3 +703,76 @@ Day 5 补考模式（总计 8 小时）：
 **面试口述主题**：项目表达严格使用 30 秒定位、2 分钟摘要、5 分钟优化链、10 分钟深挖四档；根据面试官打断随时收束。回答的目标是可验证、边界诚实和取舍清楚，而不是背出唯一标准答案。
 
 **没通过时的降级/补救**：当天仍写明确的 not-ready 原因和截止日期，不追加无边界题海。只修触发硬失败或低于 70% 的维度，选择上述 3～7 天最小包；保留原模拟证据以便复测对比。补救结束后无论结果如何都用同一 rubric 复测并开始有针对性的投递，同时在真实面试反馈中继续迭代。
+
+## 附录 A：岗位匹配与诚实边界
+
+完成 14 天只代表形成了可审计的面试能力，不代表获得 offer，更不等于拥有生产环境年限。表中的“可达到”指通过本文验收后可以投递并接受对应追问；“仍缺”必须在简历和面试中如实说明。
+
+| 岗位方向 | 14 天后可达到的面试 ready | 仍缺的生产经验/后续能力 |
+| --- | --- | --- |
+| 初级 CUDA 工程师 | 能独立写六个核心 kernel，做 reference、边界、sanitizer、可靠计时，并解释执行、内存、同步和常见优化 | 大型代码库协作、线上故障、长期维护、跨平台发布和真实业务约束仍需工作项目积累 |
+| CUDA 性能优化 | 能用 Roofline、ncu、PTX/SASS 和单变量实验建立一条 A100 性能证据链，避免用单指标断言根因 | 多代 GPU 的长期调优、真实负载分布、功耗/频率控制、回归体系及生产 SLO 经验不足 |
+| LLM 推理算子 | 能讲清并实现 GEMV、RMSNorm、Softmax 等基础算子，理解 Attention、融合和 decode memory-bound 边界 | 完整推理框架集成、量化校准、Paged Attention/KV cache 管理、动态 batching 和线上吞吐/时延权衡仍需补齐 |
+| CUTLASS/高性能算子 | 能下钻 `ldmatrix`、`mma.sync`、`cp.async`，读基础模板和机器指令，说明与 cuBLAS/CUTLASS 的差距 | 不能声称已具备生产级 CUTLASS kernel 设计能力；复杂 layout、epilogue、autotuning、多架构维护和接近库峰值需要长期实践 |
+| 多 GPU/HPC | 能讨论单卡 kernel 的正确性/性能证据和基础系统容量边界 | NCCL、拓扑感知、通信计算重叠、collective 调优、MPI、故障恢复和大规模集群实战不在这 14 天的完成范围 |
+
+优先投递初级 CUDA、偏 kernel 的性能优化和初级推理算子岗位；CUTLASS/高性能算子岗位可作为成长型投递，多 GPU/HPC 岗位应明确标注当前是单卡基础而非生产经验。岗位 JD 若把上述“仍缺”列为硬门槛，就先走附录 E 的后续路线或调整岗位层级。
+
+## 附录 B：内容分级与时间不足压缩
+
+压缩只改变广度、排版和额外实验，不改变硬验收。六个核心 kernel（Reduction、Shared Transpose、Softmax、Tiled GEMM、warp-per-row GEMV、RMSNorm）的正确性、A100 旗舰项目、两轮模拟面试，以及每天的概念、代码/实验、证据、面试四类输出不得删除。
+
+| 落后程度 | 具体压缩顺序 | 仍必须保留 |
+| --- | --- | --- |
+| 落后 1～2 天 | ① 削减 Hopper 的指令/映射细节，只保留 TMA、WGMMA、Cluster/DSM、`mbarrier`、warp specialization 的正确概念对比；② 删除扩展 kernel 和额外 shape；③ 压缩报告美化；④ 停止额外 tile、stage、block 参数扫描 | 六核正确性与边界、reference/容差、适用 sanitizer、可靠计时、主题所需 ncu/PTX/SASS、旗舰项目、两轮模拟、四类输出 |
+| 落后 3～4 天 | 在上述基础上，跳过所有“尽量完成”和重复阅读；每个实验只保留一个代表 shape 加硬边界 shape；旗舰项目只选 GEMM 或 Attention 一条优化链；口述只保留规定时长，不额外扩题；补考严格占当天 8 小时 | 同上；Day 9/10 仍各按文中 8 小时时间盒执行，不把两天工作硬塞成一次超长夜战 |
+
+若落后超过 4 天，就承认无法在原 14 天期限内完整通过全部硬验收，不靠每天无限加时制造“完成”。先检查独立编码正确性、证据诚实性、旗舰项目和两轮模拟这四类硬门槛：任何一类未达标且目标岗位将其列为硬要求，应延后面试并设明确复测日；若只是非目标岗位的扩展项未完成，可以按岗位匹配表缩小投递范围并如实说明边界。
+
+## 附录 C：投递前检查表
+
+- [ ] 能在不看仓库答案时独立写出六个核心 kernel 的正确基础版，并解释线程映射、边界和同步。
+- [ ] 每个核心 kernel 都有 CPU/可信 reference、finite 检查、明确的 `max_abs`/`max_rel` 容差及边界 shape；容差与 dtype、归约顺序相匹配。
+- [ ] 对适用程序运行 Compute Sanitizer，保存命令和原始结果；若工具阻塞，记录原因，不能标为通过。
+- [ ] 性能采用 warm-up、CUDA Event、多轮统计和同步后的错误检查；shape、dtype、编译参数、GPU、时钟/功耗条件可复核，profiler replay 不冒充正常墙钟。
+- [ ] 能从一个 ncu 症状提出至少两个竞争原因、所需补充证据、一个单变量实验和复测指标，不从单指标直接断言根因。
+- [ ] 能从 CUDA C++ 沿 load→compute→store 定位关键 PTX/SASS，解释资源、spill、`LDMATRIX`/HMMA 等证据能证明和不能证明什么。
+- [ ] 旗舰项目的 5 分钟和 10 分钟版都能脱稿讲清问题、baseline、正确性、计时、优化阶梯、失败实验、瓶颈、库差距和边界。
+- [ ] 两轮各 45 分钟模拟均有原始录音/答题、逐项评分和时间戳，并按 Day 14 同一 rubric 完成硬失败审计。
+- [ ] 能正确区分 A100 实测与 Hopper 概念：不把 A100 的 `cp.async`/HMMA 结果写成 TMA/WGMMA 的 H100 性能证据。
+- [ ] 所有数字标为 `TODAY-RERUN` 或 `REPO-HISTORICAL`；前者附环境、命令、输出，后者附仓库路径/SHA 并明确未必由本人当天复现。
+- [ ] 简历项目链接只依赖已跟踪文件或稳定外部制品。`week05_inference/decode_graph.cu`、`week05_inference/dequant_gemv.cu`、`week05_inference/fused_rmsnorm.cu`、`week06_tensorcore/_TODO_day6.md` 等本机可选未跟踪脚手架只可作为临时练习入口，不是本文主依赖，也不能作为简历证据，除非之后单独审查并纳入版本控制。
+
+## 附录 D：精选常见追问
+
+这份清单用于追问树，不用于题海。每题都按“结论→条件/边界→项目证据”作答；不会时记录证据缺口，而不是背一句口号。
+
+| 类别 | 精选追问 |
+| --- | --- |
+| 执行 | block/warp 如何映射数据？为什么高 occupancy 仍可能 eligible warps 很低？ILP 与 TLP 如何取舍？ |
+| 内存 | coalescing、transaction、cache 与 shared bank conflict 分别在哪一层？`float4` 源码为何不保证宽机器 load？local memory 为什么可能访问片外？ |
+| 同步 | `__syncthreads()`、warp primitive、memory fence 各保证什么？分支中的 barrier 为什么会死锁？raw `cp.async` wait 为什么不是 CTA barrier？ |
+| 性能 | 如何定义 algorithmic bytes 和 arithmetic intensity？CUDA Event、ncu replay、端到端时延各回答什么问题？怎样用单变量实验推翻自己的瓶颈假设？ |
+| 异步 | 2-stage/3-stage 的 prologue、steady、epilogue 和 stage 复用条件是什么？为什么更多 stage 可能更慢？Hopper TMA 与 Ampere `cp.async` 的发起者和同步模型有何不同？ |
+| MMA | WMMA、PTX `mma.sync`、SASS HMMA 分别是哪一层？`ldmatrix` 搬什么、layout 为什么重要？为何不能把一个 fragment/lane mapping 推广到所有 shape/type？ |
+| 项目 | baseline 是否公平？正确性和计时如何审计？最有效与失败的优化各是什么？与 cuBLAS/CUTLASS 的差距为何存在？本人贡献是什么？ |
+| 工程边界 | 如何处理异步错误、输入别名、极端 shape、容差和回归？A100 结果如何迁移而不冒充 Hopper 实测？生产 SLO、容量、回压和故障恢复还有哪些未覆盖？ |
+
+## 附录 E：Day 14 后补救路径
+
+以下是后续路线，不塞回 14 天，也不改写 Day 14 的原始得分。每次只选与目标岗位硬缺口直接相关的一条，设可复测产物和截止日。
+
+| 缺口 | 后续最小路线 | 可复测产物 |
+| --- | --- | --- |
+| PTX/SASS | 再选两类 kernel 做源码→PTX→SASS→资源→ncu 对照，加入一次 spill 或宽 load 反例 | 两份逐层证据报告和闭卷定位录像 |
+| 独立手写 | 每周随机抽 3 题，限时写基础正确版，覆盖陌生 shape 和数值边界 | reference、容差、sanitizer、失败输入与复测记录 |
+| 性能诊断 | 对 3 种不同症状各做“竞争原因→单变量实验→复测” | 三张诊断卡、正常墙钟与相关 ncu 指标 |
+| C++ 工程化 | 把一个练习整理为 CMake/测试/错误处理/基准/CI 友好的小项目 | 可重复构建、单测、benchmark 和使用说明 |
+| PyTorch/LLM | 写 PyTorch extension 或 Triton/CUDA 对照，补 KV cache、量化、动态 batching 基础 | correctness/perf 对照与端到端边界说明 |
+| 多 GPU | 从 NCCL collective、拓扑、通信计算重叠开始，再补 MPI 与故障处理 | 两卡可复现实验、拓扑说明和扩展瓶颈分析 |
+
+## 附录 F：最终 ready 判断与开始投递
+
+最终判断只复用 Day 14 阈值，不新增另一套门槛：两轮均至少 80/100、合计至少 165/200，项目 20 分投影至少 16/20，且无 Day 14 定义的硬失败。达到时标记 **interview-ready**，而不是“生产级”或“保证拿 offer”。
+
+达到阈值后当天执行：冻结证据索引和项目口述版本；按附录 A 选 10～20 个匹配岗位并标注硬门槛；完成首批真实投递；为每次面试记录题目、失败点和证据缺口，滚动更新后续路线。未达到时标记 **not-ready for the selected role**，按 Day 14 已定义的 3～7 天最小补救和同一 rubric 复测；若只是岗位错配，降低岗位范围或层级，而不是虚报能力。补救后仍用同一评分表做投递决定，避免阈值漂移。
