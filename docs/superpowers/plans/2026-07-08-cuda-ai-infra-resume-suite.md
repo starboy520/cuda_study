@@ -4,7 +4,7 @@
 
 **Goal:** 在远程工作区生成一套包含事实母版、CUDA+AI Infra 通用版、四份岗位专项版和投递建议的中文 ATS 简历，并以不进入公开 Git 历史的方式打包交付。
 
-**Architecture:** 所有含个人信息的输出只写入本地 `resume_private/`，通过 `.git/info/exclude` 在当前克隆内排除，不修改共享 `.gitignore`。先审计工作经历与 CUDA 仓库证据并建立事实母版，再从同一事实底座派生通用版和四份专项版，最后做跨版本一致性、隐私、ATS 和压缩包验证。
+**Architecture:** 所有包含真实联系方式或完整简历内容的输出只写入本地 `resume_private/`，通过 `.git/info/exclude` 在当前克隆内排除，不修改共享 `.gitignore`。先审计工作经历与 CUDA 仓库证据并建立事实母版，再从同一事实底座派生通用版和四份专项版，最后做跨版本一致性、隐私、ATS 和压缩包验证。
 
 **Tech Stack:** Markdown、Git 本地 exclude、shell 只读验证、ZIP、CUDA 项目仓库证据。
 
