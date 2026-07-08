@@ -149,7 +149,7 @@ Day 12～14 薄弱项回补 → 限时编码与诊断 → 项目追问 → 完�
 
 **分步实验**：
 
-1. `mkdir -p /tmp/cuda_interview_sprint/day01 && cd /tmp/cuda_interview_sprint/day01`，记录 `nvidia-smi`、`nvcc --version`；所有生成物留在此目录。
+1. `mkdir -p /tmp/cuda_interview_sprint/day01 && cd /tmp/cuda_interview_sprint/day01`；执行 `nvidia-smi > environment.txt`、`nvcc --version >> environment.txt`、`ncu --version >> environment.txt`。`commands.sh` 只手工记录已经执行的命令，或用 `printf '%s\n' 'nvcc ...' >> commands.sh` 逐条写入安全的纯文字；不要把含 `$()`、反引号或未确认变量的命令通过 here-document 再执行。所有生成物留在此目录。
 2. 生成虚拟 ISA：`nvcc -O3 -lineinfo -arch=compute_80 -ptx "$OLDPWD/week04_gemm/gemm_naive/gemm_naive.cu" -o naive.compute_80.ptx`。
 3. 生成 A100 机器码路径并保留资源报告：`nvcc -O3 -lineinfo -arch=sm_80 -Xptxas=-v "$OLDPWD/week04_gemm/gemm_naive/gemm_naive.cu" -o naive.sm80 2> ptxas.log`。
 4. 导出实际嵌入的机器指令：`cuobjdump --dump-sass ./naive.sm80 > naive.sm80.sass`；用 `cuobjdump --list-elf` 确认目标 code object。
@@ -173,9 +173,8 @@ Day 12～14 薄弱项回补 → 限时编码与诊断 → 项目追问 → 完�
 
 | 时间 | 任务 | 到点产物 |
 | ---: | --- | --- |
-| 1.5 小时 | Day 1 最小补考（若无需补考，则用于阅读方法） | 补考记录或数据流标注规则 |
-| 1.5 小时 | 阅读五类观察点并先看 CUDA 源码 | 五版数据流草图 |
-| 3 小时 | 在 `/tmp/cuda_interview_sprint/day02/` 生成/整理五版 PTX、SASS | 每版编译日志与摘录 |
+| 1.5 小时 | Day 1 最小补考；无需补考时阅读五版源码并画统一数据流框架 | 补考记录或一张统一框架图 |
+| 4.5 小时 | 从完整 HEAD 快照编译五版，并逐版完成 PTX+SASS 双层取证 | 五版双层产物、日志与摘录 |
 | 1 小时 | 填观察表，横向比较 load/shared/FFMA/HMMA/control/store | `instruction_observation.md` |
 | 1 小时 | 闭卷验收和 3 分钟口述 | 答题纸、录音索引 |
 
@@ -183,13 +182,14 @@ Day 12～14 薄弱项回补 → 限时编码与诊断 → 项目追问 → 完�
 
 **分步实验**：
 
-1. 给五版画同一模板：输入地址生成、global load、可选 shared stage、register fragment/accumulator、FFMA/HMMA、边界控制、global store。
-2. 五版都在 `/tmp/cuda_interview_sprint/day02/` 生成双层产物：用 `nvcc -O3 -lineinfo -arch=compute_80 -ptx <source> -o <name>.ptx` 生成 PTX；再用 `nvcc -O3 -lineinfo -arch=sm_80 -Xptxas=-v <source> -o <name>.sm80` 生成含 cubin 的 executable 和资源日志，最后用 `cuobjdump --dump-sass <name>.sm80 > <name>.sass` 导出 SASS。记录每条完整命令和目标 kernel 名。
-3. 当前源码若含 TODO 或不能编译，不得用 FAIL/TODO 代替验收，也不得临场凭想象补实现。先运行 `git log --oneline -- <path>` 找该路径最近的已完成版本，再用 `git show <commit>:<path> > /tmp/cuda_interview_sprint/day02/<name>.cu` 导出到临时目录后编译；不 checkout、不改工作树。若历史版本仍不可用，当日判定未通过并进入补考，不虚构 PTX/SASS 证据。
-4. 对每一版分别在 PTX 和 SASS 中按数据流摘录实际存在的项：索引/地址计算、global load、shared load/store、主计算 `fma`/`FFMA` 或 `mma`/`HMMA`、控制/同步、global store。某版没有 shared 或同步指令时在对应项写“按该实现不适用”并给源码数据流理由，不强求不存在的类别；但 PTX、SASS 两个层次都必须实际观察并留定位信息。
-5. 表格列固定为“版本、源码数据流、PTX 关键证据、SASS 关键证据、资源、我能证明的结论、仍不能证明的结论”，naive/shared/register tiling/`float4`/WMMA 五行必须齐全。`float4` 的宽 load 留到 Day 3 作严格验证。
+1. 只画一张五版共用的数据流框架：输入地址生成、global load、可选 shared stage、register fragment/accumulator、FFMA/HMMA、边界控制、global store；观察表中每版另写一句与框架的差异，不重复画五张图。
+2. 为避免工作区变化和单文件遗漏，先执行 `mkdir -p /tmp/cuda_interview_sprint/day02/source`，再从仓库根目录执行 `git archive HEAD | tar -x -C /tmp/cuda_interview_sprint/day02/source` 导出完整提交树；五个当前源文件经检查可直接编译，正常使用该 HEAD 快照中的文件，所有修复也只发生在 `/tmp` 副本。
+3. 五版都在 `/tmp/cuda_interview_sprint/day02/` 生成双层产物：用 `nvcc -O3 -lineinfo -arch=compute_80 -ptx <source> -o <name>.ptx` 生成 PTX；再用 `nvcc -O3 -lineinfo -arch=sm_80 -Xptxas=-v <source> -o <name>.sm80` 生成含 cubin 的 executable 和资源日志，最后用 `cuobjdump --dump-sass <name>.sm80 > <name>.sass` 导出 SASS。记录每条完整命令和目标 kernel 名。
+4. 若确需回看历史版本，先人工检查候选 commit 的 diff、配套文件和可构建状态，得到 `verified_sha` 后用 `git archive <verified_sha> | tar -x -C /tmp/cuda_interview_sprint/day02/source-history` 导出完整树；不能假设“最近 commit”就是完成版，也不能用单文件 `git show` 丢失相对 include。若验证过的完整历史树仍不可用，当日判定未通过并进入补考，不虚构证据。
+5. 对每一版分别在 PTX 和 SASS 中按数据流摘录实际存在的项：索引/地址计算、global load、shared load/store、主计算 `fma`/`FFMA` 或 `mma`/`HMMA`、控制/同步、global store。某版没有 shared 或同步指令时在对应项写“按该实现不适用”并给源码数据流理由，不强求不存在的类别；但 PTX、SASS 两个层次都必须实际观察并留定位信息。
+6. 表格列固定为“版本、与统一数据流框架的一句差异、PTX 关键证据、SASS 关键证据、资源、我能证明的结论、仍不能证明的结论”，naive/shared/register tiling/`float4`/WMMA 五行必须齐全。`float4` 的宽 load 留到 Day 3 作严格验证。
 
-**必须产出**：五版各自的 PTX、cubin/executable、SASS、ptxas log 和正确性 PASS，`instruction_observation.md` 必须含五行且每行都有“PTX 关键证据”“SASS 关键证据”两列，另附五张源码数据流图；任何版本缺少任一层证据都判定当日未通过，不能以 TODO/FAIL 或另一版证据代替。
+**必须产出**：五版各自的 PTX、cubin/executable、SASS、ptxas log 和正确性 PASS，一张统一数据流框架图，以及含五行的 `instruction_observation.md`；每行必须有一句版本差异和“PTX 关键证据”“SASS 关键证据”两列。任何版本缺少任一层证据都判定当日未通过，不能以 TODO/FAIL 或另一版证据代替。
 
 **闭卷验收题**：① 为什么按数据流读比从第一行逐句翻译有效？② shared 版和 naive 版预期在哪两个指令类别上不同？③ PTX 与 SASS 各证明哪一层，为什么不能相互替代？④ `FFMA` 与 `HMMA` 分别支持什么结论、不能单独支持什么性能结论？⑤ 给一段未知 PTX 和对应 SASS，分别按什么顺序找 load→compute→store？现场随机抽两版同时指出两层证据，且五版双层观察表齐全、无越界结论才通过。
 
@@ -219,7 +219,7 @@ Day 12～14 薄弱项回补 → 限时编码与诊断 → 项目追问 → 完�
 
 1. 在 `/tmp/cuda_interview_sprint/day03/` 建 baseline 与 pressure 两个临时源码；通过增加多个独立 accumulator/延长 live range 制造压力，保持数学结果和 shape 不变。
 2. 两版均以 `nvcc -O3 -lineinfo -arch=sm_80 -Xptxas=-v` 构建，记录 registers、stack frame、spill stores/loads；导出 SASS，搜索 local load/store，但把“没搜到某个助记符”记为待 ncu 互证而非无 spill 定论。
-3. 先运行正确性，再按本机 `ncu --query-metrics` 查可用名称，采集 local load/store sectors/bytes 及 LaunchStats；保存 `.ncu-rep`。三层只有互相一致时才下强结论。
+3. 先运行正确性与 `ncu --list-sections`，再按本机 `ncu --query-metrics` 查可用 section/metric 名称；选择本机存在的 section 后执行 `ncu --section <available_section> -o /tmp/cuda_interview_sprint/day03/local-traffic ./app`，必要时补充已确认存在的 local load/store sectors/bytes metric。ncu 通常生成 `.ncu-rep`，实际文件名以命令输出为准；三层只有互相一致时才下强结论。
 4. 对 `float4` 检查指针与行首 16-byte 对齐、尾部处理、PTX 向量 load 及 SASS 实际 load 宽度；与标量版同 shape 对拍。源码出现 `float4` 但编译器拆成标量时，结论必须是“未形成宽 load”。
 5. 同时记录正常 CUDA Event 墙钟、寄存器数、occupancy 和吞吐；明确 profiler 重放时间不可充当正常墙钟。比较只说明证据，不预设少寄存器版本更快。
 
@@ -251,7 +251,7 @@ Day 12～14 薄弱项回补 → 限时编码与诊断 → 项目追问 → 完�
 
 **分步实验**：
 
-1. 选 Day 3 可运行 GEMM；先记录 ptxas 资源与无 profiler 墙钟，再运行 `ncu --list-sections`，确认本机的 `SchedulerStats`、`WarpStateStats`、`LaunchStats`、`Occupancy`、`SpeedOfLight` 可用后采集，避免照抄跨版本 metric 名。
+1. 选 Day 3 可运行 GEMM；先记录 ptxas 资源与无 profiler 墙钟，再运行 `ncu --list-sections`，确认本机实际存在的 scheduler/warp state/launch/occupancy/SpeedOfLight section 名后，用 `ncu --section <available_section> -o /tmp/cuda_interview_sprint/day04/baseline ./app` 保存报告，variant 使用另一输出前缀；ncu 通常生成 `.ncu-rep`，实际文件名以命令输出为准。避免照抄跨版本 section/metric 名。
 2. 按“高层吞吐→active/eligible/issued→主要 stall→对应 SASS/源码”顺序读报告。stall 只产生候选解释，例如 long scoreboard 可能来自 global/local load-use 距离或 spill，不能直接等于“DRAM 带宽瓶颈”。
 3. 只选一个假设，例如“增加独立 accumulator 能提高 eligible/issued，隐藏依赖链延迟”；只改 accumulator 独立性，保持 shape、数据、编译参数和其余 tile 不变。
 4. 复测正确性、正常墙钟、资源、scheduler 与 stall。若指标不支持假设，同样写成有效反证；不追加第二个改动救结果。
@@ -287,7 +287,7 @@ Day 12～14 薄弱项回补 → 限时编码与诊断 → 项目追问 → 完�
 1. 在笔记首行锁定 `m16n8k16.row.col.f32.f16.f16.f32`，列出 M/N/K、A/B 元素类型、accumulator 类型、layout 和每 warp 协作范围；所有映射结论都带此限定。
 2. 先根据主教材/对应 PTX ISA 语义画 A(16×16)、B(16×8)、C/D(16×8) 的逻辑坐标，再标 lane 提供的 shared 地址与返回 registers；用几个唯一值元素做纸上追踪。若某个寄存器位映射未核准，明确留作实验验证，不猜。
 3. 在 `/tmp` 写单 warp、单 tile microkernel：shared 装载已知 A/B，`ldmatrix` 取 fragment，执行一次指定 `mma.sync`，写回 D；CPU 逐元素 reference，覆盖零矩阵、单位/稀疏样例和一般小值。
-4. 以 `sm_80` 构建并保留 ptxas log；导出 PTX/SASS，定位相应 `ldmatrix`、`mma.sync`/HMMA。正确性与指令证据都通过才验收；墙钟只记录，不与 cuBLAS 排名。
+4. 明确分两条命令取证：`nvcc -O3 -arch=compute_80 -ptx source.cu -o file.ptx` 生成 PTX，在该文件中查 `mma.sync`/`ldmatrix`；`nvcc -O3 -lineinfo -arch=sm_80 -Xptxas=-v source.cu -o app` 生成 binary/cubin 并保留资源日志，再执行 `cuobjdump --dump-sass ./app > file.sass` 查 HMMA/LDSM 类机器指令，具体名称以实际输出为准。不要假设默认 binary 必然可 dump 出 PTX；正确性与双层指令证据都通过才验收，墙钟只记录、不与 cuBLAS 排名。
 
 **必须产出**：`m16n8k16_contract.md`、lane/register 映射图、最小实验源码副本、CPU reference 与三组 PASS、ptxas log、PTX/SASS 摘录、未确认边界清单。
 
@@ -299,36 +299,38 @@ Day 12～14 薄弱项回补 → 限时编码与诊断 → 项目追问 → 完�
 
 ## Day 6：`cp.async` 状态机与 2-stage/3-stage 流水
 
-**当日目标**：闭卷画出 copy→commit→wait→consume→reuse 状态机，明确 `wait_group` 不是 CTA barrier；比较同步、2-stage、3-stage 的正确性、资源、stall 和正常墙钟，正确处理 prologue/steady/epilogue 与边界 K。允许 3-stage 更慢，但必须用证据解释。
+**当日目标**：分别掌握 raw inline PTX 与 `cuda::pipeline<thread_scope_block>` 两层异步模型，明确二者的对应与不等价；完成正确的 3-stage，并比较同步、2-stage、3-stage 的正确性、资源、stall 和正常墙钟，正确处理 prologue/steady/epilogue 与边界 K。允许 3-stage 更慢，但必须用证据解释。
 
-**优先级**：必须完成状态机、边界 K 正确性与三版证据表；尽量完成 Attention 或 GEMM 两种对象之一的 3-stage；时间不足可跳过参数扫描。
+**优先级**：必须完成 raw PTX microtest、两层语义对照、正确的 3-stage、边界 K 验证和 sync/2-stage/3-stage 三版证据表；3-stage 不是“尽量完成”。时间不足只能跳过额外参数扫描，不能把 3-stage 降级为口头设计。
 
 **约 8 小时时间表**：
 
 | 时间 | 任务 | 到点产物 |
 | ---: | --- | --- |
-| 1.5 小时 | Day 5 补考或状态机推演 | 补考记录/状态机图 |
-| 1.5 小时 | 阅读 async group、2/3-stage 和排错表 | prologue/steady/epilogue 时间线 |
-| 2.5 小时 | `/tmp` 临时副本完成 sync/2-stage/3-stage 并对拍 | 三版 PASS、资源日志 |
-| 1.5 小时 | 采集正常墙钟与选定 ncu stall/occupancy | 对照表、`.ncu-rep` |
-| 1 小时 | 闭卷和 5 分钟口述 | 答题纸、录音 |
+| 1 小时 | 阅读并分开画 raw PTX 与 `cuda::pipeline` 两层状态机 | 两张状态机与对应/不等价表 |
+| 1 小时 | 完成 inline PTX 最小 wrapper/microtest | raw copy/commit/wait/consume PASS |
+| 4 小时 | 复用完整 sync/2-stage 基线，基于教材骨架实现并调通 3-stage | 三版 PASS、资源/SASS/计时/ncu |
+| 1 小时 | 边界 K 对拍与 Compute Sanitizer | 边界矩阵、memcheck 0 errors |
+| 1 小时 | 三版表格、闭卷和 5 分钟口述 | 对照表、答题纸、录音 |
 
 **必读仓库资料**：[主教材 9. Day 7：`cp.async` 状态机](CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md)、[10. Day 8：2-stage 与 3-stage](CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md)、[11. Day 9：流水性能证据](CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md)、[double buffering 模板](../week05_gemm_advanced/gem_double_buffering.cu)、[Attention 流水笔记](../week04_attention/ncu_pipeline_notes.md)。
 
 **分步实验**：
 
-1. 画每个 stage 的状态：free→copies issued→committed group→wait satisfied→CTA 内需要的可见性/协作同步完成→consume→free。写明 `cp.async.wait_group` 只管理调用线程的 async group 完成关系，不等价于让整个 CTA 到达同一控制点；跨线程共同读 shared 时仍需正确 CTA 同步协议。
-2. 复制 [double buffering 模板](../week05_gemm_advanced/gem_double_buffering.cu) 到 `/tmp/cuda_interview_sprint/day06/`，只改临时副本；先保留同步基线，再完成 2-stage ping-pong，最后用 `stage = tile % 3` 实现 3-stage 环形复用。
-3. 分别标出 prologue 预取数量、steady 中 wait/consume/发下一组、epilogue drain；对 `K=1, 15, 16, 17, 31, 32, 33, 257` 与非整齐 M/N 做 CPU 对拍。尾 tile 使用合法边界谓词/zero fill，禁止越界读。
-4. 三版记录 `-Xptxas=-v` 的 register/shared/spill、SASS 中 async copy/commit/wait 类别、正常 CUDA Event 墙钟；确认本机 metric 后用相同 ncu sections 对比 scheduler/stall/occupancy。stage 增多若提高 shared/register 压力、降低 occupancy 或工作量不足以摊薄 prologue，可合理更慢。
+1. 第一层只研究每线程 raw PTX：`cp.async` 发 copy，`cp.async.commit_group` 把调用线程此前未提交的 copy 组成 async group，`cp.async.wait_group` 追踪该调用线程发出的 group；画 copy→commit group→wait condition→consume 状态机，并写明 wait 不等于 CTA barrier，跨线程共同消费 shared 仍需满足正确的 CTA 可见性/会合协议。
+2. 先在 `/tmp/cuda_interview_sprint/day06/` 完成 inline PTX 最小 wrapper/microtest，只验证 raw copy/commit/wait/consume、对齐和尾部 zero-fill 语义；用正确性与 SASS 确认理解，不先混入 GEMM 多级流水。
+3. 第二层再分析现有 `cuda::pipeline<cuda::thread_scope_block>` / cooperative_groups 模板：它有 block 共享的 pipeline state 以及 producer acquire/commit、consumer wait/release 协议。编译器可能把 `cuda::memcpy_async` 降为 `cp.async` 及相关同步，但 API 的 commit/wait 不能直接等同于 PTX `commit_group/wait_group`；在对照表中分别写 API 保证与实际 SASS 观察。
+4. 不从零再写 sync 和 2-stage：复用仓库中已完成的基线，或按 Day 2 的完整 `git archive` 快照方法把已人工验证的完整树导出到 `/tmp`。主实现只基于教材 3-stage 骨架，把 2-stage 的共享 pipeline state/buffer 扩为 3-stage，完成环形 stage 生命周期。
+5. 分别标出 prologue 预取数量、steady 中 wait/consume/发下一组、epilogue drain；对 `K=1, 15, 16, 17, 31, 32, 33, 257` 与非整齐 M/N 做 CPU 对拍，并运行 `compute-sanitizer --tool memcheck ./app ...`。尾 tile 使用合法边界谓词/zero fill，禁止越界读。
+6. 三版记录 `-Xptxas=-v` 的 register/shared/spill、SASS 中实际 async copy/同步类别、正常 CUDA Event 墙钟；先 `ncu --list-sections`，再用本机存在的相同 sections 对比 scheduler/stall/occupancy。stage 增多若提高 shared/register 压力、降低 occupancy 或工作量不足以摊薄 prologue，可合理更慢。
 
-**必须产出**：状态机图、三版临时源码/diff、边界 K 测试矩阵、ptxas/SASS/ncu/正常墙钟对照表、`pipeline_explanation.md`；报告必须把 correctness、资源、stall、墙钟分栏，不能用单个 stall 下降代替加速结论。
+**必须产出**：raw PTX 与 `cuda::pipeline` 两张状态机、inline PTX microtest、两层对应/不等价表、正确的 3-stage 临时源码/diff、sync/2-stage/3-stage 边界 K 与 memcheck 结果、ptxas/SASS/ncu/正常墙钟对照表、`pipeline_explanation.md`；报告必须把 correctness、资源、stall、墙钟分栏，不能用单个 stall 下降代替加速结论。
 
-**闭卷验收题**：① commit 的对象和 wait 的条件是什么？② 为什么 wait 不是 CTA barrier？③ 2-stage 与 3-stage 的 stage 复用条件有何不同？④ prologue、steady、epilogue 各负责什么？⑤ 边界 K 如何避免读非法地址并保证数学上补零？⑥ 3-stage 为什么可能更慢？状态机、边界测试和证据表全通过才验收。
+**闭卷验收题**：① raw PTX 中每线程 commit 的对象和 wait 的条件是什么？② 为什么 raw wait 不是 CTA barrier？③ `cuda::pipeline<thread_scope_block>` 的共享状态和 producer/consumer 协议是什么，为什么 API commit/wait 不能直接等同 PTX group 指令？④ 2-stage 与 3-stage 的 stage 复用条件有何不同？⑤ prologue、steady、epilogue 各负责什么？⑥ 边界 K 如何避免非法地址并保证数学补零？⑦ 3-stage 为什么可能更慢？microtest、正确 3-stage、边界测试和三版证据表全通过才验收。
 
 **面试口述主题**：5 分钟解释一次异步流水设计，先讲正确性协议，再讲重叠收益，最后给出资源/occupancy/小 grid 让更多 stage 失效的反例。
 
-**没通过时的降级/补救**：退回单 warp 或单 CTA copy→consume microtest，先验证 group 与同步语义；Day 7 开场最多 90 分钟补考。若 3-stage 未完成，保留 sync/2-stage 的有效证据并明确未通过，禁止从 2-stage 外推 3-stage 性能。
+**没通过时的降级/补救**：raw microtest、两层语义、正确 3-stage、边界/sanitizer 或三版比较任一缺失，Day 6 都判定未通过；Day 7 开场最多 90 分钟补考并计入 8 小时。若当天需要补考，先占用概念时段，超出 1 小时的部分从 4 小时实现时段扣除；不得把 3-stage 降级为口头完成，也不得从 2-stage 外推其正确性或性能。
 
 ## Day 7：Hopper 对照与五层综合证据链
 
