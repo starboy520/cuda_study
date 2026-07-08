@@ -34,15 +34,15 @@
 | --- | --- | --- |
 | 执行模型 | [Week 3 记录](../notes/week03.md#三个硬核结论面试素材)展示 grid-stride、block/warp 分层归约和单 block 上限；同一记录还区分硬件容量限制与算法上限。 | 有线程层次、同步和 grid-stride 实践基础；需闭卷解释 warp 调度、ILP/TLP、occupancy 与 latency hiding 的关系。 |
 | 内存 | [Reduction 记录](../notes/week03.md#三个硬核结论面试素材)给出 128 MB、理论约 0.40 ms、实测 0.44 ms，即约 **91% 峰值带宽**；[GEMM 记录](../week05_gemm_advanced/benchmark.md#结论关键认知)展示 padding、bank conflict 与 float4 的取舍。 | 已有 coalescing、shared memory、padding 和向量化证据；需能从访问地址推导 transaction/bank 映射，并用指标而非口号判断瓶颈。 |
-| 并行算法 | [Week 3 记录](../notes/week03.md#week-3-完整成果)汇总 reduction 追平 CUB、scan 与 histogram 的优化结果。 | reduction/scan/histogram 已有多版实践；需从空白限时写核心版本，补齐任意尺寸、边界与数值正确性说明。 |
-| GEMM | [高级 GEMM benchmark](../week05_gemm_advanced/benchmark.md#day-8float4-向量化global-load)记录 float4 global load 配合 padded shared 后达到 **12681 GFLOPS**，并保留去 padding 后性能倒退的反例。 | 已形成 tiling、寄存器复用、向量化、bank conflict 的优化链；需闭卷重建关键索引，并用 ncu 与资源数据解释为何有效或失效。 |
-| Tensor Core | [Tensor Core profile](../week06_tensorcore/tensor_core_profile.md#1-benchmark教学版-wmma每-warp-一个-1616-tile直读-global)记录 WMMA 在 1024 shape 达 **16484 GFLOPS**；[SASS 证据](../week06_tensorcore/tensor_core_profile.md#2-证据一sass-有-hmma-指令用了-tensor-core)找到 `HMMA.16816.F32`。 | 已接触 WMMA 与机器指令取证；需独立解释 fragment、`ldmatrix`/`mma.sync` 职责、精度语义和“用了 Tensor Core 仍可能被访存限制”。 |
+| 并行算法 | [Week3 性能总表（T4，全部 PASS）](../notes/week03.md)汇总 reduction 追平 CUB、scan 与 histogram 的优化结果。 | reduction/scan/histogram 已有多版实践；需从空白限时写核心版本，补齐任意尺寸、边界与数值正确性说明。 |
+| GEMM | [Week2 Day1：float4 向量化 load（A100, 2048）](../week05_gemm_advanced/benchmark.md)记录 float4 global load 配合 padded shared 后达到 **12681 GFLOPS**，并保留去 padding 后性能倒退的反例。 | 已形成 tiling、寄存器复用、向量化、bank conflict 的优化链；需闭卷重建关键索引，并用 ncu 与资源数据解释为何有效或失效。 |
+| Tensor Core | [教学版 WMMA benchmark](../week06_tensorcore/tensor_core_profile.md)记录 WMMA 在 1024 shape 达 **16484 GFLOPS**；[SASS 证据](../week06_tensorcore/tensor_core_profile.md#2-证据一sass-有-hmma-指令用了-tensor-core)找到 `HMMA.16816.F32`。 | 已接触 WMMA 与机器指令取证；需独立解释 fragment、`ldmatrix`/`mma.sync` 职责、精度语义和“用了 Tensor Core 仍可能被访存限制”。 |
 | Attention | [Attention 流水记录](../week04_attention/ncu_pipeline_notes.md#怎么读)显示 `cp.async` 双缓冲后 long scoreboard 从 6.40 降至 0.03（**下降 99.5%**），同时 short scoreboard 基本不变。 | 已有 Online Softmax、教学版 Attention 与异步流水材料；需重建数据流、稳定性与 causal 边界，并诚实说明小 grid 下 stall 改善不等于墙钟同比加速。 |
 | profiling | [GEMM ncu 笔记](../week05_gemm_advanced/ncu_notes.md#面试口述day-4)用 4.8-way bank conflict、吞吐和周期变化闭合“假设—定位—修复—验证”；[Attention 对比](../week04_attention/ncu_pipeline_notes.md#精确-stall-指标)保留精确 stall 指标。 | 有 ncu 使用与瓶颈迁移意识；需能独立选择指标、识别 replay/锁频干扰，并把指标变化连成因果链。 |
 | 系统工程 | [Week 5 记录](../notes/week05.md#day-22026-07-07gemv-一线程一-warp-一行)包含 CPU 对拍、CUDA Event 计时和 memcheck 0 errors；设计基线还覆盖 stream、pinned memory 与错误检查。 | 已有正确性和计时框架意识；需统一边界 shape、重复运行、异步错误检查和 Compute Sanitizer 流程，并说明何时结果不可比。 |
 | 底层指令 | [Tensor Core profile](../week06_tensorcore/tensor_core_profile.md#2-证据一sass-有-hmma-指令用了-tensor-core)已经通过 `cuobjdump` 找到 HMMA；[设计说明](superpowers/specs/2026-07-08-cuda-interview-14-day-sprint-design.md#2-用户与前置基础)将 PTX/SASS、warp MMA、调度与 stall 列为主要缺口。 | 目前证据点状、缺系统阅读能力；Day 1～7 必须建立 CUDA C++ → PTX → SASS 映射，并能解释寄存器、spill、scoreboard 与关键指令。 |
 | 面试表达 | 多份记录已有“一段口述”，例如 [GEMM 反例复盘](../week05_gemm_advanced/benchmark.md#面试口述)和 [WMMA 三重证据](../week06_tensorcore/tensor_core_profile.md#7-面试口述)。 | 已有素材但未证明能脱稿应答；需形成 2～5 分钟日答、5/10 分钟项目版，并接受追问、反例和适用边界检查。 |
-| 推理与 GEMV | [Week 5 GEMV 记录](../notes/week05.md#性能对比n4096-k4096正常运行非-sanitizer)显示 warp-per-row 相比 thread-per-row 约 **19 倍**提速，带宽从 72 GB/s 到 1360 GB/s。 | 已能用合并访问解释 decode 的 memory-bound 场景；需从空白写 warp-per-row、验证数值误差，并说明向量化为何只带来有限增益。 |
+| 推理与 GEMV | [Week 5 GEMV 性能对比（N=4096 K=4096）](../notes/week05.md)显示 warp-per-row 相比 thread-per-row 约 **19 倍**提速，带宽从 72 GB/s 到 1360 GB/s。 | 已能用合并访问解释 decode 的 memory-bound 场景；需从空白写 warp-per-row、验证数值误差，并说明向量化为何只带来有限增益。 |
 
 ## 优先级规则
 
