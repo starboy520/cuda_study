@@ -167,7 +167,7 @@ Day 12～14 薄弱项回补 → 限时编码与诊断 → 项目追问 → 完�
 
 **当日目标**：对照 naive、shared、register tiling、`float4`、WMMA 五版，只追踪 global load→shared→计算→控制→store 的关键路径，形成可比较的观察表；不逐行翻译汇编，不把指令拼写当作跨架构承诺。
 
-**优先级**：必须完成五版观察表和每版至少一条有行号/函数名的 PTX 或 SASS 证据；尽量同时保留 PTX/SASS 两层；时间不足可跳过非主循环指令和精确周期推断。
+**优先级**：必须完成五版观察表，并为 naive、shared、register tiling、`float4`、WMMA 每一版同时保留有行号/函数名的 PTX 与 SASS 关键路径证据；时间不足只能跳过非主循环指令和精确周期推断，不能删减版本或任一指令层次。
 
 **约 8 小时时间表**：
 
@@ -184,17 +184,18 @@ Day 12～14 薄弱项回补 → 限时编码与诊断 → 项目追问 → 完�
 **分步实验**：
 
 1. 给五版画同一模板：输入地址生成、global load、可选 shared stage、register fragment/accumulator、FFMA/HMMA、边界控制、global store。
-2. 把源文件复制到 `/tmp/cuda_interview_sprint/day02/src/`；高级版若有 TODO，只在临时副本补齐并保存 diff，不改仓库。每版用 `nvcc -O3 -lineinfo -arch=sm_80 -Xptxas=-v ...` 编译，再用 `cuobjdump --dump-sass` 导出；能生成 PTX 的版本再以 `-arch=compute_80 -ptx` 生成 PTX。
-3. 用 kernel 名定位函数，然后只摘关键类别：global `LD*`、shared `LD*/ST*`、标量 `FFMA`、Tensor Core `HMMA`（PTX 层相应查 `mma`/WMMA 展开）、分支/谓词、global store。保留上下各少量上下文，不抄整文件。
-4. 表格列固定为“版本、源码数据流、global load、shared、计算、control、store、资源、我能证明的结论、仍不能证明的结论”。`float4` 的宽 load 留到 Day 3 作严格验证。
+2. 五版都在 `/tmp/cuda_interview_sprint/day02/` 生成双层产物：用 `nvcc -O3 -lineinfo -arch=compute_80 -ptx <source> -o <name>.ptx` 生成 PTX；再用 `nvcc -O3 -lineinfo -arch=sm_80 -Xptxas=-v <source> -o <name>.sm80` 生成含 cubin 的 executable 和资源日志，最后用 `cuobjdump --dump-sass <name>.sm80 > <name>.sass` 导出 SASS。记录每条完整命令和目标 kernel 名。
+3. 当前源码若含 TODO 或不能编译，不得用 FAIL/TODO 代替验收，也不得临场凭想象补实现。先运行 `git log --oneline -- <path>` 找该路径最近的已完成版本，再用 `git show <commit>:<path> > /tmp/cuda_interview_sprint/day02/<name>.cu` 导出到临时目录后编译；不 checkout、不改工作树。若历史版本仍不可用，当日判定未通过并进入补考，不虚构 PTX/SASS 证据。
+4. 对每一版分别在 PTX 和 SASS 中按数据流摘录实际存在的项：索引/地址计算、global load、shared load/store、主计算 `fma`/`FFMA` 或 `mma`/`HMMA`、控制/同步、global store。某版没有 shared 或同步指令时在对应项写“按该实现不适用”并给源码数据流理由，不强求不存在的类别；但 PTX、SASS 两个层次都必须实际观察并留定位信息。
+5. 表格列固定为“版本、源码数据流、PTX 关键证据、SASS 关键证据、资源、我能证明的结论、仍不能证明的结论”，naive/shared/register tiling/`float4`/WMMA 五行必须齐全。`float4` 的宽 load 留到 Day 3 作严格验证。
 
-**必须产出**：五版编译命令和 PASS/FAIL 状态、`instruction_observation.md`、五份短摘录、五张源码数据流图；任何不能编译的模板必须写明 TODO 阻塞，不得伪造指令。
+**必须产出**：五版各自的 PTX、cubin/executable、SASS、ptxas log 和正确性 PASS，`instruction_observation.md` 必须含五行且每行都有“PTX 关键证据”“SASS 关键证据”两列，另附五张源码数据流图；任何版本缺少任一层证据都判定当日未通过，不能以 TODO/FAIL 或另一版证据代替。
 
-**闭卷验收题**：① 为什么按数据流读比从第一行逐句翻译有效？② shared 版和 naive 版预期在哪两个指令类别上不同？③ `FFMA` 与 `HMMA` 分别支持什么结论、不能单独支持什么性能结论？④ 给一段未知 SASS，按什么顺序找 load→compute→store？现场随机抽两版复述且观察表无越界结论才通过。
+**闭卷验收题**：① 为什么按数据流读比从第一行逐句翻译有效？② shared 版和 naive 版预期在哪两个指令类别上不同？③ PTX 与 SASS 各证明哪一层，为什么不能相互替代？④ `FFMA` 与 `HMMA` 分别支持什么结论、不能单独支持什么性能结论？⑤ 给一段未知 PTX 和对应 SASS，分别按什么顺序找 load→compute→store？现场随机抽两版同时指出两层证据，且五版双层观察表齐全、无越界结论才通过。
 
 **面试口述主题**：3 分钟讲“五版 GEMM 在机器指令层的数据流如何逐步变化”，强调观察结果只对当前源码、编译参数和 `sm_80` 构建成立。
 
-**没通过时的降级/补救**：保底只完成 naive/shared/WMMA 三个锚点，但明确标红 register/`float4` 未通过；Day 3 开场最多 90 分钟补齐关键行。不得用“代码长得像向量化/WMMA”替代 SASS 证据。
+**没通过时的降级/补救**：任一版本缺 PTX、SASS、正确性或关键路径定位，都把该版判为未通过；Day 3 开场最多 90 分钟只补缺失版本/层次并计入当日 8 小时，仍失败则进入 Day 12 薄弱清单。不得删成三版“保底”，不得用“代码长得像向量化/WMMA”、TODO/FAIL、历史截图或单层证据替代五版双层验收。
 
 ## Day 3：寄存器、spill、local memory 与宽访存互证
 
