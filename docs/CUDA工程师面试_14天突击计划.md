@@ -413,6 +413,8 @@ Day 5 补考模式（总计 8 小时）：
 
 **必须产出**：测试矩阵与 CPU reference、本人写的两版 reduction 和三版 transpose、边界对拍、memcheck/synccheck、warmup+重复计时原始数据、吞吐/带宽表、线程映射与 bank conflict 推导、一次优化前后证据、闭卷答题与录音索引。
 
+**Day 8～11 共用数值测试契约**：CPU reference 使用 `double`/FP64 累加；逐元素先检查 GPU 输出为 finite，再以 `abs_err <= atol + rtol * abs(ref)` 判定，并同时报告 `max_abs` 与 `max_rel`。近零 reference 不能只看 relative error。每个 dtype/shape 必须声明自己的 `atol/rtol`；FP32 点式运算可从 `atol=1e-5, rtol=1e-4` 起步，但这不是普适阈值，长归约要结合 N、输入范围与累加顺序合理调宽，并报告误差如何随 N 变化。零维输入由 host 明确短路，不发起 0-grid launch。
+
 **闭卷验收题**：① 从空白写出不会漏尾元素的 block reduction 核心；② 为什么 block 间不能靠 `__syncthreads()` 收口？③ transpose 的 load 和 store 各如何合并？④ shared tile 为什么需要同步，为什么同步不能放进分歧分支？⑤ `TILE_DIM+1` 怎样改变 bank 映射？⑥ 有效带宽字节数如何计算？两类 kernel 均通过非规则 shape 与 sanitizer 才通过。
 
 **面试口述主题**：4 分钟讲“我怎样先得到正确基础版，再用 warp/block 归约与 shared padding 接近带宽上限”，必须包含一个边界 bug 或失败优化及其证据。
@@ -421,9 +423,9 @@ Day 5 补考模式（总计 8 小时）：
 
 ## Day 9：Softmax、GEMV 与 RMSNorm 基础正确版
 
-**当日目标**：从空白独立写出稳定 softmax、thread-per-row 与 warp-per-row GEMV、RMSNorm 三组核心（合计至少四个 kernel）；三个主题均先达到基础正确版，优化按级别推进，不用追求一天内把每版做到峰值。
+**当日目标**：从空白独立写出稳定 softmax 基础核、warp-per-row GEMV 和 RMSNorm 基础核；三个主题各有 FP64 CPU reference、可审计边界、正确性与 sanitizer。thread-per-row GEMV、融合和完整性能证据只在三项基础验收通过后进行。
 
-**优先级**：必须完成稳定性、非 2 的幂长度、多 shape reference 与 sanitizer；尽量完成 GEMV 合并访问和 RMSNorm gamma/残差融合；时间不足可跳过向量化、persistent kernel 与大规模调参。
+**优先级**：必须完成三个独立核心及稳定性、非 2 的幂长度、多 shape reference、finite/误差检查与 sanitizer；尽量完成 thread-per-row 对照、两版性能比较、RMSNorm 融合和完整性能证据；时间不足可跳过这些优化以及向量化、persistent kernel 与调参。
 
 **正常模式（总计 8 小时）**：
 
@@ -431,26 +433,26 @@ Day 5 补考模式（总计 8 小时）：
 | ---: | --- | --- |
 | 0.5 小时 | 接口、CPU reference、误差与 shape 契约 | 测试矩阵 |
 | 2 小时 | stable softmax：max→sum→normalize | 正确基础版、极值测试 |
-| 2 小时 | GEMV：thread-per-row→warp-per-row | 两版正确性与带宽 |
-| 1.5 小时 | RMSNorm：平方和归约、epsilon、gamma；残差融合为进阶 | 基础版及融合版/设计 |
-| 1 小时 | sanitizer、warmup+重复计时、多 shape 汇总 | 证据表 |
+| 1.75 小时 | warp-per-row GEMV：合并读取与 warp 归约 | 正确基础版 |
+| 1.75 小时 | RMSNorm：平方和归约、epsilon、gamma | 正确基础版 |
+| 1 小时 | 三项 sanitizer、多 shape 汇总；余时才做性能/融合 | 验收证据表 |
 | 1 小时 | 闭卷核心段与 4 分钟口述 | 答题纸、录音 |
 
-**必要时补考模式（总计 8 小时，含前日最多 1.5 小时）**：1.5 小时补 Day 8；0.5 小时测试契约；1.5 小时 softmax；1.75 小时两版 GEMV；1.25 小时 RMSNorm 基础版；1 小时 sanitizer/计时；0.5 小时闭卷与口述。压缩掉融合实测、额外 shape 和优化排版；若无补考，释放的 1.5 小时用于 RMSNorm 残差融合与 GEMV 优化。
+**必要时补考模式（总计 8 小时，含前日最多 1.5 小时）**：1.5 小时补 Day 8；0.5 小时测试契约；1.5 小时 softmax；1.5 小时 warp-per-row GEMV；1.5 小时 RMSNorm；1 小时三项 sanitizer/边界汇总；0.5 小时闭卷与口述。压缩掉 thread-per-row、性能比较、融合和排版；若无补考，释放的 1.5 小时才用于这些尽量项。
 
-**必读仓库资料**：[softmax](../week04_gemm/softmax/softmax.cu)、[GEMV](../week05_inference/gemv.cu)、[fused RMSNorm](../week05_inference/fused_rmsnorm.cu)、[Week 5 记录](../notes/week05.md)。只在独立版本完成或卡点复盘时阅读核心实现。
+**必读仓库资料**：[softmax](../week04_gemm/softmax/softmax.cu)、[已跟踪 GEMV](../week05_inference/gemv.cu)、[Week 5 decode 教材](Week5增强版_LLM推理优化与decode.md)、[LayerNorm/RMSNorm 与融合教材](../cuda_deep_course/course/volume06_operators/05_LayerNorm_RMSNorm与融合.md)。只在独立版本完成或卡点复盘时阅读核心实现。
 
 **分步练习**：
 
-1. 在 `/tmp/cuda_interview_sprint/day09/` 建练习文件，保留仓库脚手架时清空核心 kernel。CPU reference 使用更高精度累积；每项明确绝对/相对误差，不能只看首元素。
-2. softmax 分别完成每行 max、`exp(x-max)` 求和和 normalize；测试长度 `1,31,32,33,1000,1025`，输入含 `-1000,0,1000`、全相等和随机极值，检查有限性及每行和接近 1。
-3. GEMV 先写一线程一行，再写一 warp 一行；测试非规整 `M,K`，从地址推导 warp-per-row 对权重的合并访问与 shuffle 归约，分别报告正确性和有效带宽。
-4. RMSNorm 写 `sum(x²)` 归约、`rsqrt(mean+epsilon)` 和 gamma；覆盖很小方差、奇数 hidden size、不同 epsilon。基础版通过后才做 `residual+x` 与 gamma 融合，并写清输出语义和边界。
-5. 三组代码均运行 memcheck，含共享同步的版本运行 synccheck；均 warmup 后重复计时，至少覆盖小、中、大 shape。性能较慢不影响基础版通过，但错误结果不能进入性能表。
+1. 在 `/tmp/cuda_interview_sprint/day09/` 建练习文件并独立写核心。若想使用本机 `week05_inference/fused_rmsnorm.cu`，先运行 `git ls-files --error-unmatch week05_inference/fused_rmsnorm.cu`；失败表示它是“本机可选、当前未纳入 Git”，只能在 `test -f` 成功后复制到 `/tmp` 作脚手架，不能成为计划依赖或被擅自提交。不存在时依据已跟踪教材伪代码在 `/tmp` 新建个人练习。
+2. softmax 完成每行 max、`exp(x-max)` 求和和 normalize；shape 至少让 rows 与 D 分别覆盖 `1,31,32,33`、一个其他非 2 的幂和一个大值，输入含 `-1000,0,1000`、全相等和随机极值。按共用契约检查有限性、逐元素误差及每行和。
+3. 独立写 warp-per-row GEMV；M、K 分别覆盖 `1,31,32,33` 和奇数，从地址推导合并读取及 shuffle 归约。thread-per-row 实现、两版计时/带宽比较均为尽量项，不阻塞基础验收。
+4. RMSNorm 写 `sum(x²)`、`rsqrt(mean+epsilon)` 和 gamma；rows 与 D 分别覆盖 `1,31,32,33`、奇数及较大值，并测试全零/很小方差、不同 epsilon。基础版通过后才考虑 residual 融合。
+5. 三组代码均运行 memcheck，含共享同步的版本运行 synccheck；按 dtype/shape 记录 `atol/rtol/max_abs/max_rel/finite/PASS`。零维由 host 短路。性能与融合慢或未做不影响基础验收，但错误结果不能进入性能表。
 
-**必须产出**：三个 CPU reference、稳定 softmax、两版 GEMV、RMSNorm 基础版（若完成则附融合版）、多 shape/极值对拍、sanitizer、可靠计时与带宽、地址/归约图、闭卷答题和录音。至此 Day 8～9 至少独立写出 reduction、transpose、softmax、两版 GEMV、RMSNorm 六类核心 kernel。
+**必须产出**：三个 FP64 CPU reference、稳定 softmax、warp-per-row GEMV、RMSNorm 基础版、多 shape/极值对拍、finite/误差表、sanitizer、地址/归约图、闭卷答题和录音。thread-per-row、两版性能表和融合若完成则作为附加证据。至此仍明确包含一个本人独立 GEMV 实现。
 
-**闭卷验收题**：① 不减 max 的 softmax 为何会溢出/下溢？② 非 2 的幂归约怎样保证不漏元素？③ 两种 GEMV 映射的相邻 lane 分别访问哪里？④ GEMV 为何常受带宽限制？⑤ RMSNorm 与 LayerNorm 差什么？⑥ epsilon 放在哪里，gamma/残差融合改变哪些读写？能现场重写每组核心索引并通过基础测试才通过。
+**闭卷验收题**：① 不减 max 的 softmax 为何会溢出/下溢？② 非 2 的幂归约怎样保证不漏元素？③ warp-per-row GEMV 的相邻 lane 分别访问哪里？④ GEMV 为何常受带宽限制？⑤ RMSNorm 与 LayerNorm 差什么？⑥ epsilon 放在哪里？能现场重写三个核心索引并通过约定 shape、finite、误差与 sanitizer 才通过。
 
 **面试口述主题**：4 分钟串讲 decode 中 softmax、GEMV、RMSNorm 的数值稳定性、线程映射和 memory-bound 特征，明确基础正确版与已验证优化的边界。
 
@@ -458,9 +460,9 @@ Day 5 补考模式（总计 8 小时）：
 
 ## Day 10：闭卷 Tiled GEMM 与推理 TODO 工程收口
 
-**当日目标**：闭卷完成一个边界安全的 tiled GEMM，并按 CUDA Graph→Fused RMSNorm→Dequant GEMV 的顺序收口推理练习；Day 9 已通过 RMSNorm 核心时，本日只做融合接口、工程验证与证据，不重复抄写同一基础 kernel。
+**当日目标**：闭卷完成边界安全的 tiled GEMM，完成 CUDA Graph 基本 capture/instantiate/replay/cleanup 状态机，并独立写 Dequant GEMV 基础正确版与双层指标。Fused RMSNorm 只在 Day 9 基础核已通过且本机可选脚手架存在时做接口验收，不重复要求核心核。
 
-**优先级**：必须完成 tiled GEMM 的非规整 shape 对拍、CUDA Graph 生命周期和 dequant kernel 正确性；尽量完成 RMSNorm 残差融合及三项性能对照；时间不足可跳过 Graph 节点更新、更多量化格式和深度调参。
+**优先级**：必须完成 GEMM 正确性、Graph 基本生命周期、Dequant GEMV 实现误差与量化损失分栏、sanitizer 及四类输出；尽量完成 Fused RMSNorm 接口实装、性能调参和三项 ncu。时间不足可跳过 Graph 节点更新、更多量化格式及全部深度性能优化。
 
 **正常模式（总计 8 小时）**：
 
@@ -468,26 +470,28 @@ Day 5 补考模式（总计 8 小时）：
 | ---: | --- | --- |
 | 2.5 小时 | 90 分钟闭卷 GEMM，60 分钟边界/对拍修复 | tiled GEMM、测试 |
 | 1.5 小时 | CUDA Graph capture→instantiate→replay→destroy | 生命周期正确实现 |
-| 1 小时 | Fused RMSNorm 工程收口 | 融合正确性/接口证据 |
-| 1.5 小时 | Dequant GEMV 与量化 reference | kernel 与量化误差表 |
+| 0.5 小时 | Fused RMSNorm 接口验收（可选实装） | 接口检查表 |
+| 2 小时 | Dequant GEMV 与双层 reference | 实现误差与量化损失表 |
 | 0.75 小时 | sanitizer、warmup+重复计时 | 证据摘要 |
 | 0.75 小时 | 闭卷与 5 分钟口述 | 答题纸、录音 |
 
-**必要时补考模式（总计 8 小时，含前日最多 1.5 小时）**：1.5 小时补 Day 9；2 小时 tiled GEMM；1.25 小时 CUDA Graph；0.75 小时 Fused RMSNorm 工程检查；1.25 小时 Dequant GEMV；0.75 小时 sanitizer/计时；0.5 小时闭卷与口述。压缩来源为 GEMM 性能调参、Graph 扩展能力和报告美化，不删除四类输出或三项工程正确性。
+**必要时补考模式（总计 8 小时，含前日最多 1.5 小时）**：1.5 小时补 Day 9；2 小时 tiled GEMM 正确性；1.25 小时 Graph 基本状态机；1.75 小时 Dequant GEMV 与双层指标；0.75 小时三项边界/sanitizer；0.25 小时 RMSNorm 接口检查；0.5 小时闭卷与口述。压缩性能调参、ncu、融合实装和排版，不删除最低正确性或四类输出。
 
-**必读仓库资料**：[tiled GEMM](../week04_gemm/gemm_tiled/gemm_tiled.cu)、[CUDA Graph](../week05_inference/decode_graph.cu)、[Fused RMSNorm](../week05_inference/fused_rmsnorm.cu)、[Dequant GEMV](../week05_inference/dequant_gemv.cu)、[Week 5 记录](../notes/week05.md)。TODO 文件可作为测试框架；先在 `/tmp` 副本实现，不覆盖用户文件。
+**必读仓库资料**：[tiled GEMM](../week04_gemm/gemm_tiled/gemm_tiled.cu)、[Week 5 decode 教材（RMSNorm/Graph/Dequant 核心）](Week5增强版_LLM推理优化与decode.md)、[RMSNorm 与融合教材](../cuda_deep_course/course/volume06_operators/05_LayerNorm_RMSNorm与融合.md)、[CUDA Graph 教材](../cuda_deep_course/course/volume07_async_system/04_CUDA_Graph.md)。这些均为已跟踪主依赖。
+
+本机的 `week05_inference/decode_graph.cu`、`fused_rmsnorm.cu`、`dequant_gemv.cu` 仅是**本机可选、当前未纳入 Git**的脚手架。每个都先用 `git ls-files --error-unmatch <path>` 判断；若失败，不得把它当作克隆后必然存在的资料。仅在 `test -f <path>` 成功时复制到 `/tmp` 使用；不存在时依据上述已跟踪教材伪代码在 `/tmp` 新建个人练习，绝不提交或覆盖这些本机文件。
 
 **分步练习**：
 
 1. 限时 90 分钟从空白写 GEMM 核心：`row/col` 索引、A/B 协作加载、越界补零、同步、tile 累加、边界写回；测试 `1x1x1, 31x33x35, 127x129x65, 256x256x256`，用 CPU 与可用时 cuBLAS 双对照。
-2. CUDA Graph 按顺序实现 stream capture、结束 capture 得 graph、instantiate 得 executable graph、warmup/replay/同步；验证多次 replay 输出稳定，并在正确时机 destroy graph executable、graph、event/stream，错误路径也不能泄漏或使用已销毁对象。
-3. 若 Day 9 RMSNorm 已通过，直接检查 residual+RMSNorm+gamma 融合的输入输出别名、epsilon、hidden 尾部和 launch 错误；若未通过，先完成补考基础版，再做最小融合收口。
-4. Dequant GEMV 分两层 reference：先用同一量化权重的 CPU dequant+GEMV 检查 kernel 实现误差，再与原始浮点权重结果比较量化损失。两者必须分栏，不能把量化误差归罪于 kernel。
-5. 全部核心跑非规则 shape、memcheck，适用时 synccheck；正常计时使用 warmup+重复运行，并把 Graph capture/instantiate 一次性成本与 replay 延迟分开。
+2. CUDA Graph 为每个 CUDA API 做 `CUDA_CHECK`/状态检查。capture 一旦开始，即使被 invalidated，也要在同一 stream 调用 EndCapture 收口并处理 graph 可能为 `nullptr`；instantiate 成功后可销毁 graph。replay warmup 与正式计时分开，launch 后先完成 stream/event 同步，再 destroy executable graph。使用单出口和“已创建”状态位依次清理 exec/graph/event/stream，检查关键 launch、sync、destroy 返回，任何对象只销毁一次。
+3. Fused RMSNorm 的最低要求只是检查 Day 9 基础核与 residual/gamma 接口的输入输出别名、epsilon、D 尾部和 launch 错误；只有可选脚手架存在且基础核已通过才实装，否则写接口验收表，不阻塞本日三项必须任务。
+4. Dequant GEMV 的**实现误差**以相同 Q/scale 的 FP64 CPU dequant+GEMV 为 reference，按 `abs/rel/finite` 判 PASS。**量化损失**以原 FP 权重输出为 reference，至少报告 RMSE、`NRMSE=RMSE/(ref RMS+epsilon)`（写明 epsilon）和 max_abs，可选 cosine；质量指标不参与 kernel 对错判定。
+5. Dequant 边界必须覆盖：全零行的 scale 约定（例如 `scale=1,Q=0`，或明确自己的实现选择）、scale 正且 finite、int8 signed 极值及对称量化通常使用 `[-127,127]`、`K=1,31,32,33`、输出行 N 非 warp/block 整倍数。全部核心跑 memcheck，适用时 synccheck；性能计时与三项 ncu 均为尽量项，若做则把 capture/instantiate 一次性成本与 replay 延迟分开。
 
-**必须产出**：本人闭卷 tiled GEMM、CPU/cuBLAS 对拍、Graph 生命周期图与多次 replay、Fused RMSNorm 工程验收、Dequant GEMV 双层误差表、sanitizer、正常计时、命令/环境、闭卷答题与录音。
+**必须产出**：本人闭卷 tiled GEMM 与 CPU/可用时 cuBLAS 对拍、Graph 状态机和多次 replay/cleanup、Dequant GEMV 基础核与双层指标、RMSNorm 接口检查表、sanitizer、命令/环境、闭卷答题与录音。最低验收不要求性能调参、三项 ncu 或 Fused RMSNorm 实装。
 
-**闭卷验收题**：① 两个 shared tile 的索引如何推导？② 为什么越界 load 要写零而非跳过后继续使用旧 shared 值？③ 两次同步各保护什么？④ Graph 与 executable graph 生命周期如何区分？⑤ capture/instantiate 成本为何不应混入稳态 replay？⑥ 怎样区分 dequant kernel bug 和量化损失？现场通过非规整 GEMM、三次 Graph replay 与双层 dequant 对拍才通过。
+**闭卷验收题**：① 两个 shared tile 的索引如何推导？② 越界 load 为何补零？③ 两次同步各保护什么？④ invalidated capture 如何 EndCapture 收口且避免二次销毁？⑤ graph 与 executable graph 生命周期如何区分？⑥ 实现误差与 RMSE/NRMSE 量化损失为何不能混判？现场通过非规整 GEMM、三次 Graph replay/cleanup、Dequant 边界与双层指标才通过。
 
 **面试口述主题**：5 分钟回答“我如何把教学 kernel 变成可重复推理路径”，从 GEMM 正确性讲到 Graph 生命周期、融合边界与量化误差归因。
 
@@ -517,9 +521,9 @@ Day 5 补考模式（总计 8 小时）：
 **分步练习**：
 
 1. 开场写实验契约并锁定 GEMM 或 Attention。GEMM 建议阶梯为 naive→shared tiled→register/vectorized；Attention 建议 naive→tiled/online softmax→pipelined。每次只解释相邻版本的主要变化。
-2. 建正确性矩阵：至少三个规则/非规则 shape、固定随机种子、dtype、容差、CPU/cuBLAS 或可信 reference；任何失败版不进入性能排名。
-3. 每版做 warmup、至少 100 次 CUDA Event 计时，报告 median 或均值及波动；GEMM 报 FLOP/s，Attention 同时报延迟和有效工作量，禁止混用 profiler replay 时间。
-4. 计算 arithmetic intensity 和 Roofline 上限；用 `-Xptxas=-v`、ncu 的本机可用 sections、PTX/SASS 解释资源、访存、stall 和关键计算指令。结论必须连接源码修改、指标和墙钟。
+2. 建正确性矩阵：至少三个规则/非规则 shape、固定随机种子、dtype、逐 dtype/shape 的 `atol/rtol`、CPU/cuBLAS 或可信 reference；同时报告 finite、max_abs、max_rel 与 PASS，任何失败版不进入性能排名。
+3. 计时契约固定并记录 warmup 次数和正式样本数（例如 warmup 20、samples 100）；CUDA Event 结果统一标明 ms 或 us，至少报告 median、p5、p95（若改用 mean/std，必须预先声明且保持全表一致）。GEMM 按 `FLOP=2*M*N*K`、`GFLOP/s=FLOP/(time_seconds*1e9)`；Attention 若选，必须依据当前实现逐项列 QK、softmax、PV 等实际 FLOP 模型，不能套通用常数。禁止把 profiler replay 时间当正常墙钟。
+4. 分开计算源码模型的 algorithmic bytes 与 ncu measured DRAM bytes，并标注 arithmetic intensity 单位 `FLOP/byte`。Roofline 写成 `min(datasheet compute peak, datasheet BW * AI)`，再与同 shape/dtype/计时条件的 cuBLAS/参考库实测可达值分栏；任何“达到 X%”都写明分母是 datasheet peak、Roofline 上限还是库实测。用 ptxas、ncu、PTX/SASS 连接源码修改、指标和墙钟。
 5. 至少保留一次失败优化，例如去 padding、过大 tile/stage 或不利向量化；写原假设、唯一改动、正确性、资源、指标、墙钟以及为什么失败。
 6. 与当前环境可用的 cuBLAS/CUTLASS 对照；若没有公平可运行对照，写清库缺失和理论峰值/带宽上限，量化百分比差距。结尾列一个最可能的下一步、预期指标变化和证伪条件。
 7. 用下方模板在当天 `/tmp` 报告中填写；本计划只提供模板，不创建实际 README。
@@ -535,20 +539,24 @@ Day 5 补考模式（总计 8 小时）：
 - GPU/显存/时钟策略：
 - Driver/CUDA/nvcc/ncu：
 - Git SHA、编译参数：
-- dtype、shape、随机种子、容差：
+- dtype、shape、随机种子、每组 atol/rtol：
+- 计时 warmup、samples、统计口径与时间单位：
+- FLOP 模型（GEMM=`2MNK`；Attention 按本实现逐项列式）：
 - 构建/正确性/计时/ncu/PTX/SASS 命令：
 
 ## 正确性矩阵
-| 版本 | shape | reference | max abs/rel error | sanitizer | 结论 |
-| --- | --- | --- | ---: | --- | --- |
+| 版本 | dtype/shape | reference | atol | rtol | max_abs | max_rel | finite | sanitizer | PASS |
+| --- | --- | --- | ---: | ---: | ---: | ---: | --- | --- | --- |
 
 ## 可靠计时与版本阶梯
-| 版本 | 唯一主要变化 | warmup/重复 | 延迟 | GFLOP/s 或有效吞吐 | 波动 |
-| --- | --- | ---: | ---: | ---: | ---: |
+| 版本 | 唯一主要变化 | warmup/samples | 单位 | median | p5 | p95 | GFLOP/s 或有效吞吐 |
+| --- | --- | ---: | --- | ---: | ---: | ---: | ---: |
 
 ## Roofline 与瓶颈证据
-- 实际字节/FLOP 口径、arithmetic intensity：
-- 理论/可达上限与当前百分比：
+- algorithmic bytes（源码模型）与 ncu measured DRAM bytes：
+- FLOP 口径、AI（FLOP/byte）：
+- datasheet peak、Roofline `min(compute peak, BW*AI)`、同条件库实测可达：
+- 当前百分比及明确分母：
 - ncu 指标、ptxas 资源、关键 PTX/SASS：
 - 源码→指标→墙钟因果解释及替代解释：
 
