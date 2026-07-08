@@ -30,19 +30,19 @@
 
 下表描述的是“仓库已经提供哪些起点”，不是对个人能力的自动认证。**仓库有文档、有代码或有历史性能数字，不等于个人已经掌握；只有闭卷复述、独立重写和重新取证通过，才能把该项改为已掌握。**
 
-| 维度 | 仓库中的具体证据 | 当前判断与 14 天验收方向 |
+| 维度 | 仓库中的具体证据 | 仓库覆盖与个人验收 |
 | --- | --- | --- |
-| 执行模型 | [Week 3 记录](../notes/week03.md#三个硬核结论面试素材)展示 grid-stride、block/warp 分层归约和单 block 上限；同一记录还区分硬件容量限制与算法上限。 | 有线程层次、同步和 grid-stride 实践基础；需闭卷解释 warp 调度、ILP/TLP、occupancy 与 latency hiding 的关系。 |
-| 内存 | [Reduction 记录](../notes/week03.md#三个硬核结论面试素材)给出 128 MB、理论约 0.40 ms、实测 0.44 ms，即约 **91% 峰值带宽**；[GEMM 记录](../week05_gemm_advanced/benchmark.md#结论关键认知)展示 padding、bank conflict 与 float4 的取舍。 | 已有 coalescing、shared memory、padding 和向量化证据；需能从访问地址推导 transaction/bank 映射，并用指标而非口号判断瓶颈。 |
-| 并行算法 | [Week3 性能总表（T4，全部 PASS）](../notes/week03.md)汇总 reduction 追平 CUB、scan 与 histogram 的优化结果。 | reduction/scan/histogram 已有多版实践；需从空白限时写核心版本，补齐任意尺寸、边界与数值正确性说明。 |
-| GEMM | [Week2 Day1：float4 向量化 load（A100, 2048）](../week05_gemm_advanced/benchmark.md)记录 float4 global load 配合 padded shared 后达到 **12681 GFLOPS**，并保留去 padding 后性能倒退的反例。 | 已形成 tiling、寄存器复用、向量化、bank conflict 的优化链；需闭卷重建关键索引，并用 ncu 与资源数据解释为何有效或失效。 |
-| Tensor Core | [教学版 WMMA benchmark](../week06_tensorcore/tensor_core_profile.md)记录 WMMA 在 1024 shape 达 **16484 GFLOPS**；[SASS 证据](../week06_tensorcore/tensor_core_profile.md#2-证据一sass-有-hmma-指令用了-tensor-core)找到 `HMMA.16816.F32`。 | 已接触 WMMA 与机器指令取证；需独立解释 fragment、`ldmatrix`/`mma.sync` 职责、精度语义和“用了 Tensor Core 仍可能被访存限制”。 |
-| Attention | [Attention 流水记录](../week04_attention/ncu_pipeline_notes.md#怎么读)显示 `cp.async` 双缓冲后 long scoreboard 从 6.40 降至 0.03（**下降 99.5%**），同时 short scoreboard 基本不变。 | 已有 Online Softmax、教学版 Attention 与异步流水材料；需重建数据流、稳定性与 causal 边界，并诚实说明小 grid 下 stall 改善不等于墙钟同比加速。 |
-| profiling | [GEMM ncu 笔记](../week05_gemm_advanced/ncu_notes.md#面试口述day-4)用 4.8-way bank conflict、吞吐和周期变化闭合“假设—定位—修复—验证”；[Attention 对比](../week04_attention/ncu_pipeline_notes.md#精确-stall-指标)保留精确 stall 指标。 | 有 ncu 使用与瓶颈迁移意识；需能独立选择指标、识别 replay/锁频干扰，并把指标变化连成因果链。 |
-| 系统工程 | [Week 5 记录](../notes/week05.md#day-22026-07-07gemv-一线程一-warp-一行)包含 CPU 对拍、CUDA Event 计时和 memcheck 0 errors；设计基线还覆盖 stream、pinned memory 与错误检查。 | 已有正确性和计时框架意识；需统一边界 shape、重复运行、异步错误检查和 Compute Sanitizer 流程，并说明何时结果不可比。 |
-| 底层指令 | [Tensor Core profile](../week06_tensorcore/tensor_core_profile.md#2-证据一sass-有-hmma-指令用了-tensor-core)已经通过 `cuobjdump` 找到 HMMA；[设计说明](superpowers/specs/2026-07-08-cuda-interview-14-day-sprint-design.md#2-用户与前置基础)将 PTX/SASS、warp MMA、调度与 stall 列为主要缺口。 | 目前证据点状、缺系统阅读能力；Day 1～7 必须建立 CUDA C++ → PTX → SASS 映射，并能解释寄存器、spill、scoreboard 与关键指令。 |
-| 面试表达 | 多份记录已有“一段口述”，例如 [GEMM 反例复盘](../week05_gemm_advanced/benchmark.md#面试口述)和 [WMMA 三重证据](../week06_tensorcore/tensor_core_profile.md#7-面试口述)。 | 已有素材但未证明能脱稿应答；需形成 2～5 分钟日答、5/10 分钟项目版，并接受追问、反例和适用边界检查。 |
-| 推理与 GEMV | [Week 5 GEMV 性能对比（N=4096 K=4096）](../notes/week05.md)显示 warp-per-row 相比 thread-per-row 约 **19 倍**提速，带宽从 72 GB/s 到 1360 GB/s。 | 已能用合并访问解释 decode 的 memory-bound 场景；需从空白写 warp-per-row、验证数值误差，并说明向量化为何只带来有限增益。 |
+| 执行模型 | [Week 3 记录](../notes/week03.md#三个硬核结论面试素材)展示 grid-stride、block/warp 分层归约和单 block 上限；同一记录还区分硬件容量限制与算法上限。 | 仓库已覆盖线程层次、同步和 grid-stride。个人验收：闭卷画出执行层次，并解释 warp 调度、ILP/TLP、occupancy 与 latency hiding 的关系。 |
+| 内存 | [Reduction 记录](../notes/week03.md#三个硬核结论面试素材)显示 N=16M 的手写版在 T4 上约 0.44 ms，并追平当时的 CUB 对照；输入为 float，单次读取约 64 MiB，旧笔记把流量记为 128 MB 并据此声称 91% 峰值带宽，字节口径不恰当或未说明，不能作为掌握证据。[GEMM 记录](../week05_gemm_advanced/benchmark.md#结论关键认知)还包含 padding、bank conflict 与 float4 的取舍。 | 仓库已覆盖 coalescing、shared memory、padding 和向量化。个人验收：按实际读写流量重新跑 reduction 并计算有效带宽，再从地址推导 transaction/bank 映射；不得沿用旧 91% 结论。 |
+| 并行算法 | [Week3 性能总表（T4，全部 PASS）](../notes/week03.md)汇总 reduction 追平 CUB、scan 与 histogram 的历史结果。 | 仓库已记录 reduction/scan/histogram 多版实现。个人验收：从空白限时写核心版本，完成 reference 对拍，并覆盖任意尺寸和边界输入。 |
+| GEMM | [Week2 Day1：float4 向量化 load（A100, 2048）](../week05_gemm_advanced/benchmark.md)记录 A100、M=N=K=2048 下 float4 global load 配合 padded shared 达到 **12681 GFLOPS**，并保留去 padding 后性能倒退的反例。 | 仓库已覆盖 tiling、寄存器复用、向量化和 bank conflict 优化链。个人验收：闭卷重建关键索引，重新跑正确性与性能，并用 ncu 和资源数据解释有效或失效的原因。 |
+| Tensor Core | [教学版 WMMA benchmark](../week06_tensorcore/tensor_core_profile.md)记录 A100 80GB、FP16 输入/FP32 累加、M=N=K=1024 下 **16484 GFLOPS**；[SASS 证据](../week06_tensorcore/tensor_core_profile.md#2-证据一sass-有-hmma-指令用了-tensor-core)找到 `HMMA.16816.F32`。 | 仓库已覆盖 WMMA 与 HMMA 取证。个人验收：重跑 API、SASS、性能三重证据，闭卷解释 fragment、`ldmatrix`/`mma.sync`、精度语义及访存瓶颈。 |
+| Attention | [Attention 流水记录](../week04_attention/ncu_pipeline_notes.md#怎么读)记录 A100、N=128、D=64 的 ncu 对比：`cp.async` 双缓冲后 long scoreboard 指标从 6.40 降至 0.03（**下降 99.5%**），short scoreboard 基本不变；该小 grid 填不满 A100，指标改善不代表墙钟同比加速。 | 仓库已覆盖 Online Softmax、教学版 Attention 与异步流水材料。个人验收：从空白重建数据流、稳定性和 causal 边界，重跑对照并同时报告 stall、吞吐与墙钟限制。 |
+| profiling | [GEMM ncu 笔记](../week05_gemm_advanced/ncu_notes.md#面试口述day-4)记录 A100、M=N=K=1024 profile 中 4.8-way bank conflict 及修复后的吞吐、周期变化；[Attention 对比](../week04_attention/ncu_pipeline_notes.md#精确-stall-指标)保留具体 stall 指标。 | 仓库已覆盖一条“假设—定位—修复—验证”链。个人验收：给定未知 kernel 独立选择指标，识别 replay/锁频干扰，并闭卷把指标变化连成可证伪的因果链。 |
+| 系统工程 | [Week 5 记录](../notes/week05.md#day-22026-07-07gemv-一线程一-warp-一行)包含 A100 上的 CPU 对拍、CUDA Event 计时和 memcheck 0 errors；设计基线还覆盖 stream、pinned memory 与错误检查。 | 仓库已记录正确性与计时框架。个人验收：为新写 kernel 独立加入边界 shape、重复运行、异步错误检查和 Compute Sanitizer，并说明结果不可比的情形。 |
+| 底层指令 | [Tensor Core profile](../week06_tensorcore/tensor_core_profile.md#2-证据一sass-有-hmma-指令用了-tensor-core)记录通过 `cuobjdump` 找到 HMMA；[设计说明](superpowers/specs/2026-07-08-cuda-interview-14-day-sprint-design.md#2-用户与前置基础)将 PTX/SASS、warp MMA、调度与 stall 列为主要缺口。 | 仓库的底层指令证据仍是点状材料。个人验收：从 CUDA C++ 沿数据流定位关键 PTX/SASS，并闭卷解释寄存器、spill、scoreboard 与关键指令。 |
+| 面试表达 | 多份记录包含“一段口述”，例如 [GEMM 反例复盘](../week05_gemm_advanced/benchmark.md#面试口述)和 [WMMA 三重证据](../week06_tensorcore/tensor_core_profile.md#7-面试口述)。 | 仓库已提供口述素材，但不证明本人能脱稿应答。个人验收：录制 2～5 分钟日答和 5/10 分钟项目版，并接受追问、反例和适用边界检查。 |
+| 推理与 GEMV | [Week 5 GEMV 性能对比（N=4096 K=4096）](../notes/week05.md)记录 A100、N=K=4096 下 warp-per-row 相比 thread-per-row 约 **19 倍**提速，带宽从 72 GB/s 到 1360 GB/s。 | 仓库已覆盖 decode memory-bound 与合并访问案例。个人验收：从空白写 warp-per-row、重新对拍和计时，并闭卷说明误差变化及继续向量化收益有限的条件。 |
 
 ## 优先级规则
 
@@ -74,7 +74,8 @@
 ## 补考规则
 
 - 当天任一“必须完成”项未通过，就把失败项和判定证据写入次日开场清单。
-- 次日补考最多 **90 分钟**，只重做未通过的最小验收，不重新泛读全部材料。
+- 次日补考最多 **90 分钟**，并计入次日总计 8 小时，不是在 8 小时之外加时；只重做未通过的最小验收，不重新泛读全部材料。
+- 补考时间优先从扩展阅读和“尽量完成”项扣除；仍不足时可压缩概念学习或证据排版美化，但不得删除核心代码正确性验证，也不得省略概念、代码、证据、面试四类输出。
 - 补考通过后立即返回当日主线；补考再次失败，则进入 **Day 12 薄弱清单**，注明缺口、已试方法和可复现证据。
 - 同一难点不得连续吞掉后续日程。Day 12 再按面试频率和岗位相关性排序回补。
 - “看懂答案”“照抄通过”和“历史记录曾通过”均不算补考通过。
