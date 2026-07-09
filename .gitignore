@@ -115,3 +115,8 @@ week05_inference/grid_reduce
 week05_inference/dequant_gemv
 
 operator_practice/softmax/online_softmax
+
+# week05 其它产物
+week05_inference/a.out
+week05_inference/report*.nsys-rep
+week05_inference/report*.sqlite
