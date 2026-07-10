@@ -64,9 +64,47 @@
 
 这些内容可作为后续独立里程碑，不阻塞首版投递。
 
-## 4. 方案比较与决策
+## 4. 仓库定位与发布边界
 
-### 4.1 代码处理方式
+### 4.1 双仓库职责
+
+当前 `cuda_study` 继续作为私人学习仓库，保留课程代码、旧实现、笔记、脚手架和试错过程。公开作品集使用全新的独立仓库 `gpu-kernel-engineering`，不在 `cuda_study` 内创建嵌套 Git 仓库。
+
+两个仓库遵循以下边界：
+
+- 不复制 `cuda_study` 的旧提交历史到公开仓库。
+- 不直接搬运现有 `portfolio/` 中带教学痕迹的源码。
+- 只把重新实现并通过验收的成果提交到公开仓库。
+- 学习笔记可以作为理解材料，但公开技术结论必须由重建代码重新验证。
+- 公开仓库不得依赖私人仓库中的文件、脚本或相对路径。
+
+### 4.2 公开仓库定位
+
+`gpu-kernel-engineering` 是长期维护的 GPU kernel 性能工程总仓，而不是只服务于一次求职的临时 GEMM 仓库。首个项目是 GEMM，后续在各自完成重建和验收后加入 FlashAttention 与 CUDA operator library。
+
+根目录承担以下职责：
+
+- `projects/gemm/`：FP32 GEMM 优化阶梯。
+- `projects/flash-attention/`：后续独立里程碑，首版不创建占位实现。
+- `projects/cuda-operators/`：后续独立里程碑，首版不创建占位实现。
+- `common/`：只有出现第二个真实消费者后才抽取跨项目公共设施，避免过早抽象。
+- 根 `README.md`：作者技术定位、项目索引、代表性结果和统一复现入口。
+
+首版实际只创建根级工程文件与 `projects/gemm/`；未开始的项目只写在 roadmap 中，不创建空目录。
+
+### 4.3 简历链接稳定性
+
+简历长期只链接 `gpu-kernel-engineering`，并可通过 README 锚点直接定位 GEMM 项目。公开描述中的性能比例、GFLOPS 和 profiler 指标只能引用公开仓库当前版本可复现的结果，不能沿用 `cuda_study` 中的历史数字。
+
+推荐的首版简历叙事为：
+
+> CUDA Kernel Performance Engineering Portfolio：从零实现 FP32 GEMM 优化阶梯，通过 Nsight Compute、Roofline 与 SASS 分析瓶颈迁移，并与关闭 TF32 的 cuBLAS FP32 基线公平比较。
+
+达到稳定结果后，再补充具体性能数字。
+
+## 5. 方案比较与决策
+
+### 5.1 代码处理方式
 
 考虑过三种方式：
 
@@ -76,13 +114,13 @@
 
 采用方案 3。
 
-### 4.2 工程复杂度
+### 5.2 工程复杂度
 
 不做完整 CUDA 库，也不为首版引入复杂框架。项目保持“可读的研究型工程”定位：统一入口负责实验协议，各 kernel 保持独立、短小、可单独讲解。
 
-## 5. 总体架构
+## 6. 总体架构
 
-### 5.1 组件边界
+### 6.1 组件边界
 
 项目由以下逻辑组件组成：
 
@@ -94,7 +132,7 @@
 - **Benchmark reporter**：输出延迟、GFLOPS、相对 cuBLAS 比例和相对上一版加速比，同时保存机器可读结果。
 - **Profiling workflow**：固定 ncu 指标、SASS 提取方式和实验元数据。
 
-### 5.2 统一 kernel 接口
+### 6.2 统一 kernel 接口
 
 所有手写版本对 runner 暴露相同的 launch 语义：
 
@@ -106,7 +144,7 @@
 
 launcher 负责检查当前 kernel 的前置条件，但不静默执行不安全访问。
 
-### 5.3 数据流
+### 6.3 数据流
 
 一次完整运行按以下顺序执行：
 
@@ -120,49 +158,49 @@ launcher 负责检查当前 kernel 的前置条件，但不静默执行不安全
 8. 汇总并打印统一结果表。
 9. 可选输出 JSON/CSV 原始记录，供 README 表格生成。
 
-## 6. 优化阶梯
+## 7. 优化阶梯
 
-### 6.1 Naive
+### 7.1 Naive
 
 - 一个线程计算一个 `C[row, col]`。
 - 直接遍历 K 维读取 global memory。
 - 目标是建立最简单、可信的正确性和性能基线。
 
-### 6.2 Shared-memory tiling
+### 7.2 Shared-memory tiling
 
 - 一个 block 计算一个输出 tile。
 - 协作加载 A/B tile 到 shared memory。
 - 使用边界补零支持任意 `M/N/K`。
 - 目标是证明 global-memory 数据复用带来的收益。
 
-### 6.3 2D register tiling
+### 7.3 2D register tiling
 
 - 一个线程计算 `TM × TN` 个输出。
 - 用寄存器保存局部累加器并执行外积。
 - 参数选择同时考虑寄存器压力、occupancy、ILP 和 shared-memory 访问。
 - 目标是减少 shared-memory 读取并展示 occupancy 不是越高越好。
 
-### 6.4 `float4` vectorized load
+### 7.4 `float4` vectorized load
 
 - 对满足地址与维度对齐条件的 tile 使用 16-byte global load。
 - 明确列出快速路径约束。
 - 非对齐输入自动调用安全 2D register-tiled fallback。
 - 不允许把“越界但通常没崩”作为尾块处理方式。
 
-### 6.5 `cp.async` double buffering
+### 7.5 `cp.async` double buffering
 
 - 在两个 shared-memory stage 之间交替预取和计算。
 - 对齐输入走异步快速路径；非对齐输入走安全 fallback。
 - 明确 producer/consumer 次序、等待点和 block 同步。
 - 双缓冲不预设一定快于 `float4` 版本；如果变慢，保留结果并分析指令开销、stage 粒度、occupancy 和 kernel 当前 bound 类型。
 
-### 6.6 cuBLAS FP32 baseline
+### 7.6 cuBLAS FP32 baseline
 
 - 作为性能与大尺寸正确性对照。
 - 明确设置 math mode，关闭 TF32，避免 CUDA Core FP32 与 Tensor Core TF32 混比。
 - 记录 cuBLAS、CUDA driver/runtime 与 GPU 信息。
 
-## 7. 形状与 fallback 策略
+## 8. 形状与 fallback 策略
 
 项目区分两类输入：
 
@@ -177,9 +215,9 @@ launcher 负责检查当前 kernel 的前置条件，但不静默执行不安全
 
 约束不满足时，runner 打印 fallback 原因并调用安全版本。fallback 的性能不与快速路径混在同一优化阶梯结果中。
 
-## 8. 正确性设计
+## 9. 正确性设计
 
-### 8.1 小尺寸 CPU 对拍
+### 9.1 小尺寸 CPU 对拍
 
 至少覆盖：
 
@@ -191,11 +229,11 @@ launcher 负责检查当前 kernel 的前置条件，但不静默执行不安全
 
 CPU reference 使用 double 累加，最终转换为 float 比较。
 
-### 8.2 大尺寸 cuBLAS 对拍
+### 9.2 大尺寸 cuBLAS 对拍
 
 代表性规模包括 `512`、`1024`、`2048` 和资源允许时的 `4096`。大尺寸不运行低效 CPU reference，以 cuBLAS FP32 结果为准。
 
-### 8.3 误差报告
+### 9.3 误差报告
 
 每次验证至少输出：
 
@@ -207,7 +245,7 @@ CPU reference 使用 double 累加，最终转换为 float 比较。
 
 容差按 FP32 GEMM 的累加长度设置，并在文档中固定，不针对单个失败案例临时放宽。
 
-## 9. 性能实验协议
+## 10. 性能实验协议
 
 所有版本遵循同一协议：
 
@@ -222,16 +260,16 @@ CPU reference 使用 double 累加，最终转换为 float 比较。
 
 原有性能数字仅作为历史参考。公开 README 的数字必须由重建后的代码和固定实验命令重新生成。
 
-## 10. Profiler 与 SASS 证据
+## 11. Profiler 与 SASS 证据
 
-### 10.1 每一级固定回答
+### 11.1 每一级固定回答
 
 1. 上一版的主要瓶颈是什么？
 2. 本版修改了什么数据复用、线程映射或执行流水？
 3. 哪些 ncu 指标支持判断？
 4. 墙钟性能如何变化，原因是什么？
 
-### 10.2 ncu 证据
+### 11.2 ncu 证据
 
 根据版本选取少量、直接相关的指标，例如：
 
@@ -246,7 +284,7 @@ CPU reference 使用 double 累加，最终转换为 float 比较。
 
 不以单一高百分比直接断言瓶颈，结论必须结合吞吐、stall、occupancy 和工作规模。
 
-### 10.3 SASS 证据
+### 11.3 SASS 证据
 
 只保存与结论直接相关的短摘录和统计，例如：
 
@@ -257,7 +295,7 @@ CPU reference 使用 double 累加，最终转换为 float 比较。
 
 完整二进制和大型 profiler 报告不进入 Git。
 
-## 11. 错误处理与安全性
+## 12. 错误处理与安全性
 
 - 所有 CUDA Runtime 与 cuBLAS 调用统一检查返回值。
 - kernel launch 后立即检查 launch error；同步点检查异步错误。
@@ -266,7 +304,7 @@ CPU reference 使用 double 累加，最终转换为 float 比较。
 - fallback 必须显式报告，禁止静默将快速路径错误归因于输入。
 - benchmark 失败的版本不输出有效 GFLOPS。
 
-## 12. 验证门槛
+## 13. 验证门槛
 
 每一级按以下顺序验收：
 
@@ -282,17 +320,29 @@ CPU reference 使用 double 累加，最终转换为 float 比较。
 
 任何一项失败，都不把该版本标记为完成。
 
-## 13. Git 与公开展示
+## 14. Git 与公开展示
 
-### 13.1 提交原则
+### 14.1 提交原则
 
-- 旧教学代码保留在私人备份中，不进入重建后的公开项目历史。
+- 旧教学代码保留在 `cuda_study` 中，不进入 `gpu-kernel-engineering` 的历史。
 - 脚手架、每一级 kernel、benchmark、证据和文档分阶段提交。
 - 每个提交只表达一个技术步骤。
 - 不提交编译产物、`.ncu-rep` 大文件、临时日志或机器相关缓存。
 - 不通过压平历史制造“一次性完成”的假象。
 
-### 13.2 README 结构
+公开仓库的首版提交序列为：
+
+1. 建立根 README、许可证、忽略规则与 GEMM 工程骨架。
+2. 加入统一 runner、CPU reference、validation 和空的 kernel registry。
+3. 作者实现并验收 naive GEMM。
+4. 作者实现并验收 shared-memory tiling。
+5. 作者实现并验收 2D register tiling。
+6. 作者实现并验收 `float4` 快速路径和非对齐 fallback。
+7. 作者实现并验收 `cp.async` 双缓冲。
+8. 加入 cuBLAS FP32 公平基线。
+9. 重新采集 benchmark、ncu、SASS 并完成公开报告。
+
+### 14.2 README 结构
 
 最终 README 包含：
 
@@ -307,9 +357,9 @@ CPU reference 使用 double 累加，最终转换为 float 比较。
 
 所有公开数字都必须能由仓库中的命令和数据文件重新得到。
 
-## 14. 预期目录职责
+## 15. 预期目录职责
 
-首版采用以下目录边界；实施计划可以补充文件，但不得合并这些职责：
+`gpu-kernel-engineering/projects/gemm/` 采用以下目录边界；实施计划可以补充文件，但不得合并这些职责：
 
 - `kernels/`：各优化版本的 kernel 与 launcher
 - `runner/`：统一 CLI、kernel registry 和 benchmark 调度
@@ -321,7 +371,7 @@ CPU reference 使用 double 累加，最终转换为 float 比较。
 
 避免将全部实现塞入单个超大 `.cu` 文件，也避免为每个 kernel 复制一份 main 和 CPU reference。
 
-## 15. 完成定义
+## 16. 完成定义
 
 首版达到以下条件时可公开投递：
 
@@ -334,7 +384,9 @@ CPU reference 使用 double 累加，最终转换为 float 比较。
 - 双缓冲无论提升或下降，都有可复现数据和合理解释。
 - 新读者能在不阅读 runner 内部实现的情况下理解每个 kernel 的职责和约束。
 - 作者能够独立讲清每个索引、同步点、资源权衡和性能结论。
+- `gpu-kernel-engineering` 能在不访问 `cuda_study` 的情况下独立 clone、构建、测试和复现实验。
+- 根 README 可以作为稳定简历入口，并能清楚定位到 GEMM 项目。
 
-## 16. 一句话叙事
+## 17. 一句话叙事
 
 从正确但低效的 naive GEMM 出发，通过 shared-memory 复用、2D register tiling、向量化加载和异步流水逐步移动瓶颈，并使用统一正确性测试、Nsight Compute 与 SASS 解释每一步收益和代价。
