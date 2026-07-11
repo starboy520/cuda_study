@@ -11,7 +11,15 @@
 | [decode_step_dataflow](decode_step_dataflow.md) | 追踪单步 decode 的数据流，连接 GEMV、attention、KV 读取、调度和 kernel 级性能分析 | decode 每一步读写什么？为什么低 batch 容易受 HBM 带宽限制？ |
 | [PagedAttention 详解](PagedAttention详解.md) | 解释 block pool、logical block、physical block 和 block table，以及分页管理对碎片和共享的影响 | 为什么 KV cache 可以物理分散却逻辑连续？PagedAttention 解决了什么、没有解决什么？ |
 
+## 适用边界
+
+- 完整 dense prefill 的 attention 交互在序列长度方向具有二次规模，重点是理解全序列 token 两两交互带来的工作量增长；不要把它等同于所有 prefill 阶段开销都必然是二次的。
+- 单步 decode 只有一个 query，需要对历史 KV 做线性读取；因此序列越长，单步 attention 的读取和计算量通常随历史长度线性增长，低 batch 时更容易暴露带宽瓶颈。
+- PagedAttention 不改变同一 attention 工作负载的数学 FLOP，只改变 KV 的存储组织、物理块映射和寻址方式；实际性能仍可能受到间接寻址、block table 访问和调度管理开销影响。
+
 ## PagedAttention 两天学习顺序
+
+当前学习主线见 [四周聚焦计划：AI Infra 与 CUDA 深水区](../../../study_plan/四周聚焦计划_AIInfra与CUDA深水区.md)；本专题只负责 KV Cache、decode 和 PagedAttention 相关材料的阅读顺序与边界。
 
 ### Day 1：先建立连续 KV cache 的容量和数据流基线
 
