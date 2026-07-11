@@ -38,7 +38,7 @@ T4 专项指南记录旧实验环境与性能预期。当前硬件比较和卡�
 
 ## superpowers
 
-历史设计和实施过程文件将在 Task 7 迁入本分类。迁移完成前仍位于当前 docs/superpowers 目录；此处不创建尚不存在的归档链接。
+活跃的设计与实施过程文档仅保留在 `docs/superpowers`；已完成或被当前计划替代的记录见 [Superpowers 过程文档归档](superpowers/README.md)。
 
 ## reference
 
