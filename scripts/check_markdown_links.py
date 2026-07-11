@@ -10,7 +10,9 @@ from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
 
-LINK_RE = re.compile(r"(?<!!)\[[^\]\n]*\]\(([^)\n]+)\)")
+LINK_RE = re.compile(
+    r"(?<!!)\[[^\]\n]*\]\(\s*(<[^>\n]*>|(?:\\.|[^()\n]|\([^()\n]*\))+?)\s*\)"
+)
 FENCE_RE = re.compile(r"^\s*(`{3,}|~{3,})")
 IGNORED_SCHEMES = {"http", "https", "mailto", "tel"}
 
@@ -69,7 +71,7 @@ def destination(raw: str) -> str:
 def check_file(source: Path, root: Path) -> list[tuple[int, str, Path]]:
     """Return broken links as (line, raw target, resolved path)."""
     broken: list[tuple[int, str, Path]] = []
-    fence: str | None = None
+    fence: tuple[str, int] | None = None
 
     with source.open(encoding="utf-8") as handle:
         for line_number, line in enumerate(handle, 1):
@@ -78,8 +80,8 @@ def check_file(source: Path, root: Path) -> list[tuple[int, str, Path]]:
                 marker = fence_match.group(1)
                 marker_char = marker[0]
                 if fence is None:
-                    fence = marker_char
-                elif fence == marker_char:
+                    fence = (marker_char, len(marker))
+                elif fence[0] == marker_char and len(marker) >= fence[1]:
                     fence = None
                 continue
             if fence is not None:
