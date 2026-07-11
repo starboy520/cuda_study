@@ -6,6 +6,12 @@
 
 当前只执行这份计划，不按旧路线或目录编号推断进度。
 
+## 当前阶段
+
+**Week 1：GEMM 独立重建**
+
+实际实现发生在独立公开作品仓；本仓只提供历史代码与教材参考，不在此同步公开作品仓的实时进度。
+
 ## 当前目标
 
 - 求职落点：AI Infra / Model Serving / 推理性能。
@@ -20,8 +26,8 @@
 
 - [知识目录](../docs/README.md)：按四周与主题查资料。
 - [长期深度教材](../cuda_deep_course/README.md)：不受当前冲刺节奏约束。
-- [算子练习](../operator_practice/README.md)：实验与手写练习入口。
-- [当前 worklog](../notes/week05.md)：记录实验数据、问题和结论。
+- 当前实验参考：[2D register-tiled GEMM](../week05_gemm_advanced/gemm_2d_thread_tiling.cu)、[tiled attention](../week04_attention/tiled_attention.cu)。
+- [历史 worklog](../notes/week05.md)：用于历史实验复盘，不代表当前公开作品仓进度。
 
 ## 历史计划
 
