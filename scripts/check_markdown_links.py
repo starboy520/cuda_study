@@ -127,17 +127,22 @@ def main() -> int:
     args = parse_args()
     root = Path(__file__).resolve().parent.parent
     inputs = args.paths or [str(root)]
-    found_broken = False
+    broken: list[tuple[Path, int, str, Path]] = []
 
     for source in markdown_files(inputs, root, args.exclude_prefix):
         for line_number, raw, resolved in check_file(source, root):
-            found_broken = True
+            broken.append((source, line_number, raw, resolved))
             print(
                 f"{display_path(source, root)}:{line_number}: "
                 f"{raw} -> {display_path(resolved, root)}"
             )
 
-    return 1 if found_broken else 0
+    if broken:
+        print(f"broken relative Markdown targets: {len(broken)}", file=sys.stderr)
+        return 1
+
+    print("broken relative Markdown targets: 0")
+    return 0
 
 
 if __name__ == "__main__":
