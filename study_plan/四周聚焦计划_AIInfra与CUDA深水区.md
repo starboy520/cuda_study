@@ -1141,28 +1141,28 @@ PagedAttention 固定两天后停止。优先保住模拟面试、项目表达�
 
 ### Week 1
 
-- GEMM 现有实现与记录：`week04_gemm/`、`week05_gemm_advanced/`；
-- GEMM 作品重建设计：`docs/superpowers/specs/2026-07-10-gemm-portfolio-rebuild-design.md`。
+- GEMM 现有实现与记录：[week04_gemm](../week04_gemm/)、[week05_gemm_advanced](../week05_gemm_advanced/)；
+- GEMM 作品重建设计：[2026-07-10-gemm-portfolio-rebuild-design.md](../docs/superpowers/specs/2026-07-10-gemm-portfolio-rebuild-design.md)。
 
 ### Week 2
 
-- 主教材：`docs/topics/performance/CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md`；
-- 现有 14 天计划只作为验收题来源：`docs/interview/CUDA工程师面试_14天突击计划.md`；
-- WMMA：`week06_tensorcore/`；
-- ncu：`docs/topics/performance/Nsight_Compute_ncu详解.md`。
+- 主教材：[CUDA 深水区：PTX、SASS、MMA、异步流水与 Hopper](../docs/topics/performance/CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md)；
+- 现有 14 天计划只作为验收题来源：[CUDA 工程师面试：14 天突击计划](../docs/interview/CUDA工程师面试_14天突击计划.md)；
+- WMMA：[week06_tensorcore](../week06_tensorcore/)；
+- ncu：[Nsight Compute ncu 详解](../docs/topics/performance/Nsight_Compute_ncu详解.md)。
 
 ### Week 3
 
-- Attention 教材：`docs/courses/attention/Week4_Attention与FlashAttention完整学习资料.md`；
-- Online Softmax 证明：`docs/proofs/Online_Softmax正确性证明.md`；
-- 旧代码只用于完成后对照：`week04_attention/`。
+- Attention 教材：[Week 4：Attention 与 FlashAttention 完整学习资料](../docs/courses/attention/Week4_Attention与FlashAttention完整学习资料.md)；
+- Online Softmax 证明：[Online Softmax 正确性证明](../docs/proofs/Online_Softmax正确性证明.md)；
+- 旧代码只用于完成后对照：[week04_attention](../week04_attention/)。
 
 ### Week 4
 
-- PagedAttention：`docs/topics/kv_cache/PagedAttention详解.md`；
-- KV cache：`docs/topics/kv_cache/kv_cache_accounting.md`；
-- decode：`docs/topics/kv_cache/decode_step_dataflow.md`；
-- 面试：`docs/interview/CUDA面试核心题库.md` 与私有职业叙事材料。
+- PagedAttention：[PagedAttention 详解](../docs/topics/kv_cache/PagedAttention详解.md)；
+- KV cache：[KV cache accounting](../docs/topics/kv_cache/kv_cache_accounting.md)；
+- decode：[decode step dataflow](../docs/topics/kv_cache/decode_step_dataflow.md)；
+- 面试：[CUDA 面试核心题库](../docs/interview/CUDA面试核心题库.md) 与私有职业叙事材料（私有，不提供仓库链接）。
 
 资料纪律：先写、再查、最后对照。禁止直接复制旧 kernel 作为“重建”。
 

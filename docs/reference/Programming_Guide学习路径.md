@@ -1,8 +1,12 @@
 # 以 Programming Guide 为主线的 CUDA 学习路径
 
+> **状态：官方 Guide 长期参考索引（不是当前执行计划）**
+>
+> 当前执行计划的唯一入口是 [study_plan/README.md](../../study_plan/README.md)。本文保留基于 T4 与旧八周计划的 Guide 章节映射，均作为历史复盘和按需查阅参考。
+
 > **适用人群**：有 C++ 基础、想**只用官方 [CUDA Programming Guide](https://docs.nvidia.com/cuda/cuda-programming-guide/)** 作为主教材的人。
-> **硬件**：Tesla T4 · SM 7.5 (Turing) · CUDA 13.x。
-> **配套**：本文是「读什么 + 怎么读 + 必须自己补什么」的总纲；逐日步骤见 [Week1详细步骤.md](../../study_plan/archive/legacy-8-week/week01/Week1详细步骤.md)、[Week2详细步骤.md](../../study_plan/archive/legacy-8-week/week02/Week2详细步骤.md)。
+> **历史硬件基线**：Tesla T4 · SM 7.5 (Turing) · CUDA 13.x。
+> **历史配套**：本文曾作为「读什么 + 怎么读 + 必须自己补什么」的总纲；旧八周逐日步骤见 [Week1详细步骤.md](../../study_plan/archive/legacy-8-week/week01/Week1详细步骤.md)、[Week2详细步骤.md](../../study_plan/archive/legacy-8-week/week02/Week2详细步骤.md)。
 
 ---
 
@@ -221,7 +225,7 @@ Guide Part 4 有 20 节，**别全读**，按方向挑：
 - **每节都要写代码**，Guide 没习题，代码是唯一练习。
 - **可选**：PMPP 第四版当讲解版串讲。
 
-> 你现在在**阶段 1（Week 1）**，照 [Week1详细步骤.md](../../study_plan/archive/legacy-8-week/week01/Week1详细步骤.md) 走即可 。
+> 请按 [当前四周计划](../../study_plan/四周聚焦计划_AIInfra与CUDA深水区.md) 的当周主题按需查阅本索引；旧八周的 [Week1 详细步骤](../../study_plan/archive/legacy-8-week/week01/Week1详细步骤.md) 仅用于历史复盘参考。
 
 ---
 
