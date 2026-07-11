@@ -1,7 +1,7 @@
 # Week 1 每日学习清单（Day1–Day7）
 
-> **使用方式**：按 Day1 → Day7 顺序勾选。每 Day 对应 [Week1详细步骤.md](Week1详细步骤.md) 中的 Step，并标明 v13.x 官方章节。  
-> **官方文档**：[CUDA Programming Guide v13.x](https://docs.nvidia.com/cuda/cuda-programming-guide/)  
+> **使用方式**：按 Day1 → Day7 顺序勾选。每 Day 对应 [Week1详细步骤.md](Week1详细步骤.md) 中的 Step，并标明 v13.x 官方章节。
+> **官方文档**：[CUDA Programming Guide v13.x](https://docs.nvidia.com/cuda/cuda-programming-guide/)
 > **Legacy 对照**：[Week1详细步骤.md 附录 D](Week1详细步骤.md#附录-d新版-vs-legacy-章节对照查阅用)
 
 ### v13.x 阅读顺序（Week 1 总览）

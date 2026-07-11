@@ -20,8 +20,8 @@
 
 | 文档 | 阶段 | 说明 |
 |------|------|------|
-| [archive/Week1详细步骤.md](archive/Week1详细步骤.md) | Week1 | GPU 基础详细步骤（已归档） |
-| [archive/Week1_Day2-Day5学习清单.md](archive/Week1_Day2-Day5学习清单.md) | Week1 | Day2-5 清单（已归档） |
+| [archive/Week1详细步骤.md](../study_plan/archive/legacy-8-week/week01/Week1详细步骤.md) | Week1 | GPU 基础详细步骤（已归档） |
+| [archive/Week1_Day2-Day5学习清单.md](../study_plan/archive/legacy-8-week/week01/Week1_Day2-Day5学习清单.md) | Week1 | Day2-5 清单（已归档） |
 | [Week3_TensorCore学习文档.md](Week3_TensorCore学习文档.md) | Week3 | ⭐ Tensor Core/WMMA 自包含手册 |
 | [Week4_Attention与FlashAttention完整学习资料.md](Week4_Attention与FlashAttention完整学习资料.md) | Week4 | ⭐ Attention/FlashAttention 完整资料 |
 

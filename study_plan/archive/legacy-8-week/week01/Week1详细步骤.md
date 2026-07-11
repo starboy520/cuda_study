@@ -1,14 +1,14 @@
 # Week 1 详细步骤清单
 
-> **主题**：GPU 架构与 CUDA 编程模型  
-> **预计用时**：5–7 天（每天 3–4 小时业余 / 2–3 天全职）  
+> **主题**：GPU 架构与 CUDA 编程模型
+> **预计用时**：5–7 天（每天 3–4 小时业余 / 2–3 天全职）
 > **本周交付**：`week01_basics/` 三个可运行程序 + `notes/week01.md`（含设备表 + GFLOPS 表）
 
 **使用方式**：按 Step 01 → 12 顺序做；每步有「阅读」「动手」「完成标志」；做完一步再勾 `[ ]`。
 
-> **官方文档说明（CUDA 13.x）**  
-> NVIDIA 已将主文档重组为 [CUDA Programming Guide v13.x](https://docs.nvidia.com/cuda/cuda-programming-guide/)（5 部分结构）。  
-> 下文 **Programming Guide** 均指 **新版 v13.x**，不再使用旧版 Legacy 的 `Ch.1–3` 编号。  
+> **官方文档说明（CUDA 13.x）**
+> NVIDIA 已将主文档重组为 [CUDA Programming Guide v13.x](https://docs.nvidia.com/cuda/cuda-programming-guide/)（5 部分结构）。
+> 下文 **Programming Guide** 均指 **新版 v13.x**，不再使用旧版 Legacy 的 `Ch.1–3` 编号。
 > 旧版对照见文末 **附录 D**；本地白话版见 [Programming_Model详解.md](../../../../docs/Programming_Model详解.md)。
 
 ---
@@ -520,7 +520,7 @@ Host 流程：分配 → H2D → launch → sync → D2H → 与 CPU 结果对�
 
 ### 动手（二选一）
 
-**A. 简单实验**（推荐）  
+**A. 简单实验**（推荐）
 对 `mat_mul_naive`，试 3 种 block 配置，记录 GFLOPS：
 
 
@@ -531,7 +531,7 @@ Host 流程：分配 → H2D → launch → sync → D2H → 与 CPU 结果对�
 | (32,32)  | 1024       |                |
 
 
-**B. API 查询**（可选）  
+**B. API 查询**（可选）
 调用 `cudaOccupancyMaxActiveBlocksPerMultiprocessor` 打印不同 block size 的理论最大 active blocks。
 
 ### 完成标志
@@ -614,7 +614,7 @@ notes/
 
 ## 附录 D：新版 vs Legacy 章节对照（查阅用）
 
-> 旧链接 [cuda-c-programming-guide](https://docs.nvidia.com/cuda/cuda-c-programming-guide/) 仍可用，但章节结构与新版不同。  
+> 旧链接 [cuda-c-programming-guide](https://docs.nvidia.com/cuda/cuda-c-programming-guide/) 仍可用，但章节结构与新版不同。
 > 若看到第三方教程写 `Ch.3.3 Thread Hierarchy`，请对照下表找新版位置。
 
 | 旧版 Legacy（常见引用） | 新版对应位置 | Week 1 哪步用 |
