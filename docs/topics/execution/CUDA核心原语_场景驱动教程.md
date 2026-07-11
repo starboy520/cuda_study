@@ -180,7 +180,8 @@ for (int t = 0; t < numTiles; t++) {
         __pipeline_commit();
     }
 
-    __pipeline_wait_prior(1);   // 等"当前块"就绪（允许 1 个下块还在飞）
+    // 稳态允许下一块在飞；尾声没有下一块，必须等待全部完成
+    __pipeline_wait_prior((t + 1 < numTiles) ? 1 : 0);
     __syncthreads();
 
     compute(buf[cur]);          // 算当前块，下块同时在后台搬 ← 重叠！
@@ -203,6 +204,68 @@ wait_prior(1)    : 保留 1 个在途拷贝，实现"算这块/搬下块"重叠
 - commit/wait_prior 的计数要和 buffer 数匹配，错了会读到没搬完的数据
 - sm_75(T4) 不支持，会编译失败或退化
 ```
+
+### 补充 1：同步与异步的数据通路
+
+同步搬运通常是 `global --LD--> register --STS--> shared`：线程要先拿到寄存器结果，再写 shared。`cp.async` 则让数据从 global 直接进入 shared；发起拷贝后线程可以继续执行独立计算，既少占中转寄存器，也为搬算重叠创造条件。这里的“异步”不等于“无需同步”：消费 shared 数据前仍要等待对应拷贝完成，并满足参与线程之间的可见性要求。
+
+### 补充 2：`cuda::pipeline` 的 acquire / commit / wait / release
+
+底层 `__pipeline_commit()` / `__pipeline_wait_prior()` 直接管理已提交批次；高层 `<cuda/pipeline>` API 把同一过程写成生产者—消费者生命周期：
+
+```cpp
+#include <cuda/pipeline>
+#include <cooperative_groups.h>
+namespace cg = cooperative_groups;
+
+auto block = cg::this_thread_block();
+__shared__ cuda::pipeline_shared_state<cuda::thread_scope_block, 2> state;
+auto pipe = cuda::make_pipeline(block, &state);
+
+pipe.producer_acquire();
+cuda::memcpy_async(&smem[i], &gmem[i], sizeof(float4), pipe);
+pipe.producer_commit();
+
+pipe.consumer_wait();
+// 现在才能消费本阶段对应的 shared-memory 数据
+compute(smem);
+pipe.consumer_release();
+```
+
+四个动作各守一道边界：
+
+1. `producer_acquire()`：等到一个可复用 stage，防止覆盖仍在消费的 buffer；
+2. `producer_commit()`：提交本 stage 的全部异步拷贝，使其进入消费者可等待的序列；
+3. `consumer_wait()`：等待最老的已提交 stage 就绪，再读取对应 buffer；
+4. `consumer_release()`：声明本 stage 已消费完，允许生产者复用它。
+
+`cuda::thread_scope_block` 表示 pipeline 状态由整个 thread block 共同参与；同一 block 内各线程必须以一致的顺序推进 stage。它不是“自动替代所有 barrier”：若线程会读取其他线程负责搬入的数据，或还在读取即将复用的 buffer，仍要依赖 pipeline 的集体协议或显式 block barrier 建立正确的生产—消费边界。
+
+### 补充 3：双缓冲的序幕、稳态与尾声
+
+```text
+序幕 prologue：acquire buf[0] → 预取 tile 0 → commit
+
+稳态 steady state：
+    wait 当前 stage → 发起下一 tile 到另一个 buffer → 计算当前 tile → release 当前 stage
+    此时形成“算 buf[cur] / 搬 buf[next]”的重叠
+
+尾声 epilogue：
+    不再提交下一 tile → 把最后一个已提交 stage 等完 → 计算 → release
+```
+
+两块物理 buffer 对应两个可轮换 stage。序幕负责填满流水线，稳态才有实际重叠，尾声负责排空；把稳态的 `wait_prior(1)` 原样用于尾声会留下一个未完成 stage，因此最后一轮要 `wait_prior(0)`。三级或更多 stage 可以隐藏更长延迟，但会增加 shared memory 占用，并可能降低 occupancy。
+
+### 补充 4：边界、对齐与等待的易错点
+
+- **边界**：尾 tile 不足完整向量时，不能让越界 lane 读取非法 global 地址，也不能让未写位置保留旧 buffer 数据；应使用谓词化拷贝、零填充能力或单独的标量尾处理，并保证参与集体 pipeline 操作的线程仍按一致顺序推进。
+- **对齐**：硬件路径支持 4/8/16 B 拷贝，16 B 通常最合适；global 源地址、shared 目标地址和每行 stride 都要满足所声明粒度的对齐，不能只检查基指针。
+- **等待语义**：`wait_prior(N)` 表示返回时至多允许 `N` 个较新的已提交批次仍未完成，不是“等待第 N 批”。双缓冲稳态常用 1，排空尾声必须用 0。
+- **等待不等于 block barrier**：拷贝完成只回答“数据到了没有”；若线程 A 消费线程 B 搬入的数据，还必须保证整个参与组都到达可消费点。
+- **复用保护**：写 `buf[next]` 前必须确认上一次使用该 buffer 的消费者都已结束；低层写法常用 block barrier，高层写法用匹配的 `consumer_release()` / `producer_acquire()` 生命周期。
+- **收敛提交**：同一 warp 在分歧路径中提交或等待会让批次序列难以推理，甚至产生额外等待；尽量让参与线程收敛地执行 commit/wait，并把边界差异放在拷贝谓词上。
+
+Cooperative Groups 的分组、同步与 grid 级约束不在这里重复展开，深入阅读：[Cooperative Groups 与 CUDA Graph 深度教程](./CooperativeGroups与CUDAGraph深度教程.md)。
 
 ---
 
