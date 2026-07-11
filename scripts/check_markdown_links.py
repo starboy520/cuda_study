@@ -106,19 +106,19 @@ def check_file(
                     if not target or target.startswith("#"):
                         continue
 
-                    if WINDOWS_DRIVE_PATH_RE.match(target):
+                    if (
+                        WINDOWS_DRIVE_PATH_RE.match(target)
+                        or WINDOWS_DRIVE_RELATIVE_PATH_RE.match(target)
+                    ):
                         input_errors.append(
                             (
                                 line_number,
                                 raw,
-                                "Windows absolute local paths are not checkable",
+                                "Windows paths are not checkable",
                             )
                         )
                         continue
 
-                    is_drive_relative = bool(
-                        WINDOWS_DRIVE_RELATIVE_PATH_RE.match(target)
-                    )
                     try:
                         parsed = urlparse(target)
                     except ValueError as error:
@@ -127,10 +127,10 @@ def check_file(
                         )
                         continue
 
-                    if parsed.scheme and not is_drive_relative:
+                    if parsed.scheme:
                         continue
 
-                    link_path = target if is_drive_relative else parsed.path
+                    link_path = parsed.path
                     link_path = unquote(link_path).replace("\\ ", " ")
                     if not link_path:
                         continue
