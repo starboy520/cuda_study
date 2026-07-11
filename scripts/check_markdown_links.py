@@ -20,7 +20,8 @@ LINK_RE = re.compile(
 )
 FENCE_RE = re.compile(r"^\s*(`{3,}|~{3,})")
 WINDOWS_DRIVE_PATH_RE = re.compile(r"^[A-Za-z]:[\\/]")
-WINDOWS_DRIVE_RELATIVE_PATH_RE = re.compile(r"^[A-Za-z]:[^\\/]")
+WINDOWS_DRIVE_ROOT_RE = re.compile(r"^[A-Za-z]:$")
+WINDOWS_DRIVE_RELATIVE_PATH_RE = re.compile(r"^[A-Z]:[^\\/]")
 
 
 def display_path(path: Path, root: Path) -> str:
@@ -106,10 +107,23 @@ def check_file(
                     if not target or target.startswith("#"):
                         continue
 
+                    if target.startswith("//"):
+                        continue
+
                     if (
                         WINDOWS_DRIVE_PATH_RE.match(target)
                         or WINDOWS_DRIVE_RELATIVE_PATH_RE.match(target)
                     ):
+                        input_errors.append(
+                            (
+                                line_number,
+                                raw,
+                                "Windows paths are not checkable",
+                            )
+                        )
+                        continue
+
+                    if WINDOWS_DRIVE_ROOT_RE.match(target):
                         input_errors.append(
                             (
                                 line_number,
