@@ -1162,7 +1162,7 @@ PagedAttention 固定两天后停止。优先保住模拟面试、项目表达�
 - PagedAttention：`docs/PagedAttention详解.md`；
 - KV cache：`docs/kv_cache_accounting.md`；
 - decode：`docs/decode_step_dataflow.md`；
-- 面试：`docs/CUDA面试完整准备指南.md` 与私有职业叙事材料。
+- 面试：`docs/interview/CUDA面试核心题库.md` 与私有职业叙事材料。
 
 资料纪律：先写、再查、最后对照。禁止直接复制旧 kernel 作为“重建”。
 

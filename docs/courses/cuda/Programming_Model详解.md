@@ -552,4 +552,4 @@ Legacy 对照详见 [Week1详细步骤.md 附录 D](../study_plan/archive/legacy
 
 ---
 
-**相关文档**：[Week1详细步骤.md](../study_plan/archive/legacy-8-week/week01/Week1详细步骤.md) · [notes/CUDA基础概念.md](../notes/CUDA基础概念.md) · [CUDA学习路线图.md](CUDA学习路线图.md)
+**相关文档**：[Week1详细步骤.md](../study_plan/archive/legacy-8-week/week01/Week1详细步骤.md) · [notes/CUDA基础概念.md](../notes/CUDA基础概念.md) · [CUDA学习路线图.md](../../archive/curricula/CUDA学习路线图_legacy.md)

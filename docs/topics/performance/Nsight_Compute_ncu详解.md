@@ -526,4 +526,4 @@ ncu 只看指标。
 
 ---
 
-**返回**:[study_plan/Week5 性能工程](../study_plan/archive/legacy-8-week/week05/Week5_性能工程与Nsight实战.md) · [CUDA学习路线图](CUDA学习路线图.md)
+**返回**:[study_plan/Week5 性能工程](../study_plan/archive/legacy-8-week/week05/Week5_性能工程与Nsight实战.md) · [CUDA学习路线图](../../archive/curricula/CUDA学习路线图_legacy.md)

@@ -1,7 +1,7 @@
 # GPU 卡型专项学习指南
 
 > 本文档说明：**CUDA 学习中哪些与卡无关、哪些与卡相关**，以及你在 **T4 + A100 双卡** 环境下怎么配合使用两张卡。  
-> 配套文档：[T4实战指南.md](T4实战指南.md)（当前环境细节）· [CUDA学习路线图.md](CUDA学习路线图.md)（主课程）
+> 配套文档：[T4实战指南.md](../archive/hardware/T4实战指南.md)（历史环境细节）· [当前学习计划](../../study_plan/README.md)（主课程）
 
 > ✅ **你现在的环境：T4（Turing, sm_75）+ A100（Ampere, sm_80）双卡**。这是很好的配置：
 > T4 贴近推理业务、A100 贴近训练/大模型。本文凡是“A100 待申请”的地方都已改成“双卡
@@ -446,14 +446,14 @@ Week 1-4 主用 T4（通用能力与卡无关，省着 A100）。Week 5 起双�
 | Ampere Architecture Whitepaper | A100 深入（Week 5 后） |
 | Turing Architecture Whitepaper | 理解 T4（选读） |
 | Hopper Architecture Whitepaper | H100/FP8（Week 8 前浏览） |
-| [T4实战指南.md](T4实战指南.md) | 当前 T4 实验基准 |
+| [T4实战指南.md](../archive/hardware/T4实战指南.md) | 历史 T4 实验基准 |
 
 ---
 
 ## 十二、与主课程文档的关系
 
 ```
-CUDA学习路线图.md     →  学什么、按周推进（主路线）
+study_plan/README.md   →  当前唯一执行入口
 GPU卡型专项学习指南.md →  哪些内容因卡而异、T4/A100 如何配合（本文）
 T4实战指南.md         →  当前 T4 环境的编译、基准、实验清单
 学习资料索引.md       →  外部链接汇总
@@ -463,4 +463,4 @@ T4实战指南.md         →  当前 T4 环境的编译、基准、实验清单
 
 ---
 
-**返回**：[CUDA学习路线图.md](CUDA学习路线图.md) · [T4实战指南.md](T4实战指南.md)
+**返回**：[当前学习计划](../../study_plan/README.md) · [T4实战指南.md](../archive/hardware/T4实战指南.md)

@@ -89,7 +89,7 @@
 | Programming Guide | **2.3** 页内搜 `Global Memory` / `Shared Memory` | 六种内存名字 |
 | [Programming_Model详解.md](../../../../docs/Programming_Model详解.md) | Memory 相关小节 | 与 Week 1 衔接 |
 | [GPU架构图资源.md](../../../../docs/GPU架构图资源.md) | Memory Hierarchy | 可视化 |
-| [T4实战指南.md](../../../../docs/archive/T4实战指南.md) | 硬件速览 | 48KB shared/block |
+| [T4实战指南.md](../../../../docs/archive/hardware/T4实战指南.md) | 硬件速览 | 48KB shared/block |
 
 ### 核心概念（读完能填表）
 
@@ -450,7 +450,7 @@ Phase 2：CPU 对 blocksums 求和（Week 2 够用）
 
 | 资料 | 重点 |
 |------|------|
-| [T4实战指南.md](../../../../docs/archive/T4实战指南.md) | 转置 ~30 GB/s naive → ~200+ GB/s 优化 |
+| [T4实战指南.md](../../../../docs/archive/hardware/T4实战指南.md) | 转置 ~30 GB/s naive → ~200+ GB/s 优化 |
 | [项目清单.md](../../../../docs/项目清单.md) | P03、P04 验收 |
 
 ### 动手
@@ -513,7 +513,7 @@ nsys profile -o week2_transpose ./transpose 1024
 
 ### 阅读
 
-- 回顾 [CUDA学习路线图.md](../../../../docs/CUDA学习路线图.md) Week 2 验收项
+- 回顾 [CUDA学习路线图.md](../../../../docs/archive/curricula/CUDA学习路线图_legacy.md) Week 2 验收项
 - [项目清单.md](../../../../docs/项目清单.md) P03、P04
 
 ### 目录自检
@@ -609,4 +609,4 @@ notes/
 
 ---
 
-**返回**：[CUDA学习路线图.md](../../../../docs/CUDA学习路线图.md) · **总纲**：[Programming_Guide学习路径.md](../../../../docs/Programming_Guide学习路径.md)（阶段 2）· **上一步**：[Week1详细步骤.md](../week01/Week1详细步骤.md)
+**返回**：[CUDA学习路线图.md](../../../../docs/archive/curricula/CUDA学习路线图_legacy.md) · **总纲**：[Programming_Guide学习路径.md](../../../../docs/Programming_Guide学习路径.md)（阶段 2）· **上一步**：[Week1详细步骤.md](../week01/Week1详细步骤.md)

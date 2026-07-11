@@ -77,7 +77,7 @@
 
 ### 阅读
 
-- 无需读文档，先看 [T4实战指南.md](../../../../docs/archive/T4实战指南.md) 第一节「T4 硬件速览」（10 分钟）
+- 无需读文档，先看 [T4实战指南.md](../../../../docs/archive/hardware/T4实战指南.md) 第一节「T4 硬件速览」（10 分钟）
 
 ### 动手
 
@@ -293,7 +293,7 @@ nvidia-smi --query-gpu=name,compute_cap,memory.total --format=csv
 | Programming Guide      | **2.3** 中 Global Memory 小节（浏览）       | 先知道有哪些内存类型，Week 2 深入          |
 | [GPU架构图资源.md](../../../../docs/GPU架构图资源.md) | Memory Hierarchy 归档配图                 | 可视化辅助（新版正文图较少）                |
 | PMPP 或 CUDA by Example | SIMT / Warp 相关小节                      | 一个 Warp = 32 线程，同 warp 执行同一指令 |
-| [T4实战指南.md](../../../../docs/archive/T4实战指南.md) | 第一节                                   | T4：40 SM、2560 CUDA Cores      |
+| [T4实战指南.md](../../../../docs/archive/hardware/T4实战指南.md) | 第一节                                   | T4：40 SM、2560 CUDA Cores      |
 
 
 ### 核心概念（读完要能复述）
@@ -336,7 +336,7 @@ nvidia-smi --query-gpu=name,compute_cap,memory.total --format=csv
 | Programming Guide      | **2.7 NVCC: The NVIDIA CUDA Compiler**     | 编译流程、`-arch=sm_75` |
 | 同上                     | **2.1** 或 **2.3**（页内搜 `cudaGetLastError`） | 异步错误检查        |
 | Runtime API            | **cudaGetLastError / cudaPeekAtLastError** |               |
-| [T4实战指南.md](../../../../docs/archive/T4实战指南.md) | 第二节 编译与架构标志                                | `-arch=sm_75` |
+| [T4实战指南.md](../../../../docs/archive/hardware/T4实战指南.md) | 第二节 编译与架构标志                                | `-arch=sm_75` |
 
 
 ### 动手
@@ -454,7 +454,7 @@ Host 流程：分配 → H2D → launch → sync → D2H → 与 CPU 结果对�
 
 | 资料                     | 章节         | 重点           |
 | ---------------------- | ---------- | ------------ |
-| [T4实战指南.md](../../../../docs/archive/T4实战指南.md) | 第三节 性能基准参考 | 朴素 GEMM 预期区间 |
+| [T4实战指南.md](../../../../docs/archive/hardware/T4实战指南.md) | 第三节 性能基准参考 | 朴素 GEMM 预期区间 |
 | [项目清单.md](../../../../docs/项目清单.md)     | P02 矩阵乘    | 验收标准         |
 
 
@@ -551,7 +551,7 @@ Host 流程：分配 → H2D → launch → sync → D2H → 与 CPU 结果对�
 
 ### 阅读
 
-- 回顾 [CUDA学习路线图.md](../../../../docs/CUDA学习路线图.md) Week 1 验收项
+- 回顾 [CUDA学习路线图.md](../../../../docs/archive/curricula/CUDA学习路线图_legacy.md) Week 1 验收项
 - 扫一眼 [项目清单.md](../../../../docs/项目清单.md) P01、P02
 
 ### 动手：目录自检
@@ -661,10 +661,10 @@ notes/
 
 ## 附录 C：下一步
 
-Week 1 完成后 → [CUDA学习路线图.md](../../../../docs/CUDA学习路线图.md) **Week 2**（transpose、reduction、合并访问）
+Week 1 完成后 → [CUDA学习路线图.md](../../../../docs/archive/curricula/CUDA学习路线图_legacy.md) **Week 2**（transpose、reduction、合并访问）
 
 如需生成 `device_query` 和 `mat_mul_naive` 代码骨架，可在对话中说：**帮我生成 Week 1 Step 05/09 代码骨架**。
 
 ---
 
-**返回**：[CUDA学习路线图.md](../../../../docs/CUDA学习路线图.md)
+**返回**：[CUDA学习路线图.md](../../../../docs/archive/curricula/CUDA学习路线图_legacy.md)

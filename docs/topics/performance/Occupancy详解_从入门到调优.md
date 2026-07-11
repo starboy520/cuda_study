@@ -891,4 +891,4 @@ SM 的 Occupancy 都高。
 
 ---
 
-**返回**:[CUDA学习路线图.md](CUDA学习路线图.md)
+**返回**:[CUDA学习路线图.md](../../archive/curricula/CUDA学习路线图_legacy.md)

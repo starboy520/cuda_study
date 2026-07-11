@@ -1,6 +1,6 @@
 # Week 4：Attention、FlashAttention 与 MLA——A100 自包含学习手册
 
-> 对应：[DeepSeek CUDA 2 月冲刺计划](DeepSeek_CUDA_2月冲刺计划.md) Week 4。
+> 对应：[DeepSeek CUDA 2 月冲刺计划（legacy）](../../archive/curricula/DeepSeek_CUDA_2月冲刺计划_legacy.md) Week 4。
 > 主要实验平台：NVIDIA A100（Ampere，`sm_80`）。
 > 起点：你已经写过 CUDA kernel、GEMM、归约、stable softmax、WMMA 和 `cp.async`，但本书**不假设你知道 Attention、Transformer 或 KV cache**。
 

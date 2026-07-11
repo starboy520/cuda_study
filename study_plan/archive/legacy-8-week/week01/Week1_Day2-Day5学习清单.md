@@ -48,7 +48,7 @@ Day7  2.3 Occupancy + 复盘
 - [ ] [Programming_Model详解.md](../../../../docs/Programming_Model详解.md) §1–§8
 - [ ] Programming Guide：**1. Introduction to CUDA**（1.1–1.3）
 - [ ] Programming Guide：**2.1 Intro to CUDA C++**
-- [ ] [T4实战指南.md](../../../../docs/archive/T4实战指南.md) 第一节
+- [ ] [T4实战指南.md](../../../../docs/archive/hardware/T4实战指南.md) 第一节
 
 ### 动手步骤
 

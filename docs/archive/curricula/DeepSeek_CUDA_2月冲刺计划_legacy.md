@@ -1,5 +1,7 @@
 # DeepSeek CUDA 岗位 · 2 个月冲刺计划
 
+> **归档状态**：历史资料，不是当前执行入口。保留用于检索旧课程设计和技术解释；当前导航见相应 README。
+
 > 目标公司：DeepSeek（CUDA / GPU kernel 优化 / ML 系统 / AI Infra）
 > 时间：8 周（约 2 个月）
 > 起点：已经学过 CUDA 基础、内存系统、并行算法、shared memory GEMM、softmax、ncu/nsys/Roofline；C++ 经验较强

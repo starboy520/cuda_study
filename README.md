@@ -35,9 +35,9 @@ make && ./vec_add
 
 | 文档 | 说明 |
 |------|------|
-| [study_plan/](study_plan/README.md) | **学习计划中枢**：8 周周计划(Week1-8)统一入口,从入门到面试 |
-| [CUDA学习路线图.md](docs/CUDA学习路线图.md) | **主文档**：8 周课程、知识点、项目、面试方向（v13.x 阅读章节） |
-| [CUDA面试完整准备指南.md](docs/CUDA面试完整准备指南.md) | **面试题库**：知识地图、50 概念题、手写 kernel、性能/系统设计、进阶主题 |
+| [study_plan/](study_plan/README.md) | **学习计划中枢**：当前四周聚焦计划的唯一执行入口 |
+| [历史课程与指南归档](docs/archive/README.md) | 旧八周路线、旧指南及合并前原文索引 |
+| [CUDA 面试核心题库](docs/interview/CUDA面试核心题库.md) | **面试题库**：核心问题、追问边界、手写 kernel 与项目证据 |
 | [Occupancy详解_从入门到调优.md](docs/Occupancy详解_从入门到调优.md) | Occupancy 完整文档：基础(延迟隐藏)+ 进阶(精确计算/调优/profiler) |
 | [Programming_Model详解.md](docs/Programming_Model详解.md) | Programming Model 白话详解（配合 v13.x Part 1–2） |
 | [GPU架构图资源.md](docs/GPU架构图资源.md) | 官方架构图、Memory Hierarchy 等配图链接 |
@@ -45,7 +45,7 @@ make && ./vec_add
 | [Week1_Day2-Day5学习清单.md](study_plan/archive/legacy-8-week/week01/Week1_Day2-Day5学习清单.md) | Week 1 **Day1–Day7** 可勾选清单（v13.x 对齐） |
 | [学习资料索引.md](docs/学习资料索引.md) | 书籍、官方文档、课程、论文、工具链接 |
 | [GPU卡型专项学习指南.md](docs/GPU卡型专项学习指南.md) | T4/A100 差异、卡相关学习内容、分阶段清单 |
-| [T4实战指南.md](docs/T4实战指南.md) | T4 硬件特性、性能预期、实验建议 |
+| [T4实战指南.md](docs/archive/hardware/T4实战指南.md) | T4 历史硬件特性、性能预期、实验建议 |
 | [项目清单.md](docs/项目清单.md) | 12 个递进项目 + 作品集建议 |
 
 ## 学习节奏建议
@@ -80,4 +80,4 @@ cuda_study/
 
 ---
 
-**下一步**：阅读 [docs/CUDA学习路线图.md](docs/CUDA学习路线图.md) 从 Week 1 开始。
+**下一步**：从 [当前学习计划](study_plan/README.md) 开始。
