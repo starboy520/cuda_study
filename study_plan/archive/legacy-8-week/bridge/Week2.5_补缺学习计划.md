@@ -28,7 +28,7 @@
 
 这是你最大的真空白，且面试常考。好消息：**你天天在用编译命令，只是没理解背后发生了什么**。
 
-**读**：[卷二第 06 章 NVCC、PTX 与编译流程](../cuda_deep_course/course/volume02_programming_model/06_NVCC_PTX与编译流程.md)
+**读**：[卷二第 06 章 NVCC、PTX 与编译流程](../../../../cuda_deep_course/course/volume02_programming_model/06_NVCC_PTX与编译流程.md)
 
 **要搞懂的 5 个问题**（读完能口述就算掌握）：
 ```text
@@ -65,7 +65,7 @@ cuobjdump --dump-sass vec_add | head -40
 
 你会用 `__global__`/`__device__`，但几个"为什么"没搞清。
 
-**读**：[卷二第 03 章 CUDA 函数修饰符与执行空间](../cuda_deep_course/course/volume02_programming_model/03_CUDA函数修饰符与执行空间.md)（重点 §1 分流图、§2.1 为什么 void、§2.2 三尖括号、§5 双编译）
+**读**：[卷二第 03 章 CUDA 函数修饰符与执行空间](../../../../cuda_deep_course/course/volume02_programming_model/03_CUDA函数修饰符与执行空间.md)（重点 §1 分流图、§2.1 为什么 void、§2.2 三尖括号、§5 双编译）
 
 **要搞懂**：
 ```text
@@ -85,7 +85,7 @@ cuobjdump --dump-sass vec_add | head -40
 
 你卷七已经深入学过 stream/重叠，这章是它的基础，**快速对齐概念即可**。
 
-**读**：[卷二第 05 章 异步执行、同步与错误模型](../cuda_deep_course/course/volume02_programming_model/05_异步执行_同步与错误模型.md)（重点 §1 传送带模型、§3 两类错误）
+**读**：[卷二第 05 章 异步执行、同步与错误模型](../../../../cuda_deep_course/course/volume02_programming_model/05_异步执行_同步与错误模型.md)（重点 §1 传送带模型、§3 两类错误）
 
 **要搞懂**：
 ```text
@@ -104,8 +104,8 @@ cuobjdump --dump-sass vec_add | head -40
 这是检验你前面是否真懂的关键。**先自己答，再看答案**，答错的回头补。
 
 **做**：
-- [卷一第 06 章 复习与面试题](../cuda_deep_course/course/volume01_gpu_basics/06_卷一复习与面试题.md)
-- [卷二第 10 章 复习、练习答案与面试题](../cuda_deep_course/course/volume02_programming_model/10_卷二复习_练习答案与面试题.md)
+- [卷一第 06 章 复习与面试题](../../../../cuda_deep_course/course/volume01_gpu_basics/06_卷一复习与面试题.md)
+- [卷二第 10 章 复习、练习答案与面试题](../../../../cuda_deep_course/course/volume02_programming_model/10_卷二复习_练习答案与面试题.md)
 
 **做法**：
 ```text
@@ -128,7 +128,7 @@ cuobjdump --dump-sass vec_add | head -40
 
 ## 可选（如果还有时间）：卷一 01 系统读
 
-[卷一第 01 章 CPU 与 GPU 为什么不同](../cuda_deep_course/course/volume01_gpu_basics/01_CPU与GPU为什么不同.md)
+[卷一第 01 章 CPU 与 GPU 为什么不同](../../../../cuda_deep_course/course/volume01_gpu_basics/01_CPU与GPU为什么不同.md)
 
 你零散懂这些，但没系统读过"设计哲学"。15 分钟扫一遍，建立完整框架。重点：
 ```text
@@ -175,7 +175,7 @@ cuobjdump --dump-sass vec_add | head -40
 
 ### A. 内存传输三件套（pinned / zero-copy / Unified）⭐ 面试高频
 
-**读**：[卷三第 04 章 §4–7](../cuda_deep_course/course/volume03_memory_system/04_Cache_Host传输与Unified_Memory.md)
+**读**：[卷三第 04 章 §4–7](../../../../cuda_deep_course/course/volume03_memory_system/04_Cache_Host传输与Unified_Memory.md)
 
 ```text
 1. 为什么 pinned 比 pageable 快？（省掉驱动内部那次 staging 拷贝）
@@ -192,7 +192,7 @@ cuobjdump --dump-sass vec_add | head -40
 
 ### B. 数据复用的三个层次 ⭐ 贯穿全书的主线
 
-**读**：[卷三第 04 章 §3](../cuda_deep_course/course/volume03_memory_system/04_Cache_Host传输与Unified_Memory.md) + [卷六第 01 章 §见 AI 推导](../cuda_deep_course/course/volume06_operators/01_GEMM数学_布局与性能上限.md)
+**读**：[卷三第 04 章 §3](../../../../cuda_deep_course/course/volume03_memory_system/04_Cache_Host传输与Unified_Memory.md) + [卷六第 01 章 §见 AI 推导](../../../../cuda_deep_course/course/volume06_operators/01_GEMM数学_布局与性能上限.md)
 
 ```text
 1. 三层复用：register（线程内）/ shared（block 内）/ L2 或重读（跨 block）
@@ -204,7 +204,7 @@ cuobjdump --dump-sass vec_add | head -40
 
 ### C. Histogram（直方图）⭐ 经典手写题
 
-**读**：[卷四第 04 章 §5–7](../cuda_deep_course/course/volume04_parallel_algorithms/04_Scan与Histogram.md)
+**读**：[卷四第 04 章 §5–7](../../../../cuda_deep_course/course/volume04_parallel_algorithms/04_Scan与Histogram.md)
 
 ```text
 1. naive global atomic 的问题？（分布集中时大量线程争少数 bin）
@@ -217,7 +217,7 @@ cuobjdump --dump-sass vec_add | head -40
 
 ### D. Scan → Compact（流压缩）⭐ 面试常考的 scan 应用
 
-**读**：[卷四第 04 章 §1–4](../cuda_deep_course/course/volume04_parallel_algorithms/04_Scan与Histogram.md)
+**读**：[卷四第 04 章 §1–4](../../../../cuda_deep_course/course/volume04_parallel_algorithms/04_Scan与Histogram.md)
 
 ```text
 1. Hillis-Steele vs Blelloch：工作量差约 10 倍，深度同为 O(log n)，各自适用场景？
@@ -232,7 +232,7 @@ cuobjdump --dump-sass vec_add | head -40
 
 ### E. 只读内存路径（constant / texture）+ pitch（小补丁）
 
-**读**：[卷三第 01 章 §6–7](../cuda_deep_course/course/volume03_memory_system/01_CUDA内存空间.md)、[卷三第 02 章 §7 Pitch](../cuda_deep_course/course/volume03_memory_system/02_合并访问_对齐_AoS与SoA.md)
+**读**：[卷三第 01 章 §6–7](../../../../cuda_deep_course/course/volume03_memory_system/01_CUDA内存空间.md)、[卷三第 02 章 §7 Pitch](../../../../cuda_deep_course/course/volume03_memory_system/02_合并访问_对齐_AoS与SoA.md)
 
 ```text
 1. constant memory 何时高效？（一个 warp 读同一地址 → 广播；读散地址则退化）

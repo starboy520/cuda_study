@@ -181,4 +181,4 @@ notes/week07.md:项目日志
 
 ---
 
-**返回**:[study_plan/README.md](README.md) · 上一步:[Week6 核心算子](Week6_核心算子开发.md) · 下一步:[Week8 面试冲刺](Week8_面试冲刺.md)
+**返回**:[study_plan/README.md](../../../README.md) · 上一步:[Week6 核心算子](../week06/Week6_核心算子开发.md) · 下一步:[Week8 面试冲刺](../week08/Week8_面试冲刺.md)

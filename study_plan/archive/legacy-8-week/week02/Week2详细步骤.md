@@ -7,9 +7,9 @@
 **使用方式**：按 Step 01 → 12 顺序做；每步有「阅读」「动手」「完成标志」；做完一步再勾 `[ ]`。
 
 > **前置**：Week 1 完成 `vec_add`、`device_query`、`mat_mul_naive`（1024³ GFLOPS 基线已记录）。  
-> **总纲**：本周对应 [Programming_Guide学习路径.md](../docs/Programming_Guide学习路径.md) 的 **阶段 2：SIMT 与内存层次**。  
+> **总纲**：本周对应 [Programming_Guide学习路径.md](../../../../docs/Programming_Guide学习路径.md) 的 **阶段 2：SIMT 与内存层次**。
 > **官方文档**： [CUDA Programming Guide](https://docs.nvidia.com/cuda/cuda-programming-guide/)  
-> **Week 1 对照**：[Week1详细步骤.md](../docs/Week1详细步骤.md)
+> **Week 1 对照**：[Week1详细步骤.md](../week01/Week1详细步骤.md)
 
 > **阅读标注**（贯穿全文）：📖 精读 · 👀 扫读/查阅 · ✍️ 必须自己写代码 · ➕ 需外部补充（Guide 覆盖不了）。
 
@@ -33,7 +33,7 @@
 | 1 | 01–02 | 📖 **2.3** Global Memory + Memory Coalescing；➕ Best Practices **10.2.1** Coalesced Access | 内存层次笔记、合并访问概念 |
 | 2 | 03 | 📖 **2.3** Shared Memory + **5.4.4** Synchronization（`__syncthreads`）；👀 **5.7** Memory Model | 读懂 `vec_add` 里 `reduce_sum` |
 | 3 | 04–05 | 📖 **2.3** Matrix Transpose 示例 | `transpose` naive + shared_simple PASS |
-| 4 | 06 | 📖 **2.3** Bank Conflict；本地 [转置优化详解.md](../week02_memory/transpose/转置优化详解.md) | `transpose_shared` + GB/s 三版对比 |
+| 4 | 06 | 📖 **2.3** Bank Conflict；本地 [转置优化详解.md](../../../../week02_memory/transpose/转置优化详解.md) | `transpose_shared` + GB/s 三版对比 |
 | 5 | 07–08 | ➕ Harris «Optimizing Parallel Reduction» 前半 | `reduction` atomic 基线 + shared 树形归约 |
 | 6 | 09 | 同上 + 📖 **2.3** 边界/正确性 | 多 block reduction 汇总 PASS |
 | 7 | 10–12 | ➕ Best Practices 第 10 章（尤其 10.2.3.3 C=AAT）复盘 | 性能表、`notes/week02.md` 定稿 |
@@ -56,7 +56,7 @@
 |------|------|-----------|
 | `week02_memory/transpose/transpose.cu` 三版 | ✅ 已 PASS | Step 04–06 验收 |
 | `my_transpose.cu` 手写 | ✅ 逻辑正确 | Step 06 加分 |
-| [转置优化详解.md](../week02_memory/transpose/转置优化详解.md) | ✅ 已有 | Step 06 阅读 |
+| [转置优化详解.md](../../../../week02_memory/transpose/转置优化详解.md) | ✅ 已有 | Step 06 阅读 |
 | `vec_add.cu` 里 `reduce_sum` | 🔄 预习版 | Step 03 对照，Step 08 迁到独立目录 |
 
 ---
@@ -87,9 +87,9 @@
 | 资料 | 章节（v13.x） | 重点 |
 |------|---------------|------|
 | Programming Guide | **2.3** 页内搜 `Global Memory` / `Shared Memory` | 六种内存名字 |
-| [Programming_Model详解.md](../docs/Programming_Model详解.md) | Memory 相关小节 | 与 Week 1 衔接 |
-| [GPU架构图资源.md](../docs/GPU架构图资源.md) | Memory Hierarchy | 可视化 |
-| [T4实战指南.md](../docs/T4实战指南.md) | 硬件速览 | 48KB shared/block |
+| [Programming_Model详解.md](../../../../docs/Programming_Model详解.md) | Memory 相关小节 | 与 Week 1 衔接 |
+| [GPU架构图资源.md](../../../../docs/GPU架构图资源.md) | Memory Hierarchy | 可视化 |
+| [T4实战指南.md](../../../../docs/archive/T4实战指南.md) | 硬件速览 | 48KB shared/block |
 
 ### 核心概念（读完能填表）
 
@@ -222,7 +222,7 @@ out[...] = tile[...];
 | 资料 | 章节 | 重点 |
 |------|------|------|
 | Programming Guide | **2.3** Matrix Transpose（Global 版） | 2D 映射 |
-| 本地 | [transpose/README.md](../week02_memory/transpose/README.md) | 统一 x→col, y→row |
+| 本地 | [transpose/README.md](../../../../week02_memory/transpose/README.md) | 统一 x→col, y→row |
 
 ### 动手
 
@@ -259,7 +259,7 @@ make && ./transpose 4096
 
 | 资料 | 重点 |
 |------|------|
-| [转置优化详解.md](../week02_memory/transpose/转置优化详解.md) § 四 | shared_simple 版本 |
+| [转置优化详解.md](../../../../week02_memory/transpose/转置优化详解.md) § 四 | shared_simple 版本 |
 | 本地 `transpose.cu` 42–60 行 | 同线程读/写 |
 
 ### 动手
@@ -289,7 +289,7 @@ make && ./transpose 4096
 
 | 资料 | 重点 |
 |------|------|
-| [转置优化详解.md](../week02_memory/transpose/转置优化详解.md) § 五–§ 六 | 写回 x/y 对调、`tile[TILE+1]` |
+| [转置优化详解.md](../../../../week02_memory/transpose/转置优化详解.md) § 五–§ 六 | 写回 x/y 对调、`tile[TILE+1]` |
 | 📖 Programming Guide | **2.3** Bank Conflict | 32 banks, 4B width |
 | ➕ Best Practices Guide | **10.2.3.3 Shared Memory in Matrix Multiplication (C=AAT)** | **transpose 官方版**：naive 12.8 → shared 140 → padding `[TILE+1]` 199 GB/s，与你三版数字直接对比 |
 
@@ -450,8 +450,8 @@ Phase 2：CPU 对 blocksums 求和（Week 2 够用）
 
 | 资料 | 重点 |
 |------|------|
-| [T4实战指南.md](../docs/T4实战指南.md) | 转置 ~30 GB/s naive → ~200+ GB/s 优化 |
-| [项目清单.md](../docs/项目清单.md) | P03、P04 验收 |
+| [T4实战指南.md](../../../../docs/archive/T4实战指南.md) | 转置 ~30 GB/s naive → ~200+ GB/s 优化 |
+| [项目清单.md](../../../../docs/项目清单.md) | P03、P04 验收 |
 
 ### 动手
 
@@ -513,8 +513,8 @@ nsys profile -o week2_transpose ./transpose 1024
 
 ### 阅读
 
-- 回顾 [CUDA学习路线图.md](../docs/CUDA学习路线图.md) Week 2 验收项
-- [项目清单.md](../docs/项目清单.md) P03、P04
+- 回顾 [CUDA学习路线图.md](../../../../docs/CUDA学习路线图.md) Week 2 验收项
+- [项目清单.md](../../../../docs/项目清单.md) P03、P04
 
 ### 目录自检
 
@@ -589,7 +589,7 @@ notes/
 
 | 现象 | 原因 | 处理 |
 |------|------|------|
-| transpose shared FAIL | 写回索引对调错误 | 对照 [转置优化详解.md](../week02_memory/transpose/转置优化详解.md) |
+| transpose shared FAIL | 写回索引对调错误 | 对照 [转置优化详解.md](../../../../week02_memory/transpose/转置优化详解.md) |
 | reduction 结果偏小 | 未初始化 shared / 越界线程未填 0 | `global_id >= n` 时 `sdata[i]=0` |
 | reduction 死锁 | `__syncthreads` 在分支内不一致 | 保证 block 内所有线程都到达 |
 | 带宽计算很小 | 计时包了 H2D/D2H | 只计 kernel；公式用 `/1e9` 且 time 用秒 |
@@ -609,4 +609,4 @@ notes/
 
 ---
 
-**返回**：[CUDA学习路线图.md](../docs/CUDA学习路线图.md) · **总纲**：[Programming_Guide学习路径.md](../docs/Programming_Guide学习路径.md)（阶段 2）· **上一步**：[Week1详细步骤.md](../docs/Week1详细步骤.md)
+**返回**：[CUDA学习路线图.md](../../../../docs/CUDA学习路线图.md) · **总纲**：[Programming_Guide学习路径.md](../../../../docs/Programming_Guide学习路径.md)（阶段 2）· **上一步**：[Week1详细步骤.md](../week01/Week1详细步骤.md)

@@ -57,10 +57,10 @@ Day7  性能表定稿 + compute-sanitizer（选做）+ Week 2 复盘
 ### 需要看的资料
 
 - [ ] Programming Guide **2.3** — 页内搜 `Global Memory`、`Shared Memory`
-- [ ] [Programming_Model详解.md](../docs/Programming_Model详解.md) — Memory 相关小节
+- [ ] [Programming_Model详解.md](../../../../docs/Programming_Model详解.md) — Memory 相关小节
 - [ ] [Best Practices Guide — Memory Optimizations](https://docs.nvidia.com/cuda/cuda-c-best-practices-guide/index.html) 前半（Coalescing 段）
-- [ ] [GPU架构图资源.md](../docs/GPU架构图资源.md) — Memory Hierarchy 图
-- [ ] [T4实战指南.md](../docs/T4实战指南.md) — 300 GB/s 带宽、48 KB shared/block
+- [ ] [GPU架构图资源.md](../../../../docs/GPU架构图资源.md) — Memory Hierarchy 图
+- [ ] [T4实战指南.md](../../../../docs/archive/T4实战指南.md) — 300 GB/s 带宽、48 KB shared/block
 
 ### 动手步骤
 
@@ -156,8 +156,8 @@ cd week01_basics/vec_add && make && ./vec_add 1048576
 ### 需要看的资料
 
 - [ ] Programming Guide **2.3** — Matrix Transpose Example
-- [ ] [转置优化详解.md](../week02_memory/transpose/转置优化详解.md) § 一–§ 四
-- [ ] [transpose/README.md](../week02_memory/transpose/README.md)
+- [ ] [转置优化详解.md](../../../../week02_memory/transpose/转置优化详解.md) § 一–§ 四
+- [ ] [transpose/README.md](../../../../week02_memory/transpose/README.md)
 
 ### 动手步骤
 
@@ -169,7 +169,7 @@ make && ./transpose 1024 768    # 非方阵
 
 - [ ] 确认 `transpose_naive` PASS
 - [ ] 确认 `transpose_shared_simple` PASS
-- [ ] 阅读 [矩阵转置两层转置图解.md](../week02_memory/transpose/矩阵转置两层转置图解.md)（若有）
+- [ ] 阅读 [矩阵转置两层转置图解.md](../../../../week02_memory/transpose/矩阵转置两层转置图解.md)（若有）
 - [ ] 在 `notes/week02.md` 用 4×4 例子手算一个元素转置下标
 
 **若代码已全部 PASS**：本日重点改为 **读文档 + 手算**，不必重写 kernel。
@@ -203,7 +203,7 @@ make && ./transpose 1024 768    # 非方阵
 
 ### 需要看的资料
 
-- [ ] [转置优化详解.md](../week02_memory/transpose/转置优化详解.md) § 五–§ 七（全文精读）
+- [ ] [转置优化详解.md](../../../../week02_memory/transpose/转置优化详解.md) § 五–§ 七（全文精读）
 - [ ] Programming Guide **2.3** — Bank Conflict
 - [ ] 对照 `my_transpose.cu` 与 `transpose.cu` 的 `transpose_shared`
 
@@ -362,9 +362,9 @@ nvcc -O3 -arch=sm_75 -std=c++14 -o reduction reduction.cu
 
 ### 需要看的资料
 
-- [ ] [T4实战指南.md](../docs/T4实战指南.md) — 转置带宽预期
-- [ ] [项目清单.md](../docs/项目清单.md) — P03、P04 验收
-- [ ] [CUDA学习路线图.md](../docs/CUDA学习路线图.md) — Week 3 预览
+- [ ] [T4实战指南.md](../../../../docs/archive/T4实战指南.md) — 转置带宽预期
+- [ ] [项目清单.md](../../../../docs/项目清单.md) — P03、P04 验收
+- [ ] [CUDA学习路线图.md](../../../../docs/CUDA学习路线图.md) — Week 3 预览
 
 ### 动手步骤
 
@@ -427,4 +427,4 @@ notes/week02.md            ✅ 定稿
 
 ---
 
-**返回**：[Week2详细步骤.md](Week2详细步骤.md) · [CUDA学习路线图.md](../docs/CUDA学习路线图.md)
+**返回**：[Week2详细步骤.md](Week2详细步骤.md) · [CUDA学习路线图.md](../../../../docs/CUDA学习路线图.md)

@@ -203,4 +203,4 @@ notes/week06.md  —— 三个算子的正确性 + 性能 + 数值稳定说明 +
 
 ---
 
-**返回**:[study_plan/README.md](README.md) · 上一步:[Week5 性能工程](Week5_性能工程与Nsight实战.md) · 下一步:[Week7 作品集](Week7_作品集项目.md)
+**返回**:[study_plan/README.md](../../../README.md) · 上一步:[Week5 性能工程](../week05/Week5_性能工程与Nsight实战.md) · 下一步:[Week7 作品集](../week07/Week7_作品集项目.md)

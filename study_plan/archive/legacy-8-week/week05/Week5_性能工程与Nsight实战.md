@@ -217,4 +217,4 @@ notes/week05.md  —— 三个 kernel 的 bound 分析 + occupancy 调优表 +
 
 ---
 
-**返回**:[study_plan/README.md](README.md) · 下一步:[Week6 核心算子](Week6_核心算子开发.md)
+**返回**:[study_plan/README.md](../../../README.md) · 下一步:[Week6 核心算子](../week06/Week6_核心算子开发.md)

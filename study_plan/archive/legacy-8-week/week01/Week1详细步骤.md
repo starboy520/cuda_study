@@ -9,7 +9,7 @@
 > **官方文档说明（CUDA 13.x）**  
 > NVIDIA 已将主文档重组为 [CUDA Programming Guide v13.x](https://docs.nvidia.com/cuda/cuda-programming-guide/)（5 部分结构）。  
 > 下文 **Programming Guide** 均指 **新版 v13.x**，不再使用旧版 Legacy 的 `Ch.1–3` 编号。  
-> 旧版对照见文末 **附录 D**；本地白话版见 [Programming_Model详解.md](Programming_Model详解.md)。
+> 旧版对照见文末 **附录 D**；本地白话版见 [Programming_Model详解.md](../../../../docs/Programming_Model详解.md)。
 
 ---
 
@@ -21,7 +21,7 @@
 
 | Day | Step | 官方文档（v13.x） | 代码/笔记 |
 |-----|------|------------------|-----------|
-| 1 | 01–03 | **1. Introduction**（1.1–1.3）+ [Programming_Model详解](Programming_Model详解.md) §1–§8 + **2.1** | 环境确认、跑通 `vec_add` |
+| 1 | 01–03 | **1. Introduction**（1.1–1.3）+ [Programming_Model详解](../../../../docs/Programming_Model详解.md) §1–§8 + **2.1** | 环境确认、跑通 `vec_add` |
 | 2 | 04 | **2.5 Asynchronous Execution**（扫读）+ [Event API](https://docs.nvidia.com/cuda/cuda-runtime-api/group__CUDART__EVENT.html) | `vec_add` H2D/Kernel/D2H 计时 |
 | 3 | 05–06 | **5.1 Compute Capabilities** + **1.2 Programming Model** + **2.3**（SIMT/Warp 部分） | `device_query`、手算 blocks、SIMT 笔记 |
 | 4 | 07 | **2.7 NVCC** + **2.1/2.3**（页内搜 `cudaGetLastError`） | 故意 launch 错误、`CUDA_CHECK` |
@@ -77,7 +77,7 @@
 
 ### 阅读
 
-- 无需读文档，先看 [T4实战指南.md](T4实战指南.md) 第一节「T4 硬件速览」（10 分钟）
+- 无需读文档，先看 [T4实战指南.md](../../../../docs/archive/T4实战指南.md) 第一节「T4 硬件速览」（10 分钟）
 
 ### 动手
 
@@ -96,7 +96,7 @@ nvidia-smi --query-gpu=name,compute_cap,memory.total --format=csv,noheader
 
 ### 交付物
 
-`notes/week01.md` 开头环境信息（可先复制 [week01_template.md](../notes/week01_template.md)）
+`notes/week01.md` 开头环境信息（可先复制 [week01_template.md](../../../../notes/week01_template.md)）
 
 ---
 
@@ -109,7 +109,7 @@ nvidia-smi --query-gpu=name,compute_cap,memory.total --format=csv,noheader
 
 | 资料                                                                                   | 章节（v13.x）                                              | 重点                                      |
 | ------------------------------------------------------------------------------------ | ------------------------------------------------------- | --------------------------------------- |
-| [Programming_Model详解.md](Programming_Model详解.md)                                     | **§1–§8 全文**                                            | 推荐先读，建立编程模型整体图                         |
+| [Programming_Model详解.md](../../../../docs/Programming_Model详解.md)                                     | **§1–§8 全文**                                            | 推荐先读，建立编程模型整体图                         |
 | [CUDA Programming Guide](https://docs.nvidia.com/cuda/cuda-programming-guide/)       | **1. Introduction to CUDA**（1.1–1.3）                    | 编程模型抽象、CUDA 平台（语言无关）                   |
 | 同上                                                                                   | **2.1 Intro to CUDA C++** 前半                            | Host/Device、Kernel、`<<<grid, block>>>` 入门 |
 
@@ -150,7 +150,7 @@ nvidia-smi --query-gpu=name,compute_cap,memory.total --format=csv,noheader
 | ----------------- | ------------------------------------------------- | ---------------------------------------------- |
 | Programming Guide | **2.1 Intro to CUDA C++**                         | `__global__`、launch、`cudaMalloc` / `cudaMemcpy` |
 | 同上                | **2.1** 中 Thread indexing（页内搜 `threadIdx`）        | `threadIdx`、`blockIdx`、`blockDim`、`gridDim` 公式 |
-| 本地代码              | [vec_add.cu](../week01_basics/vec_add/vec_add.cu) | 逐行对照文档                                         |
+| 本地代码              | [vec_add.cu](../../../../week01_basics/vec_add/vec_add.cu) | 逐行对照文档                                         |
 
 
 ### 动手
@@ -236,7 +236,7 @@ if (i < n) { ... }                               // 边界处理
 | -------------------------------- | ------------------------------------ | ---------------- |
 | Programming Guide                | **5.1 Compute Capabilities**（Technical Appendices，浏览） | CC 7.5 对应 Turing |
 | Runtime API                      | **cudaGetDeviceProperties**          | 结构体各字段含义         |
-| [GPU卡型专项学习指南.md](GPU卡型专项学习指南.md) | 第三节 CC 速查                            | sm_75            |
+| [GPU卡型专项学习指南.md](../../../../docs/GPU卡型专项学习指南.md) | 第三节 CC 速查                            | sm_75            |
 
 
 ### 动手
@@ -291,9 +291,9 @@ nvidia-smi --query-gpu=name,compute_cap,memory.total --format=csv
 | ---------------------- | ------------------------------------- | ----------------------------- |
 | Programming Guide      | **1.2 Programming Model** + **2.3 Writing SIMT Kernels** 前半 | Grid → Block → Thread、SIMT、Warp |
 | Programming Guide      | **2.3** 中 Global Memory 小节（浏览）       | 先知道有哪些内存类型，Week 2 深入          |
-| [GPU架构图资源.md](GPU架构图资源.md) | Memory Hierarchy 归档配图                 | 可视化辅助（新版正文图较少）                |
+| [GPU架构图资源.md](../../../../docs/GPU架构图资源.md) | Memory Hierarchy 归档配图                 | 可视化辅助（新版正文图较少）                |
 | PMPP 或 CUDA by Example | SIMT / Warp 相关小节                      | 一个 Warp = 32 线程，同 warp 执行同一指令 |
-| [T4实战指南.md](T4实战指南.md) | 第一节                                   | T4：40 SM、2560 CUDA Cores      |
+| [T4实战指南.md](../../../../docs/archive/T4实战指南.md) | 第一节                                   | T4：40 SM、2560 CUDA Cores      |
 
 
 ### 核心概念（读完要能复述）
@@ -336,7 +336,7 @@ nvidia-smi --query-gpu=name,compute_cap,memory.total --format=csv
 | Programming Guide      | **2.7 NVCC: The NVIDIA CUDA Compiler**     | 编译流程、`-arch=sm_75` |
 | 同上                     | **2.1** 或 **2.3**（页内搜 `cudaGetLastError`） | 异步错误检查        |
 | Runtime API            | **cudaGetLastError / cudaPeekAtLastError** |               |
-| [T4实战指南.md](T4实战指南.md) | 第二节 编译与架构标志                                | `-arch=sm_75` |
+| [T4实战指南.md](../../../../docs/archive/T4实战指南.md) | 第二节 编译与架构标志                                | `-arch=sm_75` |
 
 
 ### 动手
@@ -454,8 +454,8 @@ Host 流程：分配 → H2D → launch → sync → D2H → 与 CPU 结果对�
 
 | 资料                     | 章节         | 重点           |
 | ---------------------- | ---------- | ------------ |
-| [T4实战指南.md](T4实战指南.md) | 第三节 性能基准参考 | 朴素 GEMM 预期区间 |
-| [项目清单.md](项目清单.md)     | P02 矩阵乘    | 验收标准         |
+| [T4实战指南.md](../../../../docs/archive/T4实战指南.md) | 第三节 性能基准参考 | 朴素 GEMM 预期区间 |
+| [项目清单.md](../../../../docs/项目清单.md)     | P02 矩阵乘    | 验收标准         |
 
 
 ### 动手
@@ -500,7 +500,7 @@ Host 流程：分配 → H2D → launch → sync → D2H → 与 CPU 结果对�
 
 ## Step 11：Occupancy 基本概念（入门）
 
-**本地详解**：[Occupancy详解_从入门到调优.md](Occupancy详解_从入门到调优.md)（基础：概念+T4数字+实验；进阶：精确计算+调优方法论）
+**本地详解**：[Occupancy详解_从入门到调优.md](../../../../docs/Occupancy详解_从入门到调优.md)（基础：概念+T4数字+实验；进阶：精确计算+调优方法论）
 
 ### 阅读
 
@@ -551,8 +551,8 @@ Host 流程：分配 → H2D → launch → sync → D2H → 与 CPU 结果对�
 
 ### 阅读
 
-- 回顾 [CUDA学习路线图.md](CUDA学习路线图.md) Week 1 验收项
-- 扫一眼 [项目清单.md](项目清单.md) P01、P02
+- 回顾 [CUDA学习路线图.md](../../../../docs/CUDA学习路线图.md) Week 1 验收项
+- 扫一眼 [项目清单.md](../../../../docs/项目清单.md) P01、P02
 
 ### 动手：目录自检
 
@@ -661,10 +661,10 @@ notes/
 
 ## 附录 C：下一步
 
-Week 1 完成后 → [CUDA学习路线图.md](CUDA学习路线图.md) **Week 2**（transpose、reduction、合并访问）
+Week 1 完成后 → [CUDA学习路线图.md](../../../../docs/CUDA学习路线图.md) **Week 2**（transpose、reduction、合并访问）
 
 如需生成 `device_query` 和 `mat_mul_naive` 代码骨架，可在对话中说：**帮我生成 Week 1 Step 05/09 代码骨架**。
 
 ---
 
-**返回**：[CUDA学习路线图.md](CUDA学习路线图.md)
+**返回**：[CUDA学习路线图.md](../../../../docs/CUDA学习路线图.md)
