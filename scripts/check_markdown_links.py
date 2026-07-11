@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Check relative links in Markdown files."""
+"""Check relative inline Markdown links in Markdown files.
+
+Supported syntax is single-line inline Markdown links. Images, fenced code
+blocks, external URLs, and anchor-only links are ignored. Reference-style
+links and multiline links are not supported.
+"""
 
 from __future__ import annotations
 
@@ -68,41 +73,44 @@ def destination(raw: str) -> str:
     return re.split(r"\s+", value, maxsplit=1)[0]
 
 
-def check_file(source: Path, root: Path) -> list[tuple[int, str, Path]]:
+def check_file(source: Path) -> list[tuple[int, str, Path]]:
     """Return broken links as (line, raw target, resolved path)."""
     broken: list[tuple[int, str, Path]] = []
     fence: tuple[str, int] | None = None
 
-    with source.open(encoding="utf-8") as handle:
-        for line_number, line in enumerate(handle, 1):
-            fence_match = FENCE_RE.match(line)
-            if fence_match:
-                marker = fence_match.group(1)
-                marker_char = marker[0]
-                if fence is None:
-                    fence = (marker_char, len(marker))
-                elif fence[0] == marker_char and len(marker) >= fence[1]:
-                    fence = None
-                continue
-            if fence is not None:
-                continue
-
-            for match in LINK_RE.finditer(line):
-                raw = match.group(1)
-                target = destination(raw)
-                if not target or target.startswith("#"):
+    try:
+        with source.open(encoding="utf-8") as handle:
+            for line_number, line in enumerate(handle, 1):
+                fence_match = FENCE_RE.match(line)
+                if fence_match:
+                    marker = fence_match.group(1)
+                    marker_char = marker[0]
+                    if fence is None:
+                        fence = (marker_char, len(marker))
+                    elif fence[0] == marker_char and len(marker) >= fence[1]:
+                        fence = None
+                    continue
+                if fence is not None:
                     continue
 
-                parsed = urlsplit(target)
-                if parsed.scheme.lower() in IGNORED_SCHEMES:
-                    continue
+                for match in LINK_RE.finditer(line):
+                    raw = match.group(1)
+                    target = destination(raw)
+                    if not target or target.startswith("#"):
+                        continue
 
-                link_path = unquote(parsed.path).replace("\\ ", " ")
-                if not link_path:
-                    continue
-                resolved = (source.parent / link_path).resolve()
-                if not resolved.exists():
-                    broken.append((line_number, raw, resolved))
+                    parsed = urlsplit(target)
+                    if parsed.scheme.lower() in IGNORED_SCHEMES:
+                        continue
+
+                    link_path = unquote(parsed.path).replace("\\ ", " ")
+                    if not link_path:
+                        continue
+                    resolved = (source.parent / link_path).resolve()
+                    if not resolved.exists():
+                        broken.append((line_number, raw, resolved))
+    except (OSError, UnicodeError) as error:
+        raise RuntimeError(f"cannot read Markdown file {source}: {error}") from None
 
     return broken
 
@@ -112,7 +120,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "paths",
         nargs="*",
-        help="Markdown files or directories (default: repository root)",
+        help="Markdown files or directories (default: current directory)",
     )
     parser.add_argument(
         "--exclude-prefix",
@@ -126,11 +134,37 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     root = Path(__file__).resolve().parent.parent
-    inputs = args.paths or [str(root)]
+    inputs = args.paths or ["."]
     broken: list[tuple[Path, int, str, Path]] = []
+    scanned = 0
+    had_input_error = False
+
+    for value in args.paths:
+        candidate = Path(value)
+        if not candidate.is_absolute():
+            candidate = Path.cwd() / candidate
+        candidate = candidate.resolve()
+        if not candidate.exists():
+            print(f"input path does not exist: {value}", file=sys.stderr)
+            had_input_error = True
+        elif not candidate.is_dir() and not (
+            candidate.is_file() and candidate.suffix.lower() == ".md"
+        ):
+            print(
+                f"input path is neither a Markdown file nor a directory: {value}",
+                file=sys.stderr,
+            )
+            had_input_error = True
 
     for source in markdown_files(inputs, root, args.exclude_prefix):
-        for line_number, raw, resolved in check_file(source, root):
+        scanned += 1
+        try:
+            file_broken = check_file(source)
+        except RuntimeError as error:
+            print(str(error), file=sys.stderr)
+            had_input_error = True
+            continue
+        for line_number, raw, resolved in file_broken:
             broken.append((source, line_number, raw, resolved))
             print(
                 f"{display_path(source, root)}:{line_number}: "
@@ -139,6 +173,13 @@ def main() -> int:
 
     if broken:
         print(f"broken relative Markdown targets: {len(broken)}", file=sys.stderr)
+        return 1
+
+    if had_input_error:
+        return 1
+
+    if scanned == 0:
+        print("no Markdown files were scanned", file=sys.stderr)
         return 1
 
     print("broken relative Markdown targets: 0")
