@@ -41,8 +41,8 @@ make && ./vec_add
 | [Occupancy详解_从入门到调优.md](docs/Occupancy详解_从入门到调优.md) | Occupancy 完整文档：基础(延迟隐藏)+ 进阶(精确计算/调优/profiler) |
 | [Programming_Model详解.md](docs/Programming_Model详解.md) | Programming Model 白话详解（配合 v13.x Part 1–2） |
 | [GPU架构图资源.md](docs/GPU架构图资源.md) | 官方架构图、Memory Hierarchy 等配图链接 |
-| [Week1详细步骤.md](docs/Week1详细步骤.md) | **Week 1 逐步清单**（含 v13.x 阅读章节 + Legacy 对照） |
-| [Week1_Day2-Day5学习清单.md](docs/Week1_Day2-Day5学习清单.md) | Week 1 **Day1–Day7** 可勾选清单（v13.x 对齐） |
+| [Week1详细步骤.md](study_plan/archive/legacy-8-week/week01/Week1详细步骤.md) | **Week 1 逐步清单**（含 v13.x 阅 读章节 + Legacy 对照） |
+| [Week1_Day2-Day5学习清单.md](study_plan/archive/legacy-8-week/week01/Week1_Day2-Day5学习清单.md) | Week 1 **Day1–Day7** 可勾选清单（v13.x 对齐） |
 | [学习资料索引.md](docs/学习资料索引.md) | 书籍、官方文档、课程、论文、工具链接 |
 | [GPU卡型专项学习指南.md](docs/GPU卡型专项学习指南.md) | T4/A100 差异、卡相关学习内容、分阶段清单 |
 | [T4实战指南.md](docs/T4实战指南.md) | T4 硬件特性、性能预期、实验建议 |

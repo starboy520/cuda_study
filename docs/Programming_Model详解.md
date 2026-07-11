@@ -533,7 +533,7 @@ Programming Model 是逻辑规则；`-arch=sm_75` 是把 kernel **编译成 T4 �
 | §9 | **2.5 Asynchronous Execution** | Ch.6 Async |
 
 **建议**：读完本文 §1–§8 后，再回官方 **2.1 + 2.3** 读一遍，会轻松很多。  
-Legacy 对照详见 [Week1详细步骤.md 附录 D](Week1详细步骤.md#附录-d新版-vs-legacy-章节对照查阅用)。
+Legacy 对照详见 [Week1详细步骤.md 附录 D](../study_plan/archive/legacy-8-week/week01/Week1详细步骤.md#附录-d新版-vs-legacy-章节对照查阅用)。
 
 ---
 
@@ -552,4 +552,4 @@ Legacy 对照详见 [Week1详细步骤.md 附录 D](Week1详细步骤.md#附录-
 
 ---
 
-**相关文档**：[Week1详细步骤.md](Week1详细步骤.md) · [notes/CUDA基础概念.md](../notes/CUDA基础概念.md) · [CUDA学习路线图.md](CUDA学习路线图.md)
+**相关文档**：[Week1详细步骤.md](../study_plan/archive/legacy-8-week/week01/Week1详细步骤.md) · [notes/CUDA基础概念.md](../notes/CUDA基础概念.md) · [CUDA学习路线图.md](CUDA学习路线图.md)

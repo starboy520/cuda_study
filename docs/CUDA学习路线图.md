@@ -22,14 +22,14 @@ CUDA 岗位通常要求的不只是 `__global__ void kernel()`，而是：
 
 > **官方文档说明（CUDA 13.x，最新结构）**  
 > 主教材为 [CUDA Programming Guide](https://docs.nvidia.com/cuda/cuda-programming-guide/)（5 部分结构，非旧版 `Ch.1–7`），官方最近更新（2026-05）已**完整发布 Part 3/4/5 全部小节**。  
-> 下文 **Programming Guide** 均指新版；完整小节清单与 Legacy 对照见 [Week1详细步骤.md 附录 D](Week1详细步骤.md#附录-d新版-vs-legacy-章节对照查阅用)。  
+> 下文 **Programming Guide** 均指新版；完整小节清单与 Legacy 对照见 [Week1详细 步骤.md 附录 D](../study_plan/archive/legacy-8-week/week01/Week1详细步骤.md#附录-d新版-vs-legacy-章节对照查阅用)。
 > **重要更正**：原子操作、`__syncthreads`/`__syncwarp`、warp shuffle、WMMA/Tensor Core 等的**权威定义现集中在 5.4 C/C++ Language Extensions**（旧计划误指到 2.3/3.2）。
 
 **Programming Guide v13.x 与 8 周路线速查（精确到小节）**
 
 | 周 | 官方章节（v13.x） | 本地文档 |
 |----|------------------|----------|
-| 1 | **Part 1** + **2.1** + **2.3**（分段）+ **2.5**（扫读）+ **2.7** + **5.1** | [Week1详细步骤](Week1详细步骤.md)、[每日清单](Week1_Day2-Day5学习清单.md) |
+| 1 | **Part 1** + **2.1** + **2.3**（分段）+ **2.5**（扫读）+ **2.7** + **5.1** | [Week1详细步骤](../study_plan/archive/legacy-8-week/week01/Week1详细步骤.md)、[每日清单](../study_plan/archive/legacy-8-week/week01/Week1_Day2-Day5学习清单.md) |
 | 2 | **2.3** Shared Memory / Coalescing / Transpose + **5.4.4** 同步原语 | [Week2详细步骤](../study_plan/archive/legacy-8-week/week02/Week2详细步骤.md) |
 | 3 | **2.5** Async 深入 + **5.4.5** Atomics + **5.4.6** Warp Functions（shuffle）+ **4.1** Unified Memory + **4.3** Stream-Ordered Allocator + **4.4** Cooperative Groups | Week 3 |
 | 4 | cuBLAS / Thrust + **3.1** Advanced CUDA APIs（浏览）+ **3.5** Tour of CUDA Features | Week 4 |
@@ -101,7 +101,7 @@ Week 8  面试冲刺           → 四大手写题默写 + 概念题 + 模拟面
 1. [Programming_Model详解.md](Programming_Model详解.md) §1–§8（本地，建议 Day 1 先读）
 2. [CUDA Programming Guide v13.x](https://docs.nvidia.com/cuda/cuda-programming-guide/) — **1. Introduction to CUDA**（1.1–1.3）
 3. 同上 — **2.1 Intro to CUDA C++**（Day 1–2 主战场）
-4. 同上 — **2.3 Writing SIMT Kernels**（Day 3/6/7 分段读，见 [Week1详细步骤.md](Week1详细步骤.md) 阅读边界）
+4. 同上 — **2.3 Writing SIMT Kernels**（Day 3/6/7 分段读，见 [Week1详细步骤.md](../study_plan/archive/legacy-8-week/week01/Week1详细步骤.md) 阅读边界）
 5. 同上 — **2.5 Asynchronous Execution**（Day 2 扫读，Week 3 深入 Stream）
 6. 同上 — **2.7 NVCC**（Day 4）
 7. 同上 — **5.1 Compute Capabilities**（Day 3 浏览）
@@ -127,7 +127,7 @@ Week 8  面试冲刺           → 四大手写题默写 + 概念题 + 模拟面
 
 - `week01_basics/` 代码 + `notes/week01.md`（含 GFLOPS 表格）
 
-**逐步清单**：[Week1详细步骤.md](Week1详细步骤.md)（12 Step）· [Week1_Day2-Day5学习清单.md](Week1_Day2-Day5学习清单.md)（Day1–Day7 可勾选）
+**逐步清单**：[Week1详细步骤.md](../study_plan/archive/legacy-8-week/week01/Week1详细步骤.md)（12 Step）· [Week1_Day2-Day5学习清单.md](../study_plan/archive/legacy-8-week/week01/Week1_Day2-Day5学习清单.md)（Day1–Day7 可勾选）
 
 ---
 
@@ -479,4 +479,4 @@ flowchart TB
 
 ---
 
-**配套文档**：[学习资料索引.md](学习资料索引.md) · [GPU卡型专项学习指南.md](GPU卡型专项学习指南.md) · [T4实战指南.md](T4实战指南.md) · [项目清单.md](项目清单.md) · [Week1详细步骤.md](Week1详细步骤.md)（v13.x 章节 + Legacy 对照）
+**配套文档**：[学习资料索引.md](学习资料索引.md) · [GPU卡型专项学习指南.md](GPU卡型专项学习指南.md) · [T4实战指南.md](T4实战指南.md) · [项目清单.md](项目清单.md) · [Week1详细步骤.md](../study_plan/archive/legacy-8-week/week01/Week1详细步骤.md)（v13.x 章节 + Legacy 对照）
