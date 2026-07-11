@@ -12,14 +12,14 @@ import argparse
 import re
 import sys
 from pathlib import Path
-from urllib.parse import unquote, urlsplit
+from urllib.parse import unquote, urlparse
 
 
 LINK_RE = re.compile(
     r"(?<!!)\[[^\]\n]*\]\(\s*(<[^>\n]*>|(?:\\.|[^()\n]|\([^()\n]*\))+?)\s*\)"
 )
 FENCE_RE = re.compile(r"^\s*(`{3,}|~{3,})")
-IGNORED_SCHEMES = {"http", "https", "mailto", "tel"}
+WINDOWS_DRIVE_PATH_RE = re.compile(r"^[A-Za-z]:[\\/]")
 
 
 def display_path(path: Path, root: Path) -> str:
@@ -99,8 +99,8 @@ def check_file(source: Path) -> list[tuple[int, str, Path]]:
                     if not target or target.startswith("#"):
                         continue
 
-                    parsed = urlsplit(target)
-                    if parsed.scheme.lower() in IGNORED_SCHEMES:
+                    parsed = urlparse(target)
+                    if parsed.scheme and not WINDOWS_DRIVE_PATH_RE.match(target):
                         continue
 
                     link_path = unquote(parsed.path).replace("\\ ", " ")
