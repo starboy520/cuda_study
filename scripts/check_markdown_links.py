@@ -20,6 +20,7 @@ LINK_RE = re.compile(
 )
 FENCE_RE = re.compile(r"^\s*(`{3,}|~{3,})")
 WINDOWS_DRIVE_PATH_RE = re.compile(r"^[A-Za-z]:[\\/]")
+WINDOWS_DRIVE_RELATIVE_PATH_RE = re.compile(r"^[A-Za-z]:[^\\/]")
 
 
 def display_path(path: Path, root: Path) -> str:
@@ -50,7 +51,10 @@ def markdown_files(inputs: list[str], root: Path, prefixes: list[str]):
         candidate = candidate.resolve()
 
         if candidate.is_dir():
-            paths = sorted(candidate.rglob("*.md"))
+            paths = sorted(
+                path for path in candidate.rglob("*")
+                if path.is_file() and path.suffix.lower() == ".md"
+            )
         elif candidate.is_file() and candidate.suffix.lower() == ".md":
             paths = [candidate]
         else:
@@ -73,9 +77,12 @@ def destination(raw: str) -> str:
     return re.split(r"\s+", value, maxsplit=1)[0]
 
 
-def check_file(source: Path) -> list[tuple[int, str, Path]]:
-    """Return broken links as (line, raw target, resolved path)."""
+def check_file(
+    source: Path,
+) -> tuple[list[tuple[int, str, Path]], list[tuple[int, str, str]]]:
+    """Return broken links and input errors found in one Markdown file."""
     broken: list[tuple[int, str, Path]] = []
+    input_errors: list[tuple[int, str, str]] = []
     fence: tuple[str, int] | None = None
 
     try:
@@ -99,11 +106,32 @@ def check_file(source: Path) -> list[tuple[int, str, Path]]:
                     if not target or target.startswith("#"):
                         continue
 
-                    parsed = urlparse(target)
-                    if parsed.scheme and not WINDOWS_DRIVE_PATH_RE.match(target):
+                    if WINDOWS_DRIVE_PATH_RE.match(target):
+                        input_errors.append(
+                            (
+                                line_number,
+                                raw,
+                                "Windows absolute local paths are not checkable",
+                            )
+                        )
                         continue
 
-                    link_path = unquote(parsed.path).replace("\\ ", " ")
+                    is_drive_relative = bool(
+                        WINDOWS_DRIVE_RELATIVE_PATH_RE.match(target)
+                    )
+                    try:
+                        parsed = urlparse(target)
+                    except ValueError as error:
+                        input_errors.append(
+                            (line_number, raw, f"invalid URI: {error}")
+                        )
+                        continue
+
+                    if parsed.scheme and not is_drive_relative:
+                        continue
+
+                    link_path = target if is_drive_relative else parsed.path
+                    link_path = unquote(link_path).replace("\\ ", " ")
                     if not link_path:
                         continue
                     resolved = (source.parent / link_path).resolve()
@@ -112,7 +140,7 @@ def check_file(source: Path) -> list[tuple[int, str, Path]]:
     except (OSError, UnicodeError) as error:
         raise RuntimeError(f"cannot read Markdown file {source}: {error}") from None
 
-    return broken
+    return broken, input_errors
 
 
 def parse_args() -> argparse.Namespace:
@@ -120,7 +148,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "paths",
         nargs="*",
-        help="Markdown files or directories (default: current directory)",
+        help="Markdown files or directories (default: repository root)",
     )
     parser.add_argument(
         "--exclude-prefix",
@@ -134,8 +162,9 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     root = Path(__file__).resolve().parent.parent
-    inputs = args.paths or ["."]
+    inputs = args.paths or [str(root)]
     broken: list[tuple[Path, int, str, Path]] = []
+    input_errors: list[tuple[Path, int, str, str]] = []
     scanned = 0
     had_input_error = False
 
@@ -146,6 +175,7 @@ def main() -> int:
         candidate = candidate.resolve()
         if not candidate.exists():
             print(f"input path does not exist: {value}", file=sys.stderr)
+            input_errors.append((candidate, 0, value, "input path does not exist"))
             had_input_error = True
         elif not candidate.is_dir() and not (
             candidate.is_file() and candidate.suffix.lower() == ".md"
@@ -154,15 +184,23 @@ def main() -> int:
                 f"input path is neither a Markdown file nor a directory: {value}",
                 file=sys.stderr,
             )
+            input_errors.append(
+                (
+                    candidate,
+                    0,
+                    value,
+                    "input path is neither a Markdown file nor a directory",
+                )
+            )
             had_input_error = True
 
     for source in markdown_files(inputs, root, args.exclude_prefix):
         scanned += 1
         try:
-            file_broken = check_file(source)
+            file_broken, file_input_errors = check_file(source)
         except RuntimeError as error:
             print(str(error), file=sys.stderr)
-            had_input_error = True
+            input_errors.append((source, 0, "", str(error)))
             continue
         for line_number, raw, resolved in file_broken:
             broken.append((source, line_number, raw, resolved))
@@ -171,8 +209,21 @@ def main() -> int:
                 f"{raw} -> {display_path(resolved, root)}"
             )
 
+        for line_number, raw, reason in file_input_errors:
+            input_errors.append((source, line_number, raw, reason))
+            print(
+                f"{display_path(source, root)}:{line_number}: "
+                f"{raw}: {reason}",
+                file=sys.stderr,
+            )
+
+    had_input_error = had_input_error or bool(input_errors)
+
+    print(f"broken relative Markdown targets: {len(broken)}", file=sys.stderr)
+    if input_errors:
+        print(f"checker input errors: {len(input_errors)}", file=sys.stderr)
+
     if broken:
-        print(f"broken relative Markdown targets: {len(broken)}", file=sys.stderr)
         return 1
 
     if had_input_error:
@@ -182,7 +233,6 @@ def main() -> int:
         print("no Markdown files were scanned", file=sys.stderr)
         return 1
 
-    print("broken relative Markdown targets: 0")
     return 0
 
 
