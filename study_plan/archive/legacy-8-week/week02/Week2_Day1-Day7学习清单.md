@@ -57,9 +57,9 @@ Day7  性能表定稿 + compute-sanitizer（选做）+ Week 2 复盘
 ### 需要看的资料
 
 - [ ] Programming Guide **2.3** — 页内搜 `Global Memory`、`Shared Memory`
-- [ ] [Programming_Model详解.md](../../../../docs/Programming_Model详解.md) — Memory 相关小节
+- [ ] [Programming_Model详解.md](../../../../docs/courses/cuda/Programming_Model详解.md) — Memory 相关小节
 - [ ] [Best Practices Guide — Memory Optimizations](https://docs.nvidia.com/cuda/cuda-c-best-practices-guide/index.html) 前半（Coalescing 段）
-- [ ] [GPU架构图资源.md](../../../../docs/GPU架构图资源.md) — Memory Hierarchy 图
+- [ ] [GPU架构图资源.md](../../../../docs/reference/GPU架构图资源.md) — Memory Hierarchy 图
 - [ ] [T4实战指南.md](../../../../docs/archive/hardware/T4实战指南.md) — 300 GB/s 带宽、48 KB shared/block
 
 ### 动手步骤
@@ -363,7 +363,7 @@ nvcc -O3 -arch=sm_75 -std=c++14 -o reduction reduction.cu
 ### 需要看的资料
 
 - [ ] [T4实战指南.md](../../../../docs/archive/hardware/T4实战指南.md) — 转置带宽预期
-- [ ] [项目清单.md](../../../../docs/项目清单.md) — P03、P04 验收
+- [ ] [项目清单.md](../../../../docs/reference/项目清单.md) — P03、P04 验收
 - [ ] [CUDA学习路线图.md](../../../../docs/archive/curricula/CUDA学习路线图_legacy.md) — Week 3 预览
 
 ### 动手步骤

@@ -32,17 +32,17 @@
 
 | 维度 | 仓库中的具体证据 | 仓库覆盖与个人验收 |
 | --- | --- | --- |
-| 执行模型 | [Week 3 记录](../notes/week03.md#三个硬核结论面试素材)展示 grid-stride、block/warp 分层归约和单 block 上限；同一记录还区分硬件容量限制与算法上限。 | 仓库已覆盖线程层次、同步和 grid-stride。个人验收：闭卷画出执行层次，并解释 warp 调度、ILP/TLP、occupancy 与 latency hiding 的关系。 |
-| 内存 | [Reduction 记录](../notes/week03.md#三个硬核结论面试素材)显示 N=16M 的手写版在 T4 上约 0.44 ms，并追平当时的 CUB 对照；输入为 float，单次读取约 64 MiB，旧笔记把流量记为 128 MB 并据此声称 91% 峰值带宽，字节口径不恰当或未说明，不能作为掌握证据。[GEMM 记录](../week05_gemm_advanced/benchmark.md#结论关键认知)还包含 padding、bank conflict 与 float4 的取舍。 | 仓库已覆盖 coalescing、shared memory、padding 和向量化。个人验收：按实际读写流量重新跑 reduction 并计算有效带宽，再从地址推导 transaction/bank 映射；不得沿用旧 91% 结论。 |
-| 并行算法 | [Week3 性能总表（T4，全部 PASS）](../notes/week03.md)汇总 reduction 追平 CUB、scan 与 histogram 的历史结果。 | 仓库已记录 reduction/scan/histogram 多版实现。个人验收：从空白限时写核心版本，完成 reference 对拍，并覆盖任意尺寸和边界输入。 |
-| GEMM | [Week2 Day1：float4 向量化 load（A100, 2048）](../week05_gemm_advanced/benchmark.md)记录 A100、M=N=K=2048 下 float4 global load 配合 padded shared 达到 **12681 GFLOPS**，并保留去 padding 后性能倒退的反例。 | 仓库已覆盖 tiling、寄存器复用、向量化和 bank conflict 优化链。个人验收：闭卷重建关键索引，重新跑正确性与性能，并用 ncu 和资源数据解释有效或失效的原因。 |
-| Tensor Core | [教学版 WMMA benchmark](../week06_tensorcore/tensor_core_profile.md)记录 A100 80GB、FP16 输入/FP32 累加、M=N=K=1024 下 **16484 GFLOPS**；[SASS 证据](../week06_tensorcore/tensor_core_profile.md#2-证据一sass-有-hmma-指令用了-tensor-core)找到 `HMMA.16816.F32`。 | 仓库已覆盖 WMMA 与 HMMA 取证。个人验收：重跑 API、SASS、性能三重证据，闭卷解释 fragment、`ldmatrix`/`mma.sync`、精度语义及访存瓶颈。 |
-| Attention | [Attention 流水记录](../week04_attention/ncu_pipeline_notes.md#怎么读)记录 A100、N=128、D=64 的 ncu 对比：`cp.async` 双缓冲后 long scoreboard 指标从 6.40 降至 0.03（**下降 99.5%**），short scoreboard 基本不变；该小 grid 填不满 A100，指标改善不代表墙钟同比加速。 | 仓库已覆盖 Online Softmax、教学版 Attention 与异步流水材料。个人验收：从空白重建数据流、稳定性和 causal 边界，重跑对照并同时报告 stall、吞吐与墙钟限制。 |
-| profiling | [GEMM ncu 笔记](../week05_gemm_advanced/ncu_notes.md#面试口述day-4)记录 A100、M=N=K=1024 profile 中 4.8-way bank conflict 及修复后的吞吐、周期变化；[Attention 对比](../week04_attention/ncu_pipeline_notes.md#精确-stall-指标)保留具体 stall 指标。 | 仓库已覆盖一条“假设—定位—修复—验证”链。个人验收：给定未知 kernel 独立选择指标，识别 replay/锁频干扰，并闭卷把指标变化连成可证伪的因果链。 |
-| 系统工程 | [Week 5 记录](../notes/week05.md#day-22026-07-07gemv-一线程一-warp-一行)包含 A100 上的 CPU 对拍、CUDA Event 计时和 memcheck 0 errors；设计基线还覆盖 stream、pinned memory 与错误检查。 | 仓库已记录正确性与计时框架。个人验收：为新写 kernel 独立加入边界 shape、重复运行、异步错误检查和 Compute Sanitizer，并说明结果不可比的情形。 |
-| 底层指令 | [Tensor Core profile](../week06_tensorcore/tensor_core_profile.md#2-证据一sass-有-hmma-指令用了-tensor-core)记录通过 `cuobjdump` 找到 HMMA；[设计说明](superpowers/specs/2026-07-08-cuda-interview-14-day-sprint-design.md#2-用户与前置基础)将 PTX/SASS、warp MMA、调度与 stall 列为主要缺口。 | 仓库的底层指令证据仍是点状材料。个人验收：从 CUDA C++ 沿数据流定位关键 PTX/SASS，并闭卷解释寄存器、spill、scoreboard 与关键指令。 |
-| 面试表达 | 多份记录包含“一段口述”，例如 [GEMM 反例复盘](../week05_gemm_advanced/benchmark.md#面试口述)和 [WMMA 三重证据](../week06_tensorcore/tensor_core_profile.md#7-面试口述)。 | 仓库已提供口述素材，但不证明本人能脱稿应答。个人验收：录制 2～5 分钟日答和 5/10 分钟项目版，并接受追问、反例和适用边界检查。 |
-| 推理与 GEMV | [Week 5 GEMV 性能对比（N=4096 K=4096）](../notes/week05.md)记录 A100、N=K=4096 下 warp-per-row 相比 thread-per-row 约 **19 倍**提速，带宽从 72 GB/s 到 1360 GB/s。 | 仓库已覆盖 decode memory-bound 与合并访问案例。个人验收：从空白写 warp-per-row、重新对拍和计时，并闭卷说明误差变化及继续向量化收益有限的条件。 |
+| 执行模型 | [Week 3 记录](../../notes/week03.md#三个硬核结论面试素材)展示 grid-stride、block/warp 分层归约和单 block 上限；同一记录还区分硬件容量限制与算法上限。 | 仓库已覆盖线程层次、同步和 grid-stride。个人验收：闭卷画出执行层次，并解释 warp 调度、ILP/TLP、occupancy 与 latency hiding 的关系。 |
+| 内存 | [Reduction 记录](../../notes/week03.md#三个硬核结论面试素材)显示 N=16M 的手写版在 T4 上约 0.44 ms，并追平当时的 CUB 对照；输入为 float，单次读取约 64 MiB，旧笔记把流量记为 128 MB 并据此声称 91% 峰值带宽，字节口径不恰当或未说明，不能作为掌握证据。[GEMM 记录](../../week05_gemm_advanced/benchmark.md#结论关键认知)还包含 padding、bank conflict 与 float4 的取舍。 | 仓库已覆盖 coalescing、shared memory、padding 和向量化。个人验收：按实际读写流量重新跑 reduction 并计算有效带宽，再从地址推导 transaction/bank 映射；不得沿用旧 91% 结论。 |
+| 并行算法 | [Week3 性能总表（T4，全部 PASS）](../../notes/week03.md)汇总 reduction 追平 CUB、scan 与 histogram 的历史结果。 | 仓库已记录 reduction/scan/histogram 多版实现。个人验收：从空白限时写核心版本，完成 reference 对拍，并覆盖任意尺寸和边界输入。 |
+| GEMM | [Week2 Day1：float4 向量化 load（A100, 2048）](../../week05_gemm_advanced/benchmark.md)记录 A100、M=N=K=2048 下 float4 global load 配合 padded shared 达到 **12681 GFLOPS**，并保留去 padding 后性能倒退的反例。 | 仓库已覆盖 tiling、寄存器复用、向量化和 bank conflict 优化链。个人验收：闭卷重建关键索引，重新跑正确性与性能，并用 ncu 和资源数据解释有效或失效的原因。 |
+| Tensor Core | [教学版 WMMA benchmark](../../week06_tensorcore/tensor_core_profile.md)记录 A100 80GB、FP16 输入/FP32 累加、M=N=K=1024 下 **16484 GFLOPS**；[SASS 证据](../../week06_tensorcore/tensor_core_profile.md#2-证据一sass-有-hmma-指令用了-tensor-core)找到 `HMMA.16816.F32`。 | 仓库已覆盖 WMMA 与 HMMA 取证。个人验收：重跑 API、SASS、性能三重证据，闭卷解释 fragment、`ldmatrix`/`mma.sync`、精度语义及访存瓶颈。 |
+| Attention | [Attention 流水记录](../../week04_attention/ncu_pipeline_notes.md#怎么读)记录 A100、N=128、D=64 的 ncu 对比：`cp.async` 双缓冲后 long scoreboard 指标从 6.40 降至 0.03（**下降 99.5%**），short scoreboard 基本不变；该小 grid 填不满 A100，指标改善不代表墙钟同比加速。 | 仓库已覆盖 Online Softmax、教学版 Attention 与异步流水材料。个人验收：从空白重建数据流、稳定性和 causal 边界，重跑对照并同时报告 stall、吞吐与墙钟限制。 |
+| profiling | [GEMM ncu 笔记](../../week05_gemm_advanced/ncu_notes.md#面试口述day-4)记录 A100、M=N=K=1024 profile 中 4.8-way bank conflict 及修复后的吞吐、周期变化；[Attention 对比](../../week04_attention/ncu_pipeline_notes.md#精确-stall-指标)保留具体 stall 指标。 | 仓库已覆盖一条“假设—定位—修复—验证”链。个人验收：给定未知 kernel 独立选择指标，识别 replay/锁频干扰，并闭卷把指标变化连成可证伪的因果链。 |
+| 系统工程 | [Week 5 记录](../../notes/week05.md#day-22026-07-07gemv-一线程一-warp-一行)包含 A100 上的 CPU 对拍、CUDA Event 计时和 memcheck 0 errors；设计基线还覆盖 stream、pinned memory 与错误检查。 | 仓库已记录正确性与计时框架。个人验收：为新写 kernel 独立加入边界 shape、重复运行、异步错误检查和 Compute Sanitizer，并说明结果不可比的情形。 |
+| 底层指令 | [Tensor Core profile](../../week06_tensorcore/tensor_core_profile.md#2-证据一sass-有-hmma-指令用了-tensor-core)记录通过 `cuobjdump` 找到 HMMA；[设计说明](../archive/superpowers/specs/2026-07-08-cuda-interview-14-day-sprint-design.md#2-用户与前置基础)将 PTX/SASS、warp MMA、调度与 stall 列为主要缺口。 | 仓库的底层指令证据仍是点状材料。个人验收：从 CUDA C++ 沿数据流定位关键 PTX/SASS，并闭卷解释寄存器、spill、scoreboard 与关键指令。 |
+| 面试表达 | 多份记录包含“一段口述”，例如 [GEMM 反例复盘](../../week05_gemm_advanced/benchmark.md#面试口述)和 [WMMA 三重证据](../../week06_tensorcore/tensor_core_profile.md#7-面试口述)。 | 仓库已提供口述素材，但不证明本人能脱稿应答。个人验收：录制 2～5 分钟日答和 5/10 分钟项目版，并接受追问、反例和适用边界检查。 |
+| 推理与 GEMV | [Week 5 GEMV 性能对比（N=4096 K=4096）](../../notes/week05.md)记录 A100、N=K=4096 下 warp-per-row 相比 thread-per-row 约 **19 倍**提速，带宽从 72 GB/s 到 1360 GB/s。 | 仓库已覆盖 decode memory-bound 与合并访问案例。个人验收：从空白写 warp-per-row、重新对拍和计时，并闭卷说明误差变化及继续向量化收益有限的条件。 |
 
 ## 优先级规则
 
@@ -149,7 +149,7 @@ Day 12～14 薄弱项回补 → 限时编码与诊断 → 项目追问 → 完�
 | 1.5 小时 | 沿 kernel 找参数、load、FFMA、store，记录源行与指令类别 | 四段对照摘录 |
 | 1.5 小时 | 闭卷验收与 3 分钟录音；失败则在本时段重做 | 答题纸、录音、失败清单 |
 
-**必读仓库资料**：[主教材 3. Day 1：CUDA C++、PTX、SASS 不是同一层](CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md)、[naive GEMM](../week04_gemm/gemm_naive/gemm_naive.cu)。
+**必读仓库资料**：[主教材 3. Day 1：CUDA C++、PTX、SASS 不是同一层](../topics/performance/CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md)、[naive GEMM](../../week04_gemm/gemm_naive/gemm_naive.cu)。
 
 **分步实验**：
 
@@ -182,7 +182,7 @@ Day 12～14 薄弱项回补 → 限时编码与诊断 → 项目追问 → 完�
 | 1 小时 | 填观察表，横向比较 load/shared/FFMA/HMMA/control/store | `instruction_observation.md` |
 | 1 小时 | 闭卷验收和 3 分钟口述 | 答题纸、录音索引 |
 
-**必读仓库资料**：[主教材 4. Day 2：怎样开始读 PTX 与 SASS](CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md)、[naive](../week04_gemm/gemm_naive/gemm_naive.cu)、[shared tiled](../week04_gemm/gemm_tiled/gemm_tiled.cu)、[register tiling](../week05_gemm_advanced/gemm_2d_thread_tiling.cu)、[`float4`](../week05_gemm_advanced/gemm_vectorized_load.cu)、[WMMA](../week06_tensorcore/wmma_fp16_gemm.cu)。
+**必读仓库资料**：[主教材 4. Day 2：怎样开始读 PTX 与 SASS](../topics/performance/CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md)、[naive](../../week04_gemm/gemm_naive/gemm_naive.cu)、[shared tiled](../../week04_gemm/gemm_tiled/gemm_tiled.cu)、[register tiling](../../week05_gemm_advanced/gemm_2d_thread_tiling.cu)、[`float4`](../../week05_gemm_advanced/gemm_vectorized_load.cu)、[WMMA](../../week06_tensorcore/wmma_fp16_gemm.cu)。
 
 **分步实验**：
 
@@ -217,7 +217,7 @@ Day 12～14 薄弱项回补 → 限时编码与诊断 → 项目追问 → 完�
 | 1.5 小时 | ncu local traffic、`float4` 对齐与宽 load 验证 | `.ncu-rep`、宽访存结论 |
 | 1.5 小时 | 复测墙钟、闭卷与口述 | 对照表、答题纸、录音 |
 
-**必读仓库资料**：[主教材 5. Day 3：寄存器、spill 与向量化](CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md)、[register tiling](../week05_gemm_advanced/gemm_2d_thread_tiling.cu)、[`float4` 版本](../week05_gemm_advanced/gemm_vectorized_load.cu)、[GEMM ncu 笔记](../week05_gemm_advanced/ncu_notes.md)。
+**必读仓库资料**：[主教材 5. Day 3：寄存器、spill 与向量化](../topics/performance/CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md)、[register tiling](../../week05_gemm_advanced/gemm_2d_thread_tiling.cu)、[`float4` 版本](../../week05_gemm_advanced/gemm_vectorized_load.cu)、[GEMM ncu 笔记](../../week05_gemm_advanced/ncu_notes.md)。
 
 **分步实验**：
 
@@ -251,7 +251,7 @@ Day 12～14 薄弱项回补 → 限时编码与诊断 → 项目追问 → 完�
 | 1.5 小时 | 提出一个假设，做唯一代码/参数修改并复测 | before/after 证据 |
 | 1.5 小时 | 写短报告、闭卷、4 分钟口述 | `day04_diagnosis.md`、录音 |
 
-**必读仓库资料**：[主教材 12. Day 10：为什么“有很多 warp”仍可能发不出指令](CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md)、[主教材 13. Day 11：怎样读 Warp Stall](CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md)、[GEMM ncu 笔记](../week05_gemm_advanced/ncu_notes.md)、[Attention 流水笔记](../week04_attention/ncu_pipeline_notes.md)。
+**必读仓库资料**：[主教材 12. Day 10：为什么“有很多 warp”仍可能发不出指令](../topics/performance/CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md)、[主教材 13. Day 11：怎样读 Warp Stall](../topics/performance/CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md)、[GEMM ncu 笔记](../../week05_gemm_advanced/ncu_notes.md)、[Attention 流水笔记](../../week04_attention/ncu_pipeline_notes.md)。
 
 **分步实验**：
 
@@ -284,7 +284,7 @@ Day 12～14 薄弱项回补 → 限时编码与诊断 → 项目追问 → 完�
 | 1 小时 | 导出 PTX/SASS，定位 `ldmatrix`/`mma.sync`/HMMA | 指令摘录 |
 | 1 小时 | 闭卷与 4 分钟口述 | 答题纸、录音 |
 
-**必读仓库资料**：[主教材 6. Day 4：WMMA、PTX MMA、SASS HMMA 的关系](CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md)、[7. Day 5：`ldmatrix` 到底解决什么](CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md)、[8. Day 6：最小 `mma.sync` microkernel](CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md)、[WMMA GEMM](../week06_tensorcore/wmma_fp16_gemm.cu)。
+**必读仓库资料**：[主教材 6. Day 4：WMMA、PTX MMA、SASS HMMA 的关系](../topics/performance/CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md)、[7. Day 5：`ldmatrix` 到底解决什么](../topics/performance/CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md)、[8. Day 6：最小 `mma.sync` microkernel](../topics/performance/CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md)、[WMMA GEMM](../../week06_tensorcore/wmma_fp16_gemm.cu)。
 
 **分步实验**：
 
@@ -332,7 +332,7 @@ Day 5 补考模式（总计 8 小时）：
 
 补考模式只压缩重复阅读、扩展实验和报告美化，不删除 raw PTX/API 区分、正确 3-stage、边界正确性或 sync/2-stage/3-stage 三版证据。压缩后任一硬验收仍未完成，Day 6 判定未通过并按通用补考规则处理。
 
-**必读仓库资料**：[主教材 9. Day 7：`cp.async` 状态机](CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md)、[10. Day 8：2-stage 与 3-stage](CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md)、[11. Day 9：流水性能证据](CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md)、[double buffering 模板](../week05_gemm_advanced/gem_double_buffering.cu)、[Attention 流水笔记](../week04_attention/ncu_pipeline_notes.md)。
+**必读仓库资料**：[主教材 9. Day 7：`cp.async` 状态机](../topics/performance/CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md)、[10. Day 8：2-stage 与 3-stage](../topics/performance/CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md)、[11. Day 9：流水性能证据](../topics/performance/CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md)、[double buffering 模板](../../week05_gemm_advanced/gem_double_buffering.cu)、[Attention 流水笔记](../../week04_attention/ncu_pipeline_notes.md)。
 
 **分步实验**：
 
@@ -367,13 +367,13 @@ Day 5 补考模式（总计 8 小时）：
 | 2.5 小时 | A100 基线→单一修改→复测，采集五层证据 | 两组可复核产物 |
 | 1.5 小时 | 写综合报告、闭卷和 5 分钟口述 | `day07_integrated_report.md`、录音 |
 
-**必读仓库资料**：[主教材 14. Day 12：Hopper 不是“把 A100 每项都加宽”](CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md)、[TMA](CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md)、[WGMMA](CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md)、[Thread Block Cluster 与 DSM](CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md)、[综合报告模板](CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md)、[GEMM ncu 笔记](../week05_gemm_advanced/ncu_notes.md)、[Attention ncu 笔记](../week04_attention/ncu_pipeline_notes.md)。
+**必读仓库资料**：[主教材 14. Day 12：Hopper 不是“把 A100 每项都加宽”](../topics/performance/CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md)、[TMA](../topics/performance/CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md)、[WGMMA](../topics/performance/CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md)、[Thread Block Cluster 与 DSM](../topics/performance/CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md)、[综合报告模板](../topics/performance/CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md)、[GEMM ncu 笔记](../../week05_gemm_advanced/ncu_notes.md)、[Attention ncu 笔记](../../week04_attention/ncu_pipeline_notes.md)。
 
 **分步实验**：
 
 1. 画两条主循环：Ampere 由线程/warp 发 `cp.async` 到 shared、warp 以 `ldmatrix + mma.sync` 消费；Hopper 由 descriptor 驱动 TMA bulk tensor copy、以 transaction-aware barrier 管 stage、warp-group 发异步 WGMMA。注明具体 WGMMA 变体可能要求 `sm_90a`，不写未经本机验证的通用编译命令。
 2. 口述 Cluster 保证同一 GPC 内一组 CTA 协作，DSM 是 cluster 内各 CTA shared 的分布式地址空间，不是全 GPU shared/自动缓存；warp specialization 是 producer/consumer 角色分工，不保证天然更快。
-3. 下午二选一：GEMM 可用 [register tiling](../week05_gemm_advanced/gemm_2d_thread_tiling.cu)；Attention 可沿 [现有流水记录](../week04_attention/ncu_pipeline_notes.md) 选其对应对象。把可运行版本复制到 `/tmp/cuda_interview_sprint/day07/`，冻结硬件、shape、输入、编译参数、正常计时和 ncu sections。
+3. 下午二选一：GEMM 可用 [register tiling](../../week05_gemm_advanced/gemm_2d_thread_tiling.cu)；Attention 可沿 [现有流水记录](../../week04_attention/ncu_pipeline_notes.md) 选其对应对象。把可运行版本复制到 `/tmp/cuda_interview_sprint/day07/`，冻结硬件、shape、输入、编译参数、正常计时和 ncu sections。
 4. 基线依次留源码数据流、`-Xptxas=-v` 资源、关键 SASS、正常墙钟与 ncu；基于证据提出一个可证伪假设，只改一个因素（如 accumulator 独立性、padding 或 stage 数），重新做正确性和同组采集。
 5. 报告结尾写 Hopper 迁移判断：哪些 copy 可能适合 TMA、哪些 warp MMA 可能重构为 WGMMA、是否真的需要 Cluster/DSM；全部标为语义/设计判断，不写 H100 实测数字。
 
@@ -404,7 +404,7 @@ Day 5 补考模式（总计 8 小时）：
 
 **必要时补考模式（总计 8 小时，含前日最多 1.5 小时）**：1.5 小时只补 Day 7 最小失败项；1 小时 reference/测试契约；1.75 小时 reduction 两版；1.75 小时 transpose naive/shared/padding；1 小时 sanitizer 与可靠计时；0.5 小时证据摘要；0.5 小时闭卷与口述。压缩来源是额外参数扫描、Roofline 排版和优化复测次数，不删除核心正确性或概念、代码、证据、面试四类输出。
 
-**必读仓库资料**：[完整 reduction](../week03_parallel/reduction_sum_full/reduction_sum_full.cu)、[Week 3 记录](../notes/week03.md)、[operator practice transpose](../operator_practice/transpose/transpose.cu)、[Week 2 transpose](../week02_memory/transpose/transpose.cu)。只在首轮独立实现和失败定位之后对照，禁止边看边抄。
+**必读仓库资料**：[完整 reduction](../../week03_parallel/reduction_sum_full/reduction_sum_full.cu)、[Week 3 记录](../../notes/week03.md)、[operator practice transpose](../../operator_practice/transpose/transpose.cu)、[Week 2 transpose](../../week02_memory/transpose/transpose.cu)。只在首轮独立实现和失败定位之后对照，禁止边看边抄。
 
 **分步练习**：
 
@@ -444,7 +444,7 @@ Day 5 补考模式（总计 8 小时）：
 
 **必要时补考模式（总计 8 小时，含前日最多 1.5 小时）**：1.5 小时补 Day 8；0.5 小时测试契约；1.5 小时 softmax；1.5 小时 warp-per-row GEMV；1.5 小时 RMSNorm；1 小时三项 sanitizer/边界汇总；0.5 小时闭卷与口述。压缩掉 thread-per-row、性能比较、融合和排版；若无补考，释放的 1.5 小时才用于这些尽量项。
 
-**必读仓库资料**：[softmax](../week04_gemm/softmax/softmax.cu)、[已跟踪 GEMV](../week05_inference/gemv.cu)、[Week 5 decode 教材](Week5增强版_LLM推理优化与decode.md)、[LayerNorm/RMSNorm 与融合教材](../cuda_deep_course/course/volume06_operators/05_LayerNorm_RMSNorm与融合.md)。只在独立版本完成或卡点复盘时阅读核心实现。
+**必读仓库资料**：[softmax](../../week04_gemm/softmax/softmax.cu)、[已跟踪 GEMV](../../week05_inference/gemv.cu)、[Week 5 decode 教材](../courses/inference/Week5增强版_LLM推理优化与decode.md)、[LayerNorm/RMSNorm 与融合教材](../../cuda_deep_course/course/volume06_operators/05_LayerNorm_RMSNorm与融合.md)。只在独立版本完成或卡点复盘时阅读核心实现。
 
 **分步练习**：
 
@@ -481,7 +481,7 @@ Day 5 补考模式（总计 8 小时）：
 
 **必要时补考模式（总计 8 小时，含前日最多 1.5 小时）**：1.5 小时补 Day 9；2 小时 tiled GEMM 正确性；1.25 小时 Graph 基本状态机；1.75 小时 Dequant GEMV 与双层指标；0.75 小时三项边界/sanitizer；0.25 小时 RMSNorm 接口检查；0.5 小时闭卷与口述。压缩性能调参、ncu、融合实装和排版，不删除最低正确性或四类输出。
 
-**必读仓库资料**：[tiled GEMM](../week04_gemm/gemm_tiled/gemm_tiled.cu)、[Week 5 decode 教材（RMSNorm/Graph/Dequant 核心）](Week5增强版_LLM推理优化与decode.md)、[RMSNorm 与融合教材](../cuda_deep_course/course/volume06_operators/05_LayerNorm_RMSNorm与融合.md)、[CUDA Graph 教材](../cuda_deep_course/course/volume07_async_system/04_CUDA_Graph.md)。这些均为已跟踪主依赖。
+**必读仓库资料**：[tiled GEMM](../../week04_gemm/gemm_tiled/gemm_tiled.cu)、[Week 5 decode 教材（RMSNorm/Graph/Dequant 核心）](../courses/inference/Week5增强版_LLM推理优化与decode.md)、[RMSNorm 与融合教材](../../cuda_deep_course/course/volume06_operators/05_LayerNorm_RMSNorm与融合.md)、[CUDA Graph 教材](../../cuda_deep_course/course/volume07_async_system/04_CUDA_Graph.md)。这些均为已跟踪主依赖。
 
 本机的 `week05_inference/decode_graph.cu`、`fused_rmsnorm.cu`、`dequant_gemv.cu` 仅是**本机可选、当前未纳入 Git**的脚手架。每个都先用 `git ls-files --error-unmatch <path>` 判断；若失败，不得把它当作克隆后必然存在的资料。仅在 `test -f <path>` 成功时复制到 `/tmp` 使用；不存在时依据上述已跟踪教材伪代码在 `/tmp` 新建个人练习，绝不提交或覆盖这些本机文件。
 
@@ -520,7 +520,7 @@ Day 5 补考模式（总计 8 小时）：
 
 **必要时补考模式（总计 8 小时，含前日最多 1.5 小时）**：1.5 小时补 Day 10；0.5 小时冻结项目；1.25 小时 baseline/正确性矩阵；1.5 小时两级版本与失败优化复测；1.25 小时 Roofline+ncu+PTX/SASS；1.25 小时报告与差距；0.75 小时 5/10 分钟口述。压缩额外版本、shape 扫描和排版，绝不复用旧数字代替重跑。
 
-**必读仓库资料**：GEMM 路线读 [benchmark](../week05_gemm_advanced/benchmark.md)、[ncu notes](../week05_gemm_advanced/ncu_notes.md)、[Roofline](../week05_gemm_advanced/roofline.md)及 [tiled GEMM](../week04_gemm/gemm_tiled/gemm_tiled.cu)；Attention 路线读 [naive](../week04_attention/naive_attention.cu)、[tiled](../week04_attention/tiled_attention.cu)、[pipelined](../week04_attention/tiled_attention_pipelined.cu)、[ncu pipeline notes](../week04_attention/ncu_pipeline_notes.md)。这些只提供真实仓库起点与历史证据；当天必须在当前 A100、当前构建重新确认，不能复制历史数字。
+**必读仓库资料**：GEMM 路线读 [benchmark](../../week05_gemm_advanced/benchmark.md)、[ncu notes](../../week05_gemm_advanced/ncu_notes.md)、[Roofline](../../week05_gemm_advanced/roofline.md)及 [tiled GEMM](../../week04_gemm/gemm_tiled/gemm_tiled.cu)；Attention 路线读 [naive](../../week04_attention/naive_attention.cu)、[tiled](../../week04_attention/tiled_attention.cu)、[pipelined](../../week04_attention/tiled_attention_pipelined.cu)、[ncu pipeline notes](../../week04_attention/ncu_pipeline_notes.md)。这些只提供真实仓库起点与历史证据；当天必须在当前 A100、当前构建重新确认，不能复制历史数字。
 
 **分步练习**：
 
@@ -608,7 +608,7 @@ Day 5 补考模式（总计 8 小时）：
 
 **必要时补考模式（总计 8 小时，含 Day 1～11 回补 2.5 小时）**：2.5 小时补最高风险失败项（其中至少 90 分钟用于重做而非阅读）；3.5 小时完成七组各 2 题闭卷首答、查证和修正；0.75 小时错题卡与交叉追问；0.75 小时随机复测和口述；0.5 小时评分审计及 Day 13 抽题权重。压缩每组扩展题和排版，不牺牲概念、代码/实验、证据、面试四类输出，补考本身计入当天 8 小时。
 
-**必读仓库资料**：[CUDA 复习资料知识体系](CUDA面试核心题库.md)、[CUDA 面试八股全集](CUDA面试八股全集.md)、[面试八股追问答案](CUDA面试八股_追问答案.md)、[面试八股追问答案续](CUDA面试八股_追问答案_续.md)、[概念、性能分析与手写 kernel 面试题](../cuda_deep_course/course/volume10_engineering_interview/08_面试题_概念_性能分析_手写kernel.md)。每题必须先闭卷作答并留时间戳，之后才能查阅；资料答案也要结合硬件、shape、CUDA 版本和仓库证据限定边界。
+**必读仓库资料**：[CUDA 复习资料知识体系](CUDA面试核心题库.md)、[CUDA 面试八股全集](CUDA面试核心题库.md)、[面试八股追问答案](CUDA面试核心题库.md)、[面试八股追问答案续](CUDA面试核心题库.md)、[概念、性能分析与手写 kernel 面试题](../../cuda_deep_course/course/volume10_engineering_interview/08_面试题_概念_性能分析_手写kernel.md)。每题必须先闭卷作答并留时间戳，之后才能查阅；资料答案也要结合硬件、shape、CUDA 版本和仓库证据限定边界。
 
 **分步执行**：
 
@@ -646,7 +646,7 @@ Day 5 补考模式（总计 8 小时）：
 
 **必要时补考模式（总计 8 小时，含 Day 12 最多 1.5 小时）**：1.5 小时补 Day 12 三张高风险卡；1.75 小时 kernel 题 1；1.75 小时 kernel 题 2；1.5 小时三道 ncu 诊断（每题 30 分钟）；0.75 小时一个单一实验/复测设计；0.5 小时统一测试与评分；0.25 小时口述。压缩代码美化、额外优化和参数扫描，不删除两道正确性、三道诊断、证据或面试输出。
 
-**必读仓库资料**：[概念、性能分析与手写 kernel 面试题](../cuda_deep_course/course/volume10_engineering_interview/08_面试题_概念_性能分析_手写kernel.md)、[CUDA 复习资料知识体系](CUDA面试核心题库.md)、[CUDA 面试八股全集](CUDA面试八股全集.md)、[面试八股追问答案](CUDA面试八股_追问答案.md)、[面试八股追问答案续](CUDA面试八股_追问答案_续.md)。只能在题目提交、计时停止后对照；若题目来自仓库现有实现，先把答案路径交给朋友隐藏，或只复制接口/测试框架到 `/tmp`。
+**必读仓库资料**：[概念、性能分析与手写 kernel 面试题](../../cuda_deep_course/course/volume10_engineering_interview/08_面试题_概念_性能分析_手写kernel.md)、[CUDA 复习资料知识体系](CUDA面试核心题库.md)、[CUDA 面试八股全集](CUDA面试核心题库.md)、[面试八股追问答案](CUDA面试核心题库.md)、[面试八股追问答案续](CUDA面试核心题库.md)。只能在题目提交、计时停止后对照；若题目来自仓库现有实现，先把答案路径交给朋友隐藏，或只复制接口/测试框架到 `/tmp`。
 
 **分步执行**：
 
@@ -687,7 +687,7 @@ Day 5 补考模式（总计 8 小时）：
 
 **必要时补考模式（总计 8 小时，含 Day 13 最多 1 小时）**：1 小时补 Day 13 硬失败关键段；0.5 小时冻结题单；0.75 小时第一轮；0.5 小时第一轮评分；1.25 小时项目四档口述；0.75 小时第二轮；0.5 小时第二轮评分；1.25 小时最低项补测；1.5 小时 ready 决策并启动投递或制定 3～7 天补救。压缩录音排版和扩展追问，不删除两轮 45 分钟、项目表达、证据、评分或决定。
 
-**必读仓库资料**：[概念、性能分析与手写 kernel 面试题](../cuda_deep_course/course/volume10_engineering_interview/08_面试题_概念_性能分析_手写kernel.md)、[系统设计题](../cuda_deep_course/course/volume10_engineering_interview/09_系统设计题.md)、[CUDA 面试八股全集](CUDA面试八股全集.md)、[面试八股追问答案](CUDA面试八股_追问答案.md)、[面试八股追问答案续](CUDA面试八股_追问答案_续.md)、[CUDA 复习资料知识体系](CUDA面试核心题库.md)。项目环节另读 Day 11 当天生成的旗舰项目报告和原始证据；若该文件仅在 `/tmp`，先复制路径索引，不把它误写成仓库已跟踪资料。
+**必读仓库资料**：[概念、性能分析与手写 kernel 面试题](../../cuda_deep_course/course/volume10_engineering_interview/08_面试题_概念_性能分析_手写kernel.md)、[系统设计题](../../cuda_deep_course/course/volume10_engineering_interview/09_系统设计题.md)、[CUDA 面试八股全集](CUDA面试核心题库.md)、[面试八股追问答案](CUDA面试核心题库.md)、[面试八股追问答案续](CUDA面试核心题库.md)、[CUDA 复习资料知识体系](CUDA面试核心题库.md)。项目环节另读 Day 11 当天生成的旗舰项目报告和原始证据；若该文件仅在 `/tmp`，先复制路径索引，不把它误写成仓库已跟踪资料。
 
 **分步执行**：
 

@@ -39,7 +39,7 @@
 |---|---|
 | APOD 与 benchmark | `cuda_deep_course/course/volume05_performance/01_APOD与可靠Benchmark.md` |
 | Roofline(T4 实算) | `.../volume05_performance/02_性能指标_Scaling与Roofline.md` §5.1 |
-| Occupancy 调优 | `docs/Occupancy详解_从入门到调优.md`(进阶篇,本周主力) |
+| Occupancy 调优 | `docs/topics/performance/Occupancy详解_从入门到调优.md`(进阶篇,本周主力) |
 | Nsight Compute 判读 | `.../volume05_performance/05_Nsight_Compute与Compute_Sanitizer.md` §5.1 |
 | Nsight Systems | `.../volume05_performance/04_Nsight_Systems系统时间线.md` §5.1 |
 | 完整优化案例 | `.../volume05_performance/06_完整优化案例_复习与面试.md` |
@@ -103,7 +103,7 @@ ncu --section SpeedOfLight --kernel-name regex:transpose ./transpose 4096 4096
 - 用 `-Xptxas=-v` 看寄存器/spill;用 ncu Block Limit 定位 occupancy 瓶颈。
 - 什么时候提 occupancy 有用(latency-bound)、什么时候没用。
 
-**看什么** 📖 `docs/Occupancy详解_从入门到调优.md` 进阶篇(§11-§22,本周重点)。
+**看什么** 📖 `docs/topics/performance/Occupancy详解_从入门到调优.md` 进阶篇(§11-§22,本周重点)。
 
 **动手** ✍️
 1. 对 GEMM 扫 block size {128,256,512},记录时间 + 理论/实际 occupancy + 寄存器。

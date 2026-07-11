@@ -1,6 +1,6 @@
 # 一次 Decode Step 的数据流与瓶颈
 
-> 对应：docs/Week5增强版_LLM推理优化与decode.md（Day7 §51）
+> 对应：docs/courses/inference/Week5增强版_LLM推理优化与decode.md（Day7 §51）
 > 硬件：A100 80GB PCIe（sm_80，HBM 峰值约 1935 GB/s，FP32 19.5 TFLOPS）
 > 目的：把 Week5 写过的 kernel（gemv / fused_rmsnorm / dequant_gemv / decode_graph）
 >       串成「生成一个 token 要走哪些算子、每个算子卡在哪」的完整图景。

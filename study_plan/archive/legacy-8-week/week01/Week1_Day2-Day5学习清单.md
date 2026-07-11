@@ -45,7 +45,7 @@ Day7  2.3 Occupancy + 复盘
 
 ### 需要看的资料
 
-- [ ] [Programming_Model详解.md](../../../../docs/Programming_Model详解.md) §1–§8
+- [ ] [Programming_Model详解.md](../../../../docs/courses/cuda/Programming_Model详解.md) §1–§8
 - [ ] Programming Guide：**1. Introduction to CUDA**（1.1–1.3）
 - [ ] Programming Guide：**2.1 Intro to CUDA C++**
 - [ ] [T4实战指南.md](../../../../docs/archive/hardware/T4实战指南.md) 第一节
@@ -178,7 +178,7 @@ if (i < n) {
 
 - [ ] `docs/Week1详细步骤.md`：Step 05、Step 06
 - [ ] `docs/T4实战指南.md`：T4 硬件速览、编译架构标志
-- [ ] `docs/Programming_Model详解.md`：线程层次相关章节
+- [ ] `docs/courses/cuda/Programming_Model详解.md`：线程层次相关章节
 - [ ] [CUDA Programming Guide v13.x](https://docs.nvidia.com/cuda/cuda-programming-guide/)：**1.2 Programming Model** + **2.3 Writing SIMT Kernels** 前半（页内搜 `threadIdx`）
 - [ ] **2.3** 中 Global Memory 小节（浏览，Week 2 深入）
 - [ ] **5.1 Compute Capabilities**（Appendix，配合 CC 7.5）

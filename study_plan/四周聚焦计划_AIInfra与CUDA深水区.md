@@ -1146,22 +1146,22 @@ PagedAttention 固定两天后停止。优先保住模拟面试、项目表达�
 
 ### Week 2
 
-- 主教材：`docs/CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md`；
-- 现有 14 天计划只作为验收题来源：`docs/CUDA工程师面试_14天突击计划.md`；
+- 主教材：`docs/topics/performance/CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md`；
+- 现有 14 天计划只作为验收题来源：`docs/interview/CUDA工程师面试_14天突击计划.md`；
 - WMMA：`week06_tensorcore/`；
-- ncu：`docs/Nsight_Compute_ncu详解.md`。
+- ncu：`docs/topics/performance/Nsight_Compute_ncu详解.md`。
 
 ### Week 3
 
-- Attention 教材：`docs/Week4_Attention与FlashAttention完整学习资料.md`；
-- Online Softmax 证明：`docs/Online_Softmax正确性证明.md`；
+- Attention 教材：`docs/courses/attention/Week4_Attention与FlashAttention完整学习资料.md`；
+- Online Softmax 证明：`docs/proofs/Online_Softmax正确性证明.md`；
 - 旧代码只用于完成后对照：`week04_attention/`。
 
 ### Week 4
 
-- PagedAttention：`docs/PagedAttention详解.md`；
-- KV cache：`docs/kv_cache_accounting.md`；
-- decode：`docs/decode_step_dataflow.md`；
+- PagedAttention：`docs/topics/kv_cache/PagedAttention详解.md`；
+- KV cache：`docs/topics/kv_cache/kv_cache_accounting.md`；
+- decode：`docs/topics/kv_cache/decode_step_dataflow.md`；
 - 面试：`docs/interview/CUDA面试核心题库.md` 与私有职业叙事材料。
 
 资料纪律：先写、再查、最后对照。禁止直接复制旧 kernel 作为“重建”。

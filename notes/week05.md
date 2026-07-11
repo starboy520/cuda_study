@@ -1,6 +1,6 @@
 # Week5（LLM 推理优化 / Decode）Work Log
 
-> 对应：docs/Week5增强版_LLM推理优化与decode.md
+> 对应：docs/courses/inference/Week5增强版_LLM推理优化与decode.md
 > 硬件：A100 80GB PCIe（sm_80，HBM 峰值约 1935 GB/s）
 > 主题：decode = memory-bound 的天下，优化逻辑和 GEMM（compute-bound）相反
 

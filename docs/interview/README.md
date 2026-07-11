@@ -12,7 +12,7 @@
 
 | 方向 | 材料 |
 | --- | --- |
-| GEMM / Tensor Core | [cuBLAS 与 CUTLASS 面试速成](../topics/gemm_tensorcore/cuBLAS与CUTLASS面试速成.md)、[cuBLAS 函数速查](../topics/gemm_tensorcore/cuBLAS函数速查.md) |
+| GEMM / Tensor Core | [cuBLAS 与 CUTLASS 面试速成](../topics/gemm_tensorcore/cuBLAS与CUTLASS面试速成.md)、[cuBLAS 函数速查](../topics/gemm_tensorcore/cuBLAS与CUTLASS面试速成.md) |
 | 执行模型与运行时 | [CUDA 核心原语](../topics/execution/CUDA核心原语_场景驱动教程.md)、[Cooperative Groups 与 CUDA Graph](../topics/execution/CooperativeGroups与CUDAGraph深度教程.md) |
 | 性能分析 | [CUDA 深水区：PTX/SASS/MMA/异步流水与 Hopper](../topics/performance/CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md)、[Nsight Compute](../topics/performance/Nsight_Compute_ncu详解.md)、[Occupancy](../topics/performance/Occupancy详解_从入门到调优.md) |
 | KV Cache / decode | [KV Cache 专题入口](../topics/kv_cache/README.md)、[PagedAttention](../topics/kv_cache/PagedAttention详解.md) |

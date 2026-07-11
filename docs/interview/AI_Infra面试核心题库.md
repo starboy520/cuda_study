@@ -1,6 +1,6 @@
 # AI Infra 面试八股全集：从算子数据流到推理与分布式系统
 
-> 适用：LLM 推理、AI Infra、GPU 算子与分布式系统岗位。CUDA 机制本身见 [CUDA 面试八股全集](CUDA面试八股全集.md)。
+> 适用：LLM 推理、AI Infra、GPU 算子与分布式系统岗位。CUDA 机制本身见 [CUDA 面试八股全集](CUDA面试核心题库.md)。
 
 ## 0. 使用方法
 
@@ -58,7 +58,7 @@ FLOP 与 bytes 是多少？
 
 **项目证据**
 
-- [Week4 Attention 教材的 shape 预备章](Week4_Attention与FlashAttention完整学习资料.md)。
+- [Week4 Attention 教材的 shape 预备章](../courses/attention/Week4_Attention与FlashAttention完整学习资料.md)。
 
 ### Q2：为什么同一个线性层有时像 GEMM，有时像 GEMV？
 
@@ -83,7 +83,7 @@ FLOP 与 bytes 是多少？
 
 **项目证据**
 
-- CUDA 侧 GEMM 机制见 [CUDA 八股 GEMM 章节](CUDA面试八股全集.md)。
+- CUDA 侧 GEMM 机制见 [CUDA 八股 GEMM 章节](CUDA面试核心题库.md)。
 
 ---
 
@@ -116,7 +116,7 @@ $$
 
 **项目证据**
 
-- [Softmax CUDA](../week04_gemm/softmax/softmax.cu)。
+- [Softmax CUDA](../../week04_gemm/softmax/softmax.cu)。
 
 ### Q4：Online Softmax 保存什么状态？
 
@@ -147,7 +147,7 @@ l_new = exp(m_old-m_new) l_old
 
 **项目证据**
 
-- [Online Softmax 正确性证明](Online_Softmax正确性证明.md)。
+- [Online Softmax 正确性证明](../proofs/Online_Softmax正确性证明.md)。
 
 ### Q5：标准 Attention 的 shape、FLOP 和输出是什么？
 
@@ -172,7 +172,7 @@ l_new = exp(m_old-m_new) l_old
 
 **项目证据**
 
-- [完整 Attention 教材](Week4_Attention与FlashAttention完整学习资料.md)。
+- [完整 Attention 教材](../courses/attention/Week4_Attention与FlashAttention完整学习资料.md)。
 
 ---
 
@@ -201,7 +201,7 @@ FlashAttention 用 tiling 和 online softmax 在片上处理局部 score/probabi
 
 **项目证据**
 
-- [FlashAttention 渐进推导](Week4_Attention与FlashAttention完整学习资料.md#day-3flashattention从普通加权平均到分块在线计算)。
+- [FlashAttention 渐进推导](../courses/attention/Week4_Attention与FlashAttention完整学习资料.md#day-3flashattention从普通加权平均到分块在线计算)。
 
 ### Q7：`m/l/O_acc` 为什么必须使用同一基准？
 
@@ -232,7 +232,7 @@ O_new = alpha*O_old + exp(S_tile-m_new) V_tile
 
 **项目证据**
 
-- [教学版 tiled attention](../week04_attention/tiled_attention.cu)。
+- [教学版 tiled attention](../../week04_attention/tiled_attention.cu)。
 
 ---
 
@@ -261,7 +261,7 @@ prefill 同时处理 prompt 多个 token，矩阵较大、并行度高；decode 
 
 **项目证据**
 
-- [Week5 推理资料](Week5增强版_LLM推理优化与decode.md)。
+- [Week5 推理资料](../courses/inference/Week5增强版_LLM推理优化与decode.md)。
 
 ### Q9：KV Cache 为什么存在，显存怎样计算？
 
@@ -286,7 +286,7 @@ KV cache 保存每层历史 token 的 K/V，避免 decode 时重复计算历史�
 
 **项目证据**
 
-- [KV Cache 学习指南](大模型KVCache系统学习指南.md)。
+- [KV Cache 学习指南](../topics/kv_cache/大模型KVCache系统学习指南.md)。
 
 ### Q10：MQA、GQA、MLA 分别怎样减少 KV？
 
@@ -311,7 +311,7 @@ MQA/GQA 直接减少 `Hkv`，以表达能力和实现权衡换缓存/带宽。ML
 
 **项目证据**
 
-- [Week4 MLA 章节](Week4_Attention与FlashAttention完整学习资料.md)。
+- [Week4 MLA 章节](../courses/attention/Week4_Attention与FlashAttention完整学习资料.md)。
 
 ---
 
@@ -419,7 +419,7 @@ MQA/GQA 直接减少 `Hkv`，以表达能力和实现权衡换缓存/带宽。ML
 
 **项目证据**
 
-- CUDA Graph 机制见 [CUDA 面试八股](CUDA面试八股全集.md)。
+- CUDA Graph 机制见 [CUDA 面试八股](CUDA面试核心题库.md)。
 
 ---
 
@@ -448,7 +448,7 @@ FP16 尾数相对多但指数范围窄；BF16 指数范围接近 FP32、尾数�
 
 **项目证据**
 
-- [混合精度与 Scaling](../week06_tensorcore/mixed_precision_and_scaling.md)。
+- [混合精度与 Scaling](../../week06_tensorcore/mixed_precision_and_scaling.md)。
 
 ### Q16：Weight-only、W8A8、KV Cache 量化有什么差异？
 
@@ -502,7 +502,7 @@ DP 梯度 all-reduce；TP 常有 all-reduce/all-gather/reduce-scatter；PP 传 a
 
 **项目证据**
 
-- [多 GPU 教材](../cuda_deep_course/course/volume08_hpc_multigpu/README.md)。
+- [多 GPU 教材](../../cuda_deep_course/course/volume08_hpc_multigpu/README.md)。
 
 ### Q18：怎样估算 Tensor Parallel 通信量？
 
@@ -527,7 +527,7 @@ DP 梯度 all-reduce；TP 常有 all-reduce/all-gather/reduce-scatter；PP 传 a
 
 **项目证据**
 
-- NCCL 机制边界见 [CUDA 八股多 GPU 章节](CUDA面试八股全集.md)。
+- NCCL 机制边界见 [CUDA 八股多 GPU 章节](CUDA面试核心题库.md)。
 
 ---
 
@@ -689,7 +689,7 @@ DeepGEMM 面向高效低精度/分组 GEMM；FlashMLA 面向 MLA attention kerne
 
 **项目证据**
 
-- CUDA benchmark 方法见 [实验完成标准](../cuda_deep_course/course/实验方法与完成标准.md)。
+- CUDA benchmark 方法见 [实验完成标准](../../cuda_deep_course/course/实验方法与完成标准.md)。
 
 ## 项目深挖题
 

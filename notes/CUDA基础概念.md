@@ -153,7 +153,7 @@ int row = blockIdx.y * blockDim.y + threadIdx.y;
 
 ## 9. Programming Model（官方 1.2 消化版）
 
-> **更完整版本**见 [docs/Programming_Model详解.md](../docs/Programming_Model详解.md)
+> **更完整版本**见 [docs/courses/cuda/Programming_Model详解.md](../docs/courses/cuda/Programming_Model详解.md)
 
 ### 主线
 
@@ -224,4 +224,4 @@ cudaMemcpy(D2H)                → 结果搬回 CPU
 
 ---
 
-**相关文档**：`docs/Week1详细步骤.md` · `docs/GPU卡型专项学习指南.md`
+**相关文档**：`study_plan/archive/legacy-8-week/week01/Week1详细步骤.md` · `docs/reference/GPU卡型专项学习指南.md`

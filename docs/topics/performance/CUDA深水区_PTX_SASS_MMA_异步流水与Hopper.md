@@ -55,14 +55,14 @@
 
 | 观察对象 | 文件 | 用途 |
 |---|---|---|
-| naive GEMM | [gemm_naive.cu](../week04_gemm/gemm_naive/gemm_naive.cu) | global load、地址计算、FFMA 基线 |
-| shared tiled GEMM | [gemm_tiled.cu](../week04_gemm/gemm_tiled/gemm_tiled.cu) | LDS/STS、barrier、global 复用 |
-| 2D register tiled | [gemm_2d_thread_tiling.cu](../week05_gemm_advanced/gemm_2d_thread_tiling.cu) | accumulator、寄存器压力、ILP |
-| float4 加载 | [gemm_vectorized_load.cu](../week05_gemm_advanced/gemm_vectorized_load.cu) | 宽访存是否真的生成 |
-| 两级异步流水 | [gem_double_buffering.cu](../week05_gemm_advanced/gem_double_buffering.cu) | 从 `cuda::pipeline` 下钻到 `cp.async` |
-| WMMA GEMM | [wmma_fp16_gemm.cu](../week06_tensorcore/wmma_fp16_gemm.cu) | WMMA→PTX MMA→SASS HMMA |
-| A100 ncu 记录 | [ncu_notes.md](../week05_gemm_advanced/ncu_notes.md) | 寄存器/occupancy/bank conflict 证据 |
-| Tensor Core 记录 | [tensor_core_profile.md](../week06_tensorcore/tensor_core_profile.md) | HMMA 与 Tensor pipe 证据 |
+| naive GEMM | [gemm_naive.cu](../../../week04_gemm/gemm_naive/gemm_naive.cu) | global load、地址计算、FFMA 基线 |
+| shared tiled GEMM | [gemm_tiled.cu](../../../week04_gemm/gemm_tiled/gemm_tiled.cu) | LDS/STS、barrier、global 复用 |
+| 2D register tiled | [gemm_2d_thread_tiling.cu](../../../week05_gemm_advanced/gemm_2d_thread_tiling.cu) | accumulator、寄存器压力、ILP |
+| float4 加载 | [gemm_vectorized_load.cu](../../../week05_gemm_advanced/gemm_vectorized_load.cu) | 宽访存是否真的生成 |
+| 两级异步流水 | [gem_double_buffering.cu](../../../week05_gemm_advanced/gem_double_buffering.cu) | 从 `cuda::pipeline` 下钻到 `cp.async` |
+| WMMA GEMM | [wmma_fp16_gemm.cu](../../../week06_tensorcore/wmma_fp16_gemm.cu) | WMMA→PTX MMA→SASS HMMA |
+| A100 ncu 记录 | [ncu_notes.md](../../../week05_gemm_advanced/ncu_notes.md) | 寄存器/occupancy/bank conflict 证据 |
+| Tensor Core 记录 | [tensor_core_profile.md](../../../week06_tensorcore/tensor_core_profile.md) | HMMA 与 Tensor pipe 证据 |
 
 ---
 
@@ -335,7 +335,7 @@ __global__ void register_pressure(const float* x, float* y, int n) {
 
 ### 5.4 练习：验证 `float4` 是否落地
 
-检查 [gemm_vectorized_load.cu](../week05_gemm_advanced/gemm_vectorized_load.cu) 时依次问：
+检查 [gemm_vectorized_load.cu](../../../week05_gemm_advanced/gemm_vectorized_load.cu) 时依次问：
 
 1. 基地址是否至少 16-byte 对齐？
 2. 行首 `row*K` 是否保持 4 元素对齐？
@@ -396,7 +396,7 @@ PTX wmma/mma 语义（不保证一一对应）
 SASS HMMA/MMA 指令序列
 ```
 
-你已经在 [tensor_core_profile.md](../week06_tensorcore/tensor_core_profile.md) 中找到 `HMMA.16816.F32`。这能证明 Tensor Core 路径，但不代表每个 WMMA 调用只变成一条 SASS，也不代表你已经知道 fragment 在 32 个线程中的寄存器布局。
+你已经在 [tensor_core_profile.md](../../../week06_tensorcore/tensor_core_profile.md) 中找到 `HMMA.16816.F32`。这能证明 Tensor Core 路径，但不代表每个 WMMA 调用只变成一条 SASS，也不代表你已经知道 fragment 在 32 个线程中的寄存器布局。
 
 WMMA 的价值是让编译器管理 fragment 类型、加载和 MMA；直接 PTX 的价值是让你明确控制具体 MMA shape、寄存器 operand 和 shared→register 的加载方式。代价是：布局约束和正确性责任回到你手里。
 
@@ -923,7 +923,7 @@ __global__ void gemm_pipeline_3stage(/* A, B, C, M, N, K */) {
 
 ### 10.5 与现有代码的连接
 
-[gem_double_buffering.cu](../week05_gemm_advanced/gem_double_buffering.cu) 使用 `cuda::pipeline<thread_scope_block>` 和 `cuda::memcpy_async`。阅读时画出：
+[gem_double_buffering.cu](../../../week05_gemm_advanced/gem_double_buffering.cu) 使用 `cuda::pipeline<thread_scope_block>` 和 `cuda::memcpy_async`。阅读时画出：
 
 ```text
 API 的 producer_acquire/commit
@@ -1540,7 +1540,7 @@ epilogue warp/线程：
 
 ## 18. 选择一个 kernel
 
-推荐从 [gemm_2d_thread_tiling.cu](../week05_gemm_advanced/gemm_2d_thread_tiling.cu) 开始。它已经有：
+推荐从 [gemm_2d_thread_tiling.cu](../../../week05_gemm_advanced/gemm_2d_thread_tiling.cu) 开始。它已经有：
 
 - 正确性和 benchmark；
 - shared tile；

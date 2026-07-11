@@ -106,4 +106,4 @@ T4 白皮书里有 **SM 内部结构**（CUDA Core、Tensor Core、Register File
 
 ---
 
-**返回**：[Programming_Model详解.md](Programming_Model详解.md) · [CUDA基础概念.md](../notes/CUDA基础概念.md)
+**返回**：[Programming_Model详解.md](../courses/cuda/Programming_Model详解.md) · [CUDA基础概念.md](../../notes/CUDA基础概念.md)

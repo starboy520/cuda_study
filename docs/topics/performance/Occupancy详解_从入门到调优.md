@@ -884,10 +884,10 @@ SM 的 Occupancy 都高。
 | 本地 `week01_basics/device_query/` | T4 硬件参数 |
 
 配套课程章节:
-- [卷五/03 Occupancy、分歧与延迟隐藏](../cuda_deep_course/course/volume05_performance/03_Occupancy_分歧与延迟隐藏.md)
-- [卷九/02 Warp 调度与延迟隐藏](../cuda_deep_course/course/volume09_hardware_architecture/02_Warp调度_scheduler_scoreboard与延迟隐藏.md) —— 硬件根源
-- [卷九/04 存储层次硬件](../cuda_deep_course/course/volume09_hardware_architecture/04_存储层次硬件_寄存器_shared_L1L2_显存.md) —— 寄存器/shared 物理结构
-- [卷五/05 Nsight Compute](../cuda_deep_course/course/volume05_performance/05_Nsight_Compute与Compute_Sanitizer.md) —— profiler 判读
+- [卷五/03 Occupancy、分歧与延迟隐藏](../../../cuda_deep_course/course/volume05_performance/03_Occupancy_分歧与延迟隐藏.md)
+- [卷九/02 Warp 调度与延迟隐藏](../../../cuda_deep_course/course/volume09_hardware_architecture/02_Warp调度_scheduler_scoreboard与延迟隐藏.md) —— 硬件根源
+- [卷九/04 存储层次硬件](../../../cuda_deep_course/course/volume09_hardware_architecture/04_存储层次硬件_寄存器_shared_L1L2_显存.md) —— 寄存器/shared 物理结构
+- [卷五/05 Nsight Compute](../../../cuda_deep_course/course/volume05_performance/05_Nsight_Compute与Compute_Sanitizer.md) —— profiler 判读
 
 ---
 

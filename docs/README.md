@@ -1,7 +1,7 @@
 # docs 文档导航
 
 > 本目录学习文档索引。按「用途」分类，标注对应学习阶段。
-> 外部资料（官方文档/书籍/课程）见 [学习资料索引.md](学习资料索引.md)。
+> 外部资料（官方文档/书籍/课程）见 [学习资料索引.md](reference/学习资料索引.md)。
 
 ---
 
@@ -11,8 +11,8 @@
 |------|------|
 | [AI Infra + CUDA 深水区四周聚焦计划](../study_plan/四周聚焦计划_AIInfra与CUDA深水区.md) | ⭐ 当前唯一执行计划 |
 | [历史课程与指南归档](archive/README.md) | 旧八周路线与历史冲刺计划索引 |
-| [学习资料索引.md](学习资料索引.md) | 外部资料（官方文档/书/课程/开源）索引 |
-| [项目清单.md](项目清单.md) | 作品集项目清单 |
+| [学习资料索引.md](reference/学习资料索引.md) | 外部资料（官方文档/书/课程/开源）索引 |
+| [项目清单.md](reference/项目清单.md) | 作品集项目清单 |
 
 ---
 
@@ -22,8 +22,8 @@
 |------|------|------|
 | [archive/Week1详细步骤.md](../study_plan/archive/legacy-8-week/week01/Week1详细步骤.md) | Week1 | GPU 基础详细步骤（已归档） |
 | [archive/Week1_Day2-Day5学习清单.md](../study_plan/archive/legacy-8-week/week01/Week1_Day2-Day5学习清单.md) | Week1 | Day2-5 清单（已归档） |
-| [Week3_TensorCore学习文档.md](Week3_TensorCore学习文档.md) | Week3 | ⭐ Tensor Core/WMMA 自包含手册 |
-| [Week4_Attention与FlashAttention完整学习资料.md](Week4_Attention与FlashAttention完整学习资料.md) | Week4 | ⭐ Attention/FlashAttention 完整资料 |
+| [Week3_TensorCore学习文档.md](courses/cuda/Week3_TensorCore学习文档.md) | Week3 | ⭐ Tensor Core/WMMA 自包含手册 |
+| [Week4_Attention与FlashAttention完整学习资料.md](courses/attention/Week4_Attention与FlashAttention完整学习资料.md) | Week4 | ⭐ Attention/FlashAttention 完整资料 |
 
 > Week3 代码/笔记在 `week06_tensorcore/`；Week1-2 GEMM 在 `week05_gemm_advanced/`；算子练习在 `operator_practice/`。
 
@@ -33,7 +33,7 @@
 
 | 文档 | 说明 |
 |------|------|
-| [CUDA面试八股全集.md](CUDA面试八股全集.md) | ⭐ 15 章系统八股，闭卷口述粒度 |
+| [CUDA面试八股全集.md](interview/CUDA面试核心题库.md) | ⭐ 15 章系统八股，闭卷口述粒度 |
 | [CUDA 面试核心题库](interview/CUDA面试核心题库.md) | 当前 CUDA 面试复习入口 |
 
 ---
@@ -42,11 +42,11 @@
 
 | 文档 | 说明 |
 |------|------|
-| [CUDA核心原语_场景驱动教程.md](CUDA核心原语_场景驱动教程.md) | 场景驱动：问题→代码→为什么（ballot/shuffle/atomicCAS/cp.async 等） |
-| [异步拷贝_pipeline_cooperative_groups学习文档.md](异步拷贝_pipeline_cooperative_groups学习文档.md) | cp.async / pipeline / cooperative groups |
-| [Programming_Model详解.md](Programming_Model详解.md) | CUDA 编程模型 |
-| [Programming_Guide学习路径.md](Programming_Guide学习路径.md) | 官方 Programming Guide 阅读路径 |
-| [Occupancy详解_从入门到调优.md](Occupancy详解_从入门到调优.md) | Occupancy 从入门到调优 |
+| [CUDA核心原语_场景驱动教程.md](topics/execution/CUDA核心原语_场景驱动教程.md) | 场景驱动：问题→代码→为什么（ballot/shuffle/atomicCAS/cp.async 等） |
+| [异步拷贝_pipeline_cooperative_groups学习文档.md](topics/execution/CUDA核心原语_场景驱动教程.md) | cp.async / pipeline / cooperative groups |
+| [Programming_Model详解.md](courses/cuda/Programming_Model详解.md) | CUDA 编程模型 |
+| [Programming_Guide学习路径.md](reference/Programming_Guide学习路径.md) | 官方 Programming Guide 阅读路径 |
+| [Occupancy详解_从入门到调优.md](topics/performance/Occupancy详解_从入门到调优.md) | Occupancy 从入门到调优 |
 
 ---
 
@@ -54,7 +54,7 @@
 
 | 文档 | 说明 |
 |------|------|
-| [Nsight_Compute_ncu详解.md](Nsight_Compute_ncu详解.md) | ncu 使用与指标解读 |
+| [Nsight_Compute_ncu详解.md](topics/performance/Nsight_Compute_ncu详解.md) | ncu 使用与指标解读 |
 
 ---
 
@@ -62,8 +62,8 @@
 
 | 文档 | 说明 |
 |------|------|
-| [GPU卡型专项学习指南.md](GPU卡型专项学习指南.md) | 各 GPU 卡型（T4/A100/H100 等） |
-| [GPU架构图资源.md](GPU架构图资源.md) | 架构图资源 |
+| [GPU卡型专项学习指南.md](reference/GPU卡型专项学习指南.md) | 各 GPU 卡型（T4/A100/H100 等） |
+| [GPU架构图资源.md](reference/GPU架构图资源.md) | 架构图资源 |
 | [archive/hardware/T4实战指南.md](archive/hardware/T4实战指南.md) | T4 实战（已归档） |
 
 ---
@@ -72,7 +72,7 @@
 
 | 文档 | 说明 |
 |------|------|
-| [大模型KVCache系统学习指南.md](大模型KVCache系统学习指南.md) | KV cache 系统 |
+| [大模型KVCache系统学习指南.md](topics/kv_cache/大模型KVCache系统学习指南.md) | KV cache 系统 |
 
 ---
 

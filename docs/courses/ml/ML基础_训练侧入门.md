@@ -965,7 +965,7 @@ forward 是一次 kernel/DAG 调度，autograd 根据已记录的算子生成反
 
 # 第三卷：从一个字符到迷你 GPT
 
-本卷假定你会写 CUDA kernel，却刚接触 PyTorch。目标不是背 API，而是把训练看成：张量布局、数值稳定、自动微分和优化循环的组合。需要更完整的推导与 FlashAttention 实现时可读 [`docs/Week4_Attention与FlashAttention完整学习资料.md`](Week4_Attention与FlashAttention完整学习资料.md)；下面先在本卷就地建立读懂程序所需的最小概念，不依赖不存在的前卷内容。
+本卷假定你会写 CUDA kernel，却刚接触 PyTorch。目标不是背 API，而是把训练看成：张量布局、数值稳定、自动微分和优化循环的组合。需要更完整的推导与 FlashAttention 实现时可读 [`docs/courses/attention/Week4_Attention与FlashAttention完整学习资料.md`](../attention/Week4_Attention与FlashAttention完整学习资料.md)；下面先在本卷就地建立读懂程序所需的最小概念，不依赖不存在的前卷内容。
 
 ## 1. Attention 最小词典：Q、K、V、head 与残差
 
@@ -1530,4 +1530,4 @@ mini_lm 的权重 reload 与生成路径由 PASS 前断言及随后生成覆盖�
 3. [PyTorch AMP 官方文档](https://pytorch.org/docs/stable/amp.html)
 4. [DistributedDataParallel 官方文档](https://pytorch.org/docs/stable/generated/torch.nn.parallel.DistributedDataParallel.html)
 5. [FullyShardedDataParallel 官方文档](https://pytorch.org/docs/stable/fsdp.html)
-6. [Week 4 Attention 与 FlashAttention 教材](Week4_Attention与FlashAttention完整学习资料.md)
+6. [Week 4 Attention 与 FlashAttention 教材](../attention/Week4_Attention与FlashAttention完整学习资料.md)

@@ -191,7 +191,7 @@ nvcc -O3 -arch=sm_75 -std=c++14 -o mat_mul mat_mul.cu
 
 ## Occupancy 实验（Step 11）
 
-详见 [Occupancy详解_从入门到调优.md](../docs/Occupancy详解_从入门到调优.md)
+详见 [Occupancy详解_从入门到调优.md](../docs/topics/performance/Occupancy详解_从入门到调优.md)
 
 | blockDim | 线程数 | GFLOPS (1024³) |
 |----------|--------|----------------|

@@ -749,7 +749,7 @@ int main() {
 ```bash
 mkdir -p /tmp/week4_attention
 awk '/^```cpp attention_cpu.cpp$/{p=1;next} /^```$/{if(p){exit}} p' \
-  docs/Week4_Attention与FlashAttention完整学习资料.md \
+    docs/courses/attention/Week4_Attention与FlashAttention完整学习资料.md \
   > /tmp/week4_attention/attention_cpu.cpp
 g++ -O2 -std=c++17 /tmp/week4_attention/attention_cpu.cpp \
   -o /tmp/week4_attention/attention_cpu
@@ -799,7 +799,7 @@ scores[i*n+j] = Σ_x q[i*d+x] * k[j*d+x] / sqrt(d)
 第三遍：score = exp(score-row_max)/denom
 ```
 
-现有参考：[operator_practice/softmax/softmax.cu](../operator_practice/softmax/softmax.cu)。这次需要从“单个向量”扩成 `n` 行：`blockIdx.x` 选择行。
+现有参考：[operator_practice/softmax/softmax.cu](../../../operator_practice/softmax/softmax.cu)。这次需要从“单个向量”扩成 `n` 行：`blockIdx.x` 选择行。
 
 ### 10.3 Kernel 3：`PV`
 
@@ -872,7 +872,7 @@ PV:   约 2N²Dh FLOP
 
 ## 13. 先复盘你已经会的 stable softmax
 
-你已经实现过三遍式版本：[operator_practice/softmax/softmax.cu](../operator_practice/softmax/softmax.cu)。对一行 `x[0..N-1]`：
+你已经实现过三遍式版本：[operator_practice/softmax/softmax.cu](../../../operator_practice/softmax/softmax.cu)。对一行 `x[0..N-1]`：
 
 ```text
 第一遍：m = max(x)
@@ -1069,7 +1069,7 @@ int main() {
 
 ```bash
 awk '/^```cpp online_softmax_cpu.cpp$/{p=1;next} /^```$/{if(p){exit}} p' \
-  docs/Week4_Attention与FlashAttention完整学习资料.md \
+    docs/courses/attention/Week4_Attention与FlashAttention完整学习资料.md \
   > /tmp/week4_attention/online_softmax_cpu.cpp
 g++ -O2 -std=c++17 /tmp/week4_attention/online_softmax_cpu.cpp \
   -o /tmp/week4_attention/online_softmax_cpu
@@ -1845,7 +1845,7 @@ int main() {
 
 ```bash
 awk '/^```cpp tiled_attention_reference.cu$/{p=1;next} /^```$/{if(p){exit}} p' \
-  docs/Week4_Attention与FlashAttention完整学习资料.md \
+    docs/courses/attention/Week4_Attention与FlashAttention完整学习资料.md \
   > /tmp/week4_attention/tiled_attention_reference.cu
 nvcc -O3 -std=c++17 -arch=sm_80 -lineinfo \
   /tmp/week4_attention/tiled_attention_reference.cu \
@@ -1924,7 +1924,7 @@ QK^T 矩阵乘
 
 > 会写 WMMA GEMM，不等于自动会写 FlashAttention；但你已经掌握了最重的两段矩阵乘原语。
 
-回看已有实测：[Tensor Core Profile](../week06_tensorcore/tensor_core_profile.md)。你的教学 WMMA 已看到 HMMA 指令，但 Tensor pipe 活跃度低，说明“算得快”之后必须解决“怎样喂数据”。Attention 同样如此，只是流水中又插入 softmax。
+回看已有实测：[Tensor Core Profile](../../../week06_tensorcore/tensor_core_profile.md)。你的教学 WMMA 已看到 HMMA 指令，但 Tensor pipe 活跃度低，说明“算得快”之后必须解决“怎样喂数据”。Attention 同样如此，只是流水中又插入 softmax。
 
 ## 40. A100 上各精度负责什么
 
@@ -1971,7 +1971,7 @@ WMMA 的 fragment lane/register 映射不透明；softmax 又需要按 row 读�
 
 ## 42. `cp.async` 在这里做什么
 
-Ampere 的异步拷贝可以把 global 数据搬到 shared，并与当前 tile 的计算形成 pipeline。你已有完整基础：[异步拷贝与 pipeline 文档](异步拷贝_pipeline_cooperative_groups学习文档.md)。
+Ampere 的异步拷贝可以把 global 数据搬到 shared，并与当前 tile 的计算形成 pipeline。你已有完整基础：[异步拷贝与 pipeline 文档](../../topics/execution/CUDA核心原语_场景驱动教程.md)。
 
 双缓冲时间线：
 
@@ -2579,7 +2579,7 @@ bytes = B×N×Hkv×(Dh+Dv)×bytes_per_element×layers
 
 # 附录 B：推荐阅读（按顺序）
 
-1. 本仓库 [stable softmax 实现](../operator_practice/softmax/softmax.cu)。
+1. 本仓库 [stable softmax 实现](../../../operator_practice/softmax/softmax.cu)。
 2. [FlashAttention 原始论文](https://arxiv.org/abs/2205.14135)：优先看算法图、IO 动机和 forward 伪代码。
 3. [CUDA Programming Guide](https://docs.nvidia.com/cuda/cuda-programming-guide/)：异步数据拷贝与矩阵乘部分。
 4. [DeepSeek-V2 论文](https://arxiv.org/abs/2405.04434)：MLA 章节与附录。

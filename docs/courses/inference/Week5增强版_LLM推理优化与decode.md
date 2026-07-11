@@ -209,7 +209,7 @@ Q 与各位置 K 计算相关分数
 为什么最后必须回到 `D`？因为接下来要做 `H=X+AttentionOut`。逐元素相加要求 shape 相同。因此，即使 Q/K/V 内部拆成多个 head，输出投影也会把结果整理回 `[B,N,D]`。
 
 完整 Attention 数学、head 和 FlashAttention 请看
-[Week4 Attention 与 FlashAttention 完整学习资料](./Week4_Attention与FlashAttention完整学习资料.md)。
+[Week4 Attention 与 FlashAttention 完整学习资料](../attention/Week4_Attention与FlashAttention完整学习资料.md)。
 
 #### 2.4.4 KV Cache 在哪里读写
 
@@ -1194,7 +1194,7 @@ Hopper：
 
 这促成 producer/consumer warp specialization：少量 producer 发 TMA，consumer warp-group 发 WGMMA，stage barrier 管生命周期。
 
-没有 H100 时，你能做架构和源码阅读，不能声称性能实测。深入见 [CUDA 深水区教材](CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md)。
+没有 H100 时，你能做架构和源码阅读，不能声称性能实测。深入见 [CUDA 深水区教材](../../topics/performance/CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md)。
 
 ## 51. 完整 Decode 数据流
 
@@ -1276,13 +1276,13 @@ nsys profile --trace=cuda,nvtx -o /tmp/timeline ./app
 
 # 附录 B：继续深挖
 
-- [Week4 Attention 与 FlashAttention](Week4_Attention与FlashAttention完整学习资料.md)
-- [AI Infra 面试八股](AI_Infra面试八股全集.md)
-- [KV Cache 专项](大模型KVCache系统学习指南.md)
-- [Occupancy 详解](Occupancy详解_从入门到调优.md)
-- [Nsight Compute 详解](Nsight_Compute_ncu详解.md)
-- [CUDA 深水区：PTX/SASS/MMA/流水/Hopper](CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md)
-- [CUDA Graph 教材](../cuda_deep_course/course/volume07_async_system/04_CUDA_Graph.md)
+- [Week4 Attention 与 FlashAttention](../attention/Week4_Attention与FlashAttention完整学习资料.md)
+- [AI Infra 面试八股](../../interview/AI_Infra面试核心题库.md)
+- [KV Cache 专项](../../topics/kv_cache/大模型KVCache系统学习指南.md)
+- [Occupancy 详解](../../topics/performance/Occupancy详解_从入门到调优.md)
+- [Nsight Compute 详解](../../topics/performance/Nsight_Compute_ncu详解.md)
+- [CUDA 深水区：PTX/SASS/MMA/流水/Hopper](../../topics/performance/CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md)
+- [CUDA Graph 教材](../../../cuda_deep_course/course/volume07_async_system/04_CUDA_Graph.md)
 - [NVIDIA Hopper Tuning Guide](https://docs.nvidia.com/cuda/hopper-tuning-guide/)
 
 > 链接用于深挖；完成本周主线不要求先通读这些长文档。

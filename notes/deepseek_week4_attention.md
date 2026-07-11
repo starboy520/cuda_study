@@ -1,6 +1,6 @@
 # DeepSeek Week4（Attention）Work Log
 
-> 对应：docs/Week4_Attention与FlashAttention完整学习资料.md
+> 对应：docs/courses/attention/Week4_Attention与FlashAttention完整学习资料.md
 > 硬件：A100 80GB PCIe（sm_80）
 > 起点：CUDA/GEMM 熟，LLM/Attention 零基础
 
@@ -53,7 +53,7 @@ softmax 沿 key 对 N 个分数做；causal 写 -∞ 才能 exp 后为 0。
 ## Day 2（2026-07-04）：Online Softmax
 
 ### 交付
-- `docs/Online_Softmax正确性证明.md` —— 完整正确性证明（增量更新与一次性算等价）
+- `docs/proofs/Online_Softmax正确性证明.md` —— 完整正确性证明（增量更新与一次性算等价）
 - `week04_attention/online_softmax.cu` —— 自己手写 CUDA 单行版
   - running `m/l`：遍历时维护最大值 m 和相对 m 的指数和 l
   - 新 max 出现 → 旧 l 乘 `alpha = exp(m_old - m_new)` 再加本段贡献

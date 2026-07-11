@@ -1,6 +1,6 @@
 # CUDA 面试八股 · 追问答案速查（续篇：第 8-15 章）
 
-> 配套：[CUDA面试八股全集.md](CUDA面试八股全集.md)、[追问答案第1-7章](CUDA面试八股_追问答案.md)
+> 配套：[CUDA面试八股全集.md](../../interview/CUDA面试核心题库.md)、[追问答案第1-7章](../../interview/CUDA面试核心题库.md)
 > 本篇覆盖第 8-15 章：Tensor Core / cp.async / PTX-SASS / profiling / 调试 / 多GPU / Hopper / 手写题与模拟面试。
 
 ---

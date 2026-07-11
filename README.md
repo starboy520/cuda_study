@@ -29,7 +29,7 @@ make && ./vec_add
 |------|------|
 | [notes/week01.md](notes/week01.md) | Week 1 实验记录、性能表 |
 | [notes/CUDA基础概念.md](notes/CUDA基础概念.md) | 概念速查（Grid/Block/SM/Warp 等） |
-| [docs/Programming_Model详解.md](docs/Programming_Model详解.md) | **官方 Programming Model 易懂版**（v13.x Part 1–2，配合 vec_add） |
+| [docs/courses/cuda/Programming_Model详解.md](docs/courses/cuda/Programming_Model详解.md) | **官方 Programming Model 易懂版**（v13.x Part 1–2，配合 vec_add） |
 
 ## 文档导航
 
@@ -38,15 +38,15 @@ make && ./vec_add
 | [study_plan/](study_plan/README.md) | **学习计划中枢**：当前四周聚焦计划的唯一执行入口 |
 | [历史课程与指南归档](docs/archive/README.md) | 旧八周路线、旧指南及合并前原文索引 |
 | [CUDA 面试核心题库](docs/interview/CUDA面试核心题库.md) | **面试题库**：核心问题、追问边界、手写 kernel 与项目证据 |
-| [Occupancy详解_从入门到调优.md](docs/Occupancy详解_从入门到调优.md) | Occupancy 完整文档：基础(延迟隐藏)+ 进阶(精确计算/调优/profiler) |
-| [Programming_Model详解.md](docs/Programming_Model详解.md) | Programming Model 白话详解（配合 v13.x Part 1–2） |
-| [GPU架构图资源.md](docs/GPU架构图资源.md) | 官方架构图、Memory Hierarchy 等配图链接 |
+| [Occupancy详解_从入门到调优.md](docs/topics/performance/Occupancy详解_从入门到调优.md) | Occupancy 完整文档：基础(延迟隐藏)+ 进阶(精确计算/调优/profiler) |
+| [Programming_Model详解.md](docs/courses/cuda/Programming_Model详解.md) | Programming Model 白话详解（配合 v13.x Part 1–2） |
+| [GPU架构图资源.md](docs/reference/GPU架构图资源.md) | 官方架构图、Memory Hierarchy 等配图链接 |
 | [Week1详细步骤.md](study_plan/archive/legacy-8-week/week01/Week1详细步骤.md) | **Week 1 逐步清单**（含 v13.x 阅 读章节 + Legacy 对照） |
 | [Week1_Day2-Day5学习清单.md](study_plan/archive/legacy-8-week/week01/Week1_Day2-Day5学习清单.md) | Week 1 **Day1–Day7** 可勾选清单（v13.x 对齐） |
-| [学习资料索引.md](docs/学习资料索引.md) | 书籍、官方文档、课程、论文、工具链接 |
-| [GPU卡型专项学习指南.md](docs/GPU卡型专项学习指南.md) | T4/A100 差异、卡相关学习内容、分阶段清单 |
+| [学习资料索引.md](docs/reference/学习资料索引.md) | 书籍、官方文档、课程、论文、工具链接 |
+| [GPU卡型专项学习指南.md](docs/reference/GPU卡型专项学习指南.md) | T4/A100 差异、卡相关学习内容、分阶段清单 |
 | [T4实战指南.md](docs/archive/hardware/T4实战指南.md) | T4 历史硬件特性、性能预期、实验建议 |
-| [项目清单.md](docs/项目清单.md) | 12 个递进项目 + 作品集建议 |
+| [项目清单.md](docs/reference/项目清单.md) | 12 个递进项目 + 作品集建议 |
 
 ## 学习节奏建议
 

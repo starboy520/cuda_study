@@ -39,7 +39,7 @@
 |---|---|
 | 面试全景 + 题库 | `docs/interview/CUDA面试核心题库.md`（当前 canonical）|
 | 各卷面试题 | `cuda_deep_course/course/volume*/` 每卷末尾"面试题" |
-| occupancy 深度题 | `docs/Occupancy详解_从入门到调优.md` §23 |
+| occupancy 深度题 | `docs/topics/performance/Occupancy详解_从入门到调优.md` §23 |
 | 故障案例 | `.../volume10_engineering_interview/07_常见故障案例库.md` |
 
 ---

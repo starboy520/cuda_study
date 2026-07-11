@@ -1,6 +1,6 @@
 # CUDA 面试八股全集：从基础正确性到 Kernel 性能深水区
 
-> 适用：CUDA/HPC 开发、GPU Kernel、CUDA 性能工程岗位。纯 CUDA、硬件、性能、调试与工程视角；Attention、KV Cache、推理框架等内容见 [AI Infra 面试八股全集](AI_Infra面试八股全集.md)。
+> 适用：CUDA/HPC 开发、GPU Kernel、CUDA 性能工程岗位。纯 CUDA、硬件、性能、调试与工程视角；Attention、KV Cache、推理框架等内容见 [AI Infra 面试八股全集](../../interview/AI_Infra面试核心题库.md)。
 
 ## 0. 使用方法
 
@@ -57,7 +57,7 @@ GPU 不是让一次 global load 本身变得没有延迟，而是在某个 warp 
 
 **项目证据**
 
-- [Week 1 计时记录](../notes/week01.md)展示了 kernel、H2D、D2H 和固定开销的区别。
+- [Week 1 计时记录](../../../notes/week01.md)展示了 kernel、H2D、D2H 和固定开销的区别。
 
 ### Q2：GPC、TPC、SM、warp scheduler、CUDA Core 是什么关系？
 
@@ -82,7 +82,7 @@ SM 是 CUDA block 实际驻留和执行的主要计算单元；SM 内有 schedul
 
 **项目证据**
 
-- [GPU 硬件架构卷](../cuda_deep_course/course/volume09_hardware_architecture/README.md)。
+- [GPU 硬件架构卷](../../../cuda_deep_course/course/volume09_hardware_architecture/README.md)。
 
 ### Q3：SIMT 与 SIMD 有什么区别？
 
@@ -107,7 +107,7 @@ CUDA 中一个 warp 通常有 32 个线程。线程可以有不同地址和控�
 
 **项目证据**
 
-- [Programming Model 详解](Programming_Model详解.md)。
+- [Programming Model 详解](../../courses/cuda/Programming_Model详解.md)。
 
 ### Q4：warp divergence 为什么慢，应该怎样优化？
 
@@ -132,7 +132,7 @@ CUDA 中一个 warp 通常有 32 个线程。线程可以有不同地址和控�
 
 **项目证据**
 
-- [性能卷：Occupancy、分歧与延迟隐藏](../cuda_deep_course/course/volume05_performance/03_Occupancy_分歧与延迟隐藏.md)。
+- [性能卷：Occupancy、分歧与延迟隐藏](../../../cuda_deep_course/course/volume05_performance/03_Occupancy_分歧与延迟隐藏.md)。
 
 ---
 
@@ -161,7 +161,7 @@ register 是每线程片上状态；local 是每线程私有地址空间但通�
 
 **项目证据**
 
-- [CUDA 内存模型详解](../notes/CUDA内存模型详解.md)。
+- [CUDA 内存模型详解](../../../notes/CUDA内存模型详解.md)。
 
 ### Q6：什么是 global memory coalescing？
 
@@ -186,7 +186,7 @@ coalescing 是 warp 的内存请求按地址分布合并成尽可能少、利用
 
 **项目证据**
 
-- [矩阵转置实验](../week02_memory/transpose/transpose.cu)。
+- [矩阵转置实验](../../../week02_memory/transpose/transpose.cu)。
 
 ### Q7：shared memory bank conflict 是什么？
 
@@ -211,7 +211,7 @@ bank 映射与地址、访问宽度和架构有关。经典转置用 `[32][33]` 
 
 **项目证据**
 
-- [A100 GEMM bank conflict 定位](../week05_gemm_advanced/ncu_notes.md)：4.8-way 降到约 1.5-way，性能同步改善。
+- [A100 GEMM bank conflict 定位](../../../week05_gemm_advanced/ncu_notes.md)：4.8-way 降到约 1.5-way，性能同步改善。
 
 ### Q8：`float4` 为什么可能更快，什么时候不会？
 
@@ -236,7 +236,7 @@ bank 映射与地址、访问宽度和架构有关。经典转置用 `[32][33]` 
 
 **项目证据**
 
-- [float4 GEMM](../week05_gemm_advanced/gemm_vectorized_load.cu)。
+- [float4 GEMM](../../../week05_gemm_advanced/gemm_vectorized_load.cu)。
 
 ---
 
@@ -265,7 +265,7 @@ barrier 等参与线程到齐并建立相应内存顺序；fence 约束调用线
 
 **项目证据**
 
-- [fence/flag 实验](../week02_memory/fence_flag.cu)。
+- [fence/flag 实验](../../../week02_memory/fence_flag.cu)。
 
 ### Q10：Atomic 保证了什么，又没有保证什么？
 
@@ -290,7 +290,7 @@ barrier 等参与线程到齐并建立相应内存顺序；fence 约束调用线
 
 **项目证据**
 
-- [Atomic 分层实验](../week03_parallel/atomic_sum/atomic_sum.cu)。
+- [Atomic 分层实验](../../../week03_parallel/atomic_sum/atomic_sum.cu)。
 
 ### Q11：Cooperative Groups 能直接实现任意 grid 同步吗？
 
@@ -315,7 +315,7 @@ Cooperative Groups 也提供 thread block、tiled partition 等结构化 collect
 
 **项目证据**
 
-- [三阶段 Scan](../week03_parallel/scan/scan.cu)使用 kernel 边界完成全局同步。
+- [三阶段 Scan](../../../week03_parallel/scan/scan.cu)使用 kernel 边界完成全局同步。
 
 ---
 
@@ -344,7 +344,7 @@ Occupancy 是驻留 active warps 与架构最大 warps 的比例；它提供隐�
 
 **项目证据**
 
-- [Occupancy 参数实验](../notes/deepseek/week01_day04.md)。
+- [Occupancy 参数实验](../../../notes/deepseek/week01_day04.md)。
 
 ### Q13：寄存器、spill、ILP 和 TLP 怎样权衡？
 
@@ -369,7 +369,7 @@ Occupancy 是驻留 active warps 与架构最大 warps 的比例；它提供隐�
 
 **项目证据**
 
-- A100 上 8×4 线程 tile 在 occupancy 与复用间取得甜点，详见 [ncu_notes](../week05_gemm_advanced/ncu_notes.md)。
+- A100 上 8×4 线程 tile 在 occupancy 与复用间取得甜点，详见 [ncu_notes](../../../week05_gemm_advanced/ncu_notes.md)。
 
 ---
 
@@ -398,7 +398,7 @@ H2D/D2H 与 kernel 重叠通常需要 pinned host memory、异步 API、不同 s
 
 **项目证据**
 
-- [Stream overlap](../week03_parallel/stream_overlap/stream_overlap.cu)实测约 2.2×流程加速。
+- [Stream overlap](../../../week03_parallel/stream_overlap/stream_overlap.cu)实测约 2.2×流程加速。
 
 ### Q15：CUDA Event 能测什么，不能测什么？
 
@@ -423,7 +423,7 @@ Event 必须记录在正确 stream，并等待 stop event 完成。短 kernel �
 
 **项目证据**
 
-- [Week 1 GFLOPS 计时修正](../notes/week01.md)。
+- [Week 1 GFLOPS 计时修正](../../../notes/week01.md)。
 
 ### Q16：CUDA Graph 解决什么，什么时候不值得？
 
@@ -448,7 +448,7 @@ Graph 把重复的 launch/依赖序列实例化并重放，主要降低 CPU laun
 
 **项目证据**
 
-- [CUDA Graph 课程实验](../cuda_deep_course/labs/07_async_system/cuda_graph/cuda_graph.cu)；当前项目只有课程样例，回答时不要冒充完整性能专项。
+- [CUDA Graph 课程实验](../../../cuda_deep_course/labs/07_async_system/cuda_graph/cuda_graph.cu)；当前项目只有课程样例，回答时不要冒充完整性能专项。
 
 ---
 
@@ -477,7 +477,7 @@ grid-stride 让每线程处理多个元素；warp shuffle 完成 32 lane 归约�
 
 **项目证据**
 
-- [完整 Reduction](../week03_parallel/reduction_sum_full/reduction_sum_full.cu)与 CUB 对比达到约 91% 带宽峰值。
+- [完整 Reduction](../../../week03_parallel/reduction_sum_full/reduction_sum_full.cu)与 CUB 对比达到约 91% 带宽峰值。
 
 ### Q18：Scan 为什么比 Reduction 难？
 
@@ -502,7 +502,7 @@ warp 内可用 `__shfl_up_sync`，block 内先扫各 warp，再扫 warp sums。g
 
 **项目证据**
 
-- [Scan 实现](../week03_parallel/scan/scan.cu)。
+- [Scan 实现](../../../week03_parallel/scan/scan.cu)。
 
 ### Q19：Histogram 怎样降低 atomic 争用？
 
@@ -527,7 +527,7 @@ warp 内可用 `__shfl_up_sync`，block 内先扫各 warp，再扫 warp sums。g
 
 **项目证据**
 
-- [Histogram](../week03_parallel/histogram/histogram.cu)在集中分布下实测约 12× 改善。
+- [Histogram](../../../week03_parallel/histogram/histogram.cu)在集中分布下实测约 12× 改善。
 
 ---
 
@@ -556,7 +556,7 @@ naive GEMM 让每个输出重复从 global 读取 A/B，算术强度低；shared
 
 **项目证据**
 
-- [GEMM benchmark](../week05_gemm_advanced/benchmark.md)。
+- [GEMM benchmark](../../../week05_gemm_advanced/benchmark.md)。
 
 ### Q21：2D register tiling 为什么有效？
 
@@ -581,7 +581,7 @@ naive GEMM 让每个输出重复从 global 读取 A/B，算术强度低；shared
 
 **项目证据**
 
-- [2D register tiling](../week05_gemm_advanced/gemm_2d_thread_tiling.cu)和 [参数扫描](../notes/deepseek/week01_day04.md)。
+- [2D register tiling](../../../week05_gemm_advanced/gemm_2d_thread_tiling.cu)和 [参数扫描](../../../notes/deepseek/week01_day04.md)。
 
 ### Q22：怎样系统评价一个 GEMM 优化版本？
 
@@ -606,7 +606,7 @@ naive GEMM 让每个输出重复从 global 读取 A/B，算术强度低；shared
 
 **项目证据**
 
-- [Roofline 记录](../week05_gemm_advanced/roofline.md)与 [ncu_notes](../week05_gemm_advanced/ncu_notes.md)。
+- [Roofline 记录](../../../week05_gemm_advanced/roofline.md)与 [ncu_notes](../../../week05_gemm_advanced/ncu_notes.md)。
 
 ---
 
@@ -635,7 +635,7 @@ Tensor Core 是矩阵乘加硬件；WMMA 是 CUDA C++ warp matrix API；`mma.syn
 
 **项目证据**
 
-- [WMMA GEMM](../week06_tensorcore/wmma_fp16_gemm.cu)与 [三重证据](../week06_tensorcore/tensor_core_profile.md)。
+- [WMMA GEMM](../../../week06_tensorcore/wmma_fp16_gemm.cu)与 [三重证据](../../../week06_tensorcore/tensor_core_profile.md)。
 
 ### Q24：`ldmatrix` 和 fragment 是什么？
 
@@ -660,7 +660,7 @@ fragment 是 warp 分布式持有的矩阵 operand；`ldmatrix` 协作地把 sha
 
 **项目证据**
 
-- [CUDA 深水区教材 Part II](CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md)。
+- [CUDA 深水区教材 Part II](../../topics/performance/CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md)。
 
 ### Q25：CUTLASS/CuTe 的三级 tile 为什么存在？
 
@@ -714,7 +714,7 @@ Ampere `cp.async` 支持 global→shared 异步复制，避免显式中间通用
 
 **项目证据**
 
-- [两级 pipeline GEMM](../week05_gemm_advanced/gem_double_buffering.cu)。
+- [两级 pipeline GEMM](../../../week05_gemm_advanced/gem_double_buffering.cu)。
 
 ### Q27：为什么 3-stage 不一定比 2-stage 快？
 
@@ -739,7 +739,7 @@ Ampere `cp.async` 支持 global→shared 异步复制，避免显式中间通用
 
 **项目证据**
 
-- [CUDA 深水区教材 Part III](CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md)。
+- [CUDA 深水区教材 Part III](../../topics/performance/CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md)。
 
 ---
 
@@ -768,7 +768,7 @@ CUDA C++→NVVM/PTX→ptxas→cubin；fatbin 可携带多个 cubin 和 PTX。PTX
 
 **项目证据**
 
-- [PTX/SASS 两周教材](CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md)。
+- [PTX/SASS 两周教材](../../topics/performance/CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md)。
 
 ### Q29：怎样用汇编证明优化真的生效？
 
@@ -793,7 +793,7 @@ CUDA C++→NVVM/PTX→ptxas→cubin；fatbin 可携带多个 cubin 和 PTX。PTX
 
 **项目证据**
 
-- [Tensor Core SASS 证据](../week06_tensorcore/tensor_core_profile.md)。
+- [Tensor Core SASS 证据](../../../week06_tensorcore/tensor_core_profile.md)。
 
 ---
 
@@ -822,7 +822,7 @@ nsys 看系统时间线和并发；ncu 看单 kernel 微观硬件行为；Roofli
 
 **项目证据**
 
-- [A100 Roofline 与 ncu 联合分析](../notes/deepseek/week01_day05.md)。
+- [A100 Roofline 与 ncu 联合分析](../../../notes/deepseek/week01_day05.md)。
 
 ### Q31：Active、Eligible、Issued warp 和 Scoreboard 是什么？
 
@@ -847,7 +847,7 @@ active 多但 eligible 少说明很多 warp 同时等待；可用更多 TLP、�
 
 **项目证据**
 
-- [Scheduler/Scoreboard 教材](CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md)。
+- [Scheduler/Scoreboard 教材](../../topics/performance/CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md)。
 
 ### Q32：Long Scoreboard 高意味着什么？
 
@@ -872,7 +872,7 @@ active 多但 eligible 少说明很多 warp 同时等待；可用更多 TLP、�
 
 **项目证据**
 
-- [ncu 指标详解](Nsight_Compute_ncu详解.md)。
+- [ncu 指标详解](../../topics/performance/Nsight_Compute_ncu详解.md)。
 
 ---
 
@@ -926,7 +926,7 @@ memcheck 查非法/越界访问，initcheck 查未初始化 device global 读取
 
 **项目证据**
 
-- [实验完成标准](../cuda_deep_course/course/实验方法与完成标准.md)。
+- [实验完成标准](../../../cuda_deep_course/course/实验方法与完成标准.md)。
 
 ### Q35：CUDA 工程中为什么要做错误检查和 RAII？
 
@@ -951,7 +951,7 @@ launch 后 `cudaGetLastError()` 查配置/启动错误；需要确认执行完�
 
 **项目证据**
 
-- [公共错误检查头](../common/cuda_check.cuh)。
+- [公共错误检查头](../../../common/cuda_check.cuh)。
 
 ---
 
@@ -980,7 +980,7 @@ PCIe/NVLink 是互连路径，P2P 允许 GPU 直接访问/复制对端显存，N
 
 **项目证据**
 
-- [多 GPU 与拓扑教材](../cuda_deep_course/course/volume08_hpc_multigpu/README.md)；当前项目缺少真实多卡 benchmark，应如实说明。
+- [多 GPU 与拓扑教材](../../../cuda_deep_course/course/volume08_hpc_multigpu/README.md)；当前项目缺少真实多卡 benchmark，应如实说明。
 
 ### Q37：All-Reduce 为什么常分解为 Reduce-Scatter + All-Gather？
 
@@ -1005,7 +1005,7 @@ Reduce-Scatter 让各 rank 得到归约结果的一段，All-Gather 再交换各
 
 **项目证据**
 
-- 模型并行场景见 [AI Infra 面试八股](AI_Infra面试八股全集.md)。
+- 模型并行场景见 [AI Infra 面试八股](../../interview/AI_Infra面试核心题库.md)。
 
 ---
 
@@ -1034,7 +1034,7 @@ TMA 使用 tensor descriptor 和坐标发起 bulk 多维搬运，把大量 per-t
 
 **项目证据**
 
-- [Hopper 迁移章节](CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md)。无 H100 时只能称架构理解，不能声称实测性能。
+- [Hopper 迁移章节](../../topics/performance/CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md)。无 H100 时只能称架构理解，不能声称实测性能。
 
 ### Q39：WGMMA、Cluster 和 DSM 分别解决什么？
 
@@ -1059,7 +1059,7 @@ WGMMA 有自己的 fence/commit/wait 和 operand 规则，不能套 Ampere lane 
 
 **项目证据**
 
-- [Hopper 官方迁移式学习资料](CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md)。
+- [Hopper 官方迁移式学习资料](../../topics/performance/CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md)。
 
 ### Q40：Persistent kernel 与 warp specialization 的价值是什么？
 

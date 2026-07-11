@@ -2,7 +2,7 @@
 
 > 一份独立、面向实操的 ncu 手册。从"怎么跑"到"指标怎么读、瓶颈怎么定位"。是你做性能优化
 > (Week5 起)的主力工具文档。配合 [Occupancy详解](Occupancy详解_从入门到调优.md) 和课程
-> [卷五/05](../cuda_deep_course/course/volume05_performance/05_Nsight_Compute与Compute_Sanitizer.md) 使用。
+> [卷五/05](../../../cuda_deep_course/course/volume05_performance/05_Nsight_Compute与Compute_Sanitizer.md) 使用。
 >
 > 硬件基准:Tesla T4(sm_75)。命令通用,指标名随 ncu 版本略有差异,以 `--list-sections` 为准。
 
@@ -518,12 +518,12 @@ ncu 只看指标。
 ## 配套阅读
 
 - [Occupancy详解_从入门到调优.md](Occupancy详解_从入门到调优.md) —— occupancy section 的深入
-- 课程 [卷五/05 Nsight Compute 与 Compute Sanitizer](../cuda_deep_course/course/volume05_performance/05_Nsight_Compute与Compute_Sanitizer.md)
-- 课程 [卷五/04 Nsight Systems 系统时间线](../cuda_deep_course/course/volume05_performance/04_Nsight_Systems系统时间线.md)
-- 课程 [卷五/06 完整优化案例](../cuda_deep_course/course/volume05_performance/06_完整优化案例_复习与面试.md)
-- 课程 [卷九/02 Warp 调度与延迟隐藏](../cuda_deep_course/course/volume09_hardware_architecture/02_Warp调度_scheduler_scoreboard与延迟隐藏.md) —— stall 的硬件根源
+- 课程 [卷五/05 Nsight Compute 与 Compute Sanitizer](../../../cuda_deep_course/course/volume05_performance/05_Nsight_Compute与Compute_Sanitizer.md)
+- 课程 [卷五/04 Nsight Systems 系统时间线](../../../cuda_deep_course/course/volume05_performance/04_Nsight_Systems系统时间线.md)
+- 课程 [卷五/06 完整优化案例](../../../cuda_deep_course/course/volume05_performance/06_完整优化案例_复习与面试.md)
+- 课程 [卷九/02 Warp 调度与延迟隐藏](../../../cuda_deep_course/course/volume09_hardware_architecture/02_Warp调度_scheduler_scoreboard与延迟隐藏.md) —— stall 的硬件根源
 - 官方:Nsight Compute CLI / Profiling Guide、Kernel Profiling Guide
 
 ---
 
-**返回**:[study_plan/Week5 性能工程](../study_plan/archive/legacy-8-week/week05/Week5_性能工程与Nsight实战.md) · [CUDA学习路线图](../../archive/curricula/CUDA学习路线图_legacy.md)
+**返回**:[study_plan/Week5 性能工程](../../../study_plan/archive/legacy-8-week/week05/Week5_性能工程与Nsight实战.md) · [CUDA学习路线图](../../archive/curricula/CUDA学习路线图_legacy.md)

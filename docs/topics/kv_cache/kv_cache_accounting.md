@@ -1,6 +1,6 @@
 # KV Cache 显存账
 
-> 对应：docs/Week5增强版_LLM推理优化与decode.md（Day1 §5、§7）
+> 对应：docs/courses/inference/Week5增强版_LLM推理优化与decode.md（Day1 §5、§7）
 > 目的：会算「KV cache 占多少显存」，理解为什么长上下文推理极度关心它。
 
 ---

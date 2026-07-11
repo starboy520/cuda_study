@@ -2,7 +2,7 @@
 
 > **适用人群**：有 C++ 基础、想**只用官方 [CUDA Programming Guide](https://docs.nvidia.com/cuda/cuda-programming-guide/)** 作为主教材的人。
 > **硬件**：Tesla T4 · SM 7.5 (Turing) · CUDA 13.x。
-> **配套**：本文是「读什么 + 怎么读 + 必须自己补什么」的总纲；逐日步骤见 [Week1详细步骤.md](../study_plan/archive/legacy-8-week/week01/Week1详细步骤.md)、[Week2详细步骤.md](../study_plan/archive/legacy-8-week/week02/Week2详细步骤.md)。
+> **配套**：本文是「读什么 + 怎么读 + 必须自己补什么」的总纲；逐日步骤见 [Week1详细步骤.md](../../study_plan/archive/legacy-8-week/week01/Week1详细步骤.md)、[Week2详细步骤.md](../../study_plan/archive/legacy-8-week/week02/Week2详细步骤.md)。
 
 ---
 
@@ -79,7 +79,7 @@
 
 **Week 1 整章跳过**：2.2 (Python)、2.4 (Tile)、2.5/2.6（后面再读）、Part 3/4
 
-> 逐步清单已就绪：[Week1详细步骤.md](../study_plan/archive/legacy-8-week/week01/Week1详细步骤.md)（12 Step）
+> 逐步清单已就绪：[Week1详细步骤.md](../../study_plan/archive/legacy-8-week/week01/Week1详细步骤.md)（12 Step）
 
 ---
 
@@ -101,7 +101,7 @@
 2. `reduction`：1M→1 求和，至少做到 shared memory 树形归约
 3. 故意制造非合并访问，**用 ncu 看 `dram__throughput` 差异**（profiling 在阶段 6 系统学，这里先会跑一条命令）
 
-> 逐步清单：[Week2详细步骤.md](../study_plan/archive/legacy-8-week/week02/Week2详细步骤.md)
+> 逐步清单：[Week2详细步骤.md](../../study_plan/archive/legacy-8-week/week02/Week2详细步骤.md)
 
 ---
 
@@ -221,7 +221,7 @@ Guide Part 4 有 20 节，**别全读**，按方向挑：
 - **每节都要写代码**，Guide 没习题，代码是唯一练习。
 - **可选**：PMPP 第四版当讲解版串讲。
 
-> 你现在在**阶段 1（Week 1）**，照 [Week1详细步骤.md](../study_plan/archive/legacy-8-week/week01/Week1详细步骤.md) 走即可 。
+> 你现在在**阶段 1（Week 1）**，照 [Week1详细步骤.md](../../study_plan/archive/legacy-8-week/week01/Week1详细步骤.md) 走即可 。
 
 ---
 

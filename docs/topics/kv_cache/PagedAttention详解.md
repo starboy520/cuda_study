@@ -254,5 +254,5 @@ paged flash attention kernel：按 block table gather KV，做 attention
 - KV cache 字节账：[kv_cache_accounting.md](kv_cache_accounting.md)
 - decode 数据流与瓶颈：[decode_step_dataflow.md](decode_step_dataflow.md)
 - KV cache 系统指南（含 PagedAttention 背景）：[大模型KVCache系统学习指南.md](大模型KVCache系统学习指南.md) §12
-- Week5 Day7 block table 手推：[Week5增强版_LLM推理优化与decode.md](Week5增强版_LLM推理优化与decode.md) §46-48
+- Week5 Day7 block table 手推：[Week5增强版_LLM推理优化与decode.md](../../courses/inference/Week5增强版_LLM推理优化与decode.md) §46-48
 - 官方：[vLLM 文档](https://docs.vllm.ai/)、[PagedAttention 论文](https://arxiv.org/abs/2309.06180)
