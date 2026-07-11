@@ -1,97 +1,65 @@
-# docs 文档导航
+# CUDA / AI Infra 知识目录
 
-> 本目录学习文档索引。按「用途」分类，标注对应学习阶段。
-> 外部资料（官方文档/书籍/课程）见 [学习资料索引.md](reference/学习资料索引.md)。
+> 当前执行入口是[四周聚焦计划](../study_plan/README.md)。本页只负责导航，不维护第二份进度表。
 
----
+## 当前四周导航
 
-## 🗺️ 计划与路线（先看这些）
+| 阶段 | 核心材料 |
+| --- | --- |
+| Week 1：GEMM | [四周计划](../study_plan/四周聚焦计划_AIInfra与CUDA深水区.md)、[GEMM 优化阶梯](../week05_gemm_advanced/gemm_optimization_ladder.md)、[cuBLAS / CUTLASS 技术参考](topics/gemm_tensorcore/cuBLAS与CUTLASS面试速成.md) |
+| Week 2：PTX/SASS + ncu + Tensor Core | [PTX/SASS/MMA 深水区](topics/performance/CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md)、[Nsight Compute](topics/performance/Nsight_Compute_ncu详解.md)、[Tensor Core 学习文档](courses/cuda/Week3_TensorCore学习文档.md)、[Tensor Core 实验](../week06_tensorcore/README.md) |
+| Week 3：Attention + Online proof | [Attention / FlashAttention 教材](courses/attention/Week4_Attention与FlashAttention完整学习资料.md)、[Online Softmax 正确性证明](proofs/Online_Softmax正确性证明.md)、[Attention pipeline 分析](../week04_attention/ncu_pipeline_notes.md) |
+| Week 4：KV/Paged + 面试 | [KV Cache 专题](topics/kv_cache/README.md)、[PagedAttention](topics/kv_cache/PagedAttention详解.md)、[面试准备入口](interview/README.md) |
 
-| 文档 | 说明 |
-|------|------|
-| [AI Infra + CUDA 深水区四周聚焦计划](../study_plan/四周聚焦计划_AIInfra与CUDA深水区.md) | ⭐ 当前唯一执行计划 |
-| [历史课程与指南归档](archive/README.md) | 旧八周路线与历史冲刺计划索引 |
-| [学习资料索引.md](reference/学习资料索引.md) | 外部资料（官方文档/书/课程/开源）索引 |
-| [项目清单.md](reference/项目清单.md) | 作品集项目清单 |
+## 课程教材
 
----
+- [CUDA 深度学习工程教材](../cuda_deep_course/README.md)：长期系统教材总入口。
+- [教材卷目录](../cuda_deep_course/course/README.md)：按 GPU 基础、编程模型、内存、并行算法、性能和系统主题展开。
+- [CUDA Programming Model 详解](courses/cuda/Programming_Model详解.md)：编程模型与执行层次。
+- [ML 训练侧入门](courses/ml/ML基础_训练侧入门.md)：补充训练侧基础，不属于当前四周主线。
 
-## 📅 每周学习材料（跟着计划走）
+## 性能与底层
 
-| 文档 | 阶段 | 说明 |
-|------|------|------|
-| [archive/Week1详细步骤.md](../study_plan/archive/legacy-8-week/week01/Week1详细步骤.md) | Week1 | GPU 基础详细步骤（已归档） |
-| [archive/Week1_Day2-Day5学习清单.md](../study_plan/archive/legacy-8-week/week01/Week1_Day2-Day5学习清单.md) | Week1 | Day2-5 清单（已归档） |
-| [Week3_TensorCore学习文档.md](courses/cuda/Week3_TensorCore学习文档.md) | Week3 | ⭐ Tensor Core/WMMA 自包含手册 |
-| [Week4_Attention与FlashAttention完整学习资料.md](courses/attention/Week4_Attention与FlashAttention完整学习资料.md) | Week4 | ⭐ Attention/FlashAttention 完整资料 |
+- [PTX/SASS/MMA/异步流水与 Hopper](topics/performance/CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md)
+- [Nsight Compute ncu 详解](topics/performance/Nsight_Compute_ncu详解.md)
+- [Occupancy：从入门到调优](topics/performance/Occupancy详解_从入门到调优.md)
+- [CUDA 核心原语场景驱动教程](topics/execution/CUDA核心原语_场景驱动教程.md)
+- [Cooperative Groups 与 CUDA Graph](topics/execution/CooperativeGroups与CUDAGraph深度教程.md)
 
-> Week3 代码/笔记在 `week06_tensorcore/`；Week1-2 GEMM 在 `week05_gemm_advanced/`；算子练习在 `operator_practice/`。
+## GEMM / Tensor Core
 
----
+- [GEMM 优化阶梯](../week05_gemm_advanced/gemm_optimization_ladder.md)与[实测记录](../week05_gemm_advanced/benchmark.md)
+- [Week 3 Tensor Core 学习文档](courses/cuda/Week3_TensorCore学习文档.md)
+- [Tensor Core 实验入口](../week06_tensorcore/README.md)
+- [cuBLAS 与 CUTLASS 面试速成](topics/gemm_tensorcore/cuBLAS与CUTLASS面试速成.md)
 
-## 🎯 面试准备
+## Attention / KV / 推理
 
-| 文档 | 说明 |
-|------|------|
-| [CUDA面试八股全集.md](interview/CUDA面试核心题库.md) | ⭐ 15 章系统八股，闭卷口述粒度 |
-| [CUDA 面试核心题库](interview/CUDA面试核心题库.md) | 当前 CUDA 面试复习入口 |
+- [Attention 与 FlashAttention 完整学习资料](courses/attention/Week4_Attention与FlashAttention完整学习资料.md)
+- [Online Softmax 正确性证明](proofs/Online_Softmax正确性证明.md)
+- [LLM 推理优化与 decode](courses/inference/Week5增强版_LLM推理优化与decode.md)
+- [KV Cache 专题入口](topics/kv_cache/README.md)与[PagedAttention 详解](topics/kv_cache/PagedAttention详解.md)
 
----
+## AI Infra / 多卡
 
-## 🔧 概念与原语参考（查阅用）
+- [AI Infra 面试核心题库](interview/AI_Infra面试核心题库.md)：连接 kernel、推理数据流、调度与系统设计。
+- [HPC 与多 GPU 教材卷](../cuda_deep_course/course/volume08_hpc_multigpu/README.md)：长期教材入口。
+- [MoE 与多卡并行](topics/distributed/MoE与多卡并行_系统学习.md)：**后续专题，当前四周冻结**；多卡实测同样不进入当前主线。
 
-| 文档 | 说明 |
-|------|------|
-| [CUDA核心原语_场景驱动教程.md](topics/execution/CUDA核心原语_场景驱动教程.md) | 场景驱动：问题→代码→为什么（ballot/shuffle/atomicCAS/cp.async 等） |
-| [异步拷贝_pipeline_cooperative_groups学习文档.md](topics/execution/CUDA核心原语_场景驱动教程.md) | cp.async / pipeline / cooperative groups |
-| [Programming_Model详解.md](courses/cuda/Programming_Model详解.md) | CUDA 编程模型 |
-| [Programming_Guide学习路径.md](reference/Programming_Guide学习路径.md) | 官方 Programming Guide 阅读路径 |
-| [Occupancy详解_从入门到调优.md](topics/performance/Occupancy详解_从入门到调优.md) | Occupancy 从入门到调优 |
+## 面试
 
----
+- [面试准备入口](interview/README.md)
+- [CUDA 面试核心题库](interview/CUDA面试核心题库.md)
+- [AI Infra 面试核心题库](interview/AI_Infra面试核心题库.md)
 
-## 📊 性能分析工具
+## 参考
 
-| 文档 | 说明 |
-|------|------|
-| [Nsight_Compute_ncu详解.md](topics/performance/Nsight_Compute_ncu详解.md) | ncu 使用与指标解读 |
+- [学习资料索引](reference/学习资料索引.md)
+- [CUDA Programming Guide 学习路径](reference/Programming_Guide学习路径.md)
+- [GPU 卡型专项学习指南](reference/GPU卡型专项学习指南.md)
+- [GPU 架构图资源](reference/GPU架构图资源.md)
+- [项目清单](reference/项目清单.md)
 
----
+## 归档
 
-## 🖥️ 硬件与架构
-
-| 文档 | 说明 |
-|------|------|
-| [GPU卡型专项学习指南.md](reference/GPU卡型专项学习指南.md) | 各 GPU 卡型（T4/A100/H100 等） |
-| [GPU架构图资源.md](reference/GPU架构图资源.md) | 架构图资源 |
-| [archive/hardware/T4实战指南.md](archive/hardware/T4实战指南.md) | T4 实战（已归档） |
-
----
-
-## 🤖 LLM 系统（Week5+）
-
-| 文档 | 说明 |
-|------|------|
-| [大模型KVCache系统学习指南.md](topics/kv_cache/大模型KVCache系统学习指南.md) | KV cache 系统 |
-
----
-
-## 🛠️ 自动生成的计划/设计（superpowers）
-
-| 目录 | 说明 |
-|------|------|
-| [superpowers/plans/](superpowers/plans/) | Week3/Week4 的实施计划 |
-| [superpowers/specs/](superpowers/specs/) | 对应的设计 spec |
-
----
-
-## 📌 按学习阶段速查
-
-```text
-现在学 Tensor Core  → Week3_TensorCore学习文档.md
-                      + week06_tensorcore/mixed_precision_and_scaling.md（精度/scaling）
-准备学 Attention    → Week4_Attention与FlashAttention完整学习资料.md
-查原语用法          → CUDA核心原语_场景驱动教程.md（学用法）
-面试复习            → CUDA面试八股全集.md
-调优/profiler       → Nsight_Compute_ncu详解.md + Occupancy详解.md
-```
+[历史课程与指南归档](archive/README.md)保存旧路线、旧硬件资料、合并前原文和历史过程记录，仅供检索，不作为日常学习入口。
