@@ -181,3 +181,49 @@ ncu 看 long_scoreboard 从每指令 6.4 cycle 降到 0.03，short_scoreboard �
 - [ ] Day7：profiling（benchmark 表 + ncu 证据）
 - [ ] 进阶：FP16 + Tensor Core（多 query tile + mma.sync），留作 CUDA 深度专项
 - [ ] `fused_attention.cu` 三个 TODO（如需补 Day1 融合版）
+
+---
+
+## Advanced Prefill M1（2026-07-14）：Br=4 Query-tiled FP32 SIMT
+
+### 交付
+
+- 在 `gpu-kernel-engineering/projects/attention_prefill/` 新建独立作品项目。
+- 自己实现 `Br=4, Bc=16` 的 Query-tiled FP32 SIMT Attention Kernel。
+- 一个 CTA 处理最多 4 条连续 Query；同一份 K/V tile 被 4 行 Query 复用。
+- 每行维护独立的 `m/l/alpha/O_acc`，支持 causal、Query tail、K/V tail 和 feature tail。
+- 工程补齐 CPU double reference、launcher 合同测试、126-case shape 矩阵和 2 个特殊输入。
+
+### 修掉的错误
+
+1. V 搬运目标写错，导致 `v_s` 未被正确填充。
+2. Score 任务用 feature 维 `D` 解码；正确任务平面是 `valid_query × valid_kv`。
+3. 阶段 E 用打平任务编号访问 V；应使用解码后的 `cur_feature`。
+4. Grid-stride 写回从 `tid` 解码；第二轮必须从循环变量解码。
+5. causal 比较局部 Query/Key 坐标；跨 Query CTA 后必须比较全局坐标。
+
+### 核心理解
+
+- `Br=4` 共享的是 K/V tile，不共享每行 Online Softmax 状态。
+- 阶段 E 是小型 GEMV：`weight[query, key] × V[key, feature]`，Key 是归约维，feature 是独立输出维。
+- 当前采用 output-stationary：一个线程拥有一个 `(query, feature)`，独立遍历全部 Key，无需 atomic 或 Warp reduce。
+- 全 mask tile 必须成为恒等更新：`alpha=1` 且 tile 权重为 0，避免 `-∞ × V` 污染输出。
+- Sanitizer 只能证明地址、竞争和同步安全；合法地址上的错误索引仍要靠 CPU reference 与边界 shape 发现。
+
+### 验证证据
+
+- launcher 输入与 32 位设备索引合同测试通过。
+- shape matrix：`N={1,3,4,5,15,16,17,31,33}`、`D={1,2,63,64,65,127,128}`、causal `{0,1}`。
+- 126 个 shape case 加 `zero-qk`、`rising-logits` 两个特殊输入通过。
+- 代表性多 CTA、多 K/V tile、双 tail、causal shape 通过 memcheck、racecheck、synccheck、initcheck。
+
+### 下一步
+
+1. 先完成 M1 canonical CUDA Event benchmark、ncu 和 SASS 证据，不立即改线程映射。
+2. M1 完整收口后进入 M2 Warp-per-query：一个 Warp 固定一条 Query，lane 负责 feature，并探索寄存器 `O_acc`。
+3. 简版路线图见 `gpu-kernel-engineering/projects/attention_prefill/ROADMAP.md`。
+4. 当前教材继续看 `docs/courses/attention/M1_Br4_QueryTiled_FP32_SIMT_Attention完整学习资料.md` 第 57～64 节。
+
+### 一句话记忆
+
+> 线性索引先认清任务平面，causal 必须回到全局坐标；K/V tile 可以共享，但每条 Query 的 Online Softmax 状态必须独立。
