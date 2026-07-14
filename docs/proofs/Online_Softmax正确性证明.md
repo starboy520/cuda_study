@@ -572,15 +572,22 @@ $$
 
 ### 7.2 空状态与单位元
 
-定义尚未处理任何有效位置时的空状态为
+定义尚未处理任何有效位置时的完整空状态为
 
 $$
-(-\infty,0,\mathbf 0),
+(m,\ell,O_{\mathrm{acc}})=(-\infty,0,\mathbf 0),
 $$
 
 其中 $\mathbf 0\in\mathbb R^{D_v}$。它表示没有最大值、分母没有权重、向量分子没有贡献。与任意非空集合 $A$ 合并后应保持 $A$ 的状态不变，所以它是 $\oplus$ 的单位元。
 
-数学语义上，空侧对 $\ell$ 和 $O_{\mathrm{acc}}$ 的贡献都是零；工程实现必须显式判空，不能真的计算 $-\infty-(-\infty)$。首个有效元素或首个非空 tile 应直接建立其状态，或者通过安全分支与空状态合并。
+$$
+\operatorname{state}(\varnothing)\oplus\operatorname{state}(A)
+=\operatorname{state}(A)
+=\operatorname{state}(A)\oplus\operatorname{state}(\varnothing).
+$$
+
+这里的 $-\infty$ 是“尚无最大值”的哨兵。数学语义上，空侧对 $\ell$ 和 $O_{\mathrm{acc}}$ 的贡献都是零；但不能把该哨兵不加判断地代入非空状态的通用合并公式。空状态与空状态相遇时，直接计算
+$m=\max(-\infty,-\infty)$ 后再计算 $e^{-\infty-(-\infty)}$，会先出现未定义的 $-\infty-(-\infty)$。工程实现必须显式判空：首个有效元素或首个非空 tile 直接建立其状态；没有有效元素时继续保留空状态。
 
 ---
 
@@ -646,7 +653,18 @@ $(-\infty,0,\mathbf0)$，合并后旧 $(m,\ell,O_{\mathrm{acc}})$ 必须保持�
 - 当前 tile 的全部权重为 $0$；
 - $m$、$\ell$ 与 $O_{\mathrm{acc}}$ 保持原值。
 
-这既覆盖旧状态已经非空的情况，也覆盖当前状态仍为空的情况，并避免计算
+即统一执行安全语义
+
+$$
+(m_{\mathrm{new}},\ell_{\mathrm{new}},O_{\mathrm{acc,new}})
+=(m_{\mathrm{old}},\ell_{\mathrm{old}},O_{\mathrm{acc,old}}).
+$$
+
+不能令 $\alpha=0$：由于该 tile 的权重全为 $0$，这样会得到
+$\ell_{\mathrm{new}}=0\cdot\ell_{\mathrm{old}}+0=0$ 和
+$O_{\mathrm{acc,new}}=0\cdot O_{\mathrm{acc,old}}+\mathbf0=\mathbf0$，错误删除此前所有有效 tile 的状态。$\alpha=1$ 才表达“没有新数据，不改变旧状态”。
+
+这套规则既覆盖旧状态已经非空的情况，也覆盖当前状态仍为空的情况，并避免计算
 $e^{-\infty-(-\infty)}$ 产生 NaN。只要整条 query 行至少有一个有效位置（标准 causal self-attention 中自身位置可见），最终 $\ell>0$，$O_i$ 有定义。
 
 ### 9.3 浮点数下的说明
@@ -661,7 +679,125 @@ $e^{-\infty-(-\infty)}$ 产生 NaN。只要整条 query 行至少有一个有效
 
 ---
 
-## 10. 结论一览
+## 10. 推广到 M1：$B_r=4,B_c=16$ 的逐行状态
+
+前述证明固定了一条 query 行；推广到多 query tile 时，只需对 CTA 内每个 query 行分别应用同一证明。M1 取 $B_r=4,B_c=16$，它改变的是数据复用范围，不改变“每个 query 行独立做一次 softmax”的数学定义。
+
+### 10.1 Shape 与符号
+
+设 CTA 内局部 query 行为 $r\in\{0,1,2,3\}$，当前 K/V tile 内局部列为
+$c\in\{0,\dots,15\}$。对 tail tile，只在各自有效范围内取值。
+
+| 量 | 一般 shape | M1 shape | 含义 |
+| --- | --- | --- | --- |
+| $\mathrm{scores}$ | $[B_r,B_c]$ | $[4,16]$ | 四条 query 对当前 16 条 key 的 logits |
+| $\mathrm{weights}$ | $[B_r,B_c]$ | $[4,16]$ | 相对各行新基准的未归一化权重 |
+| $m,\ell,\alpha$ | $[B_r]$ | $[4]$ | 每条 query 行各自的三个标量 |
+| $O_{\mathrm{acc}}$ | $[B_r,D_v]$ | $[4,D_v]$ | 每行独立的未归一化向量分子 |
+| $K_{\mathrm{tile}}$ | $[B_c,D_h]$ | $[16,D_h]$ | CTA 内四行共享读取的 key tile |
+| $V_{\mathrm{tile}}$ | $[B_c,D_v]$ | $[16,D_v]$ | CTA 内四行共享读取的 value tile |
+
+M1 的自注意力教学实现通常令 $D_v=D_h=D$，此时
+$O_{\mathrm{acc}}$ 的 shape 可写成 $[4,D]$；一般 Attention 中仍应区分 $D_h$ 与 $D_v$。
+
+### 10.2 每一行独立应用更新公式
+
+对局部行 $r$，若当前 tile 至少有一个对该行有效的 key，定义
+
+$$
+m_{\mathrm{block}}[r]
+=\max_{c\,\text{对行 }r\text{ 有效}}\mathrm{scores}[r,c],
+$$
+
+$$
+m_{\mathrm{new}}[r]
+=\max\bigl(m_{\mathrm{old}}[r],m_{\mathrm{block}}[r]\bigr),
+\qquad
+\alpha[r]
+=e^{m_{\mathrm{old}}[r]-m_{\mathrm{new}}[r]},
+$$
+
+$$
+w[r,c]
+=
+\begin{cases}
+e^{\mathrm{scores}[r,c]-m_{\mathrm{new}}[r]},
+& c\text{ 对行 }r\text{ 有效},\\
+0,& c\text{ 被 mask}.
+\end{cases}
+$$
+
+于是标量分母逐行更新为
+
+$$
+\ell_{\mathrm{new}}[r]
+=\alpha[r]\ell_{\mathrm{old}}[r]
++\sum_c w[r,c],
+$$
+
+向量分子的每个 feature 分量逐行更新为
+
+$$
+O_{\mathrm{acc,new}}[r,d]
+=\alpha[r]O_{\mathrm{acc,old}}[r,d]
++\sum_c w[r,c]V_{\mathrm{tile}}[c,d],
+\qquad 0\le d<D_v.
+$$
+
+旧状态为空而当前 tile 非空时，按第 7.2 节直接由该 tile 建立本行状态，不计算包含空哨兵的差值。当前 tile 对行 $r$ 全 mask 时，则不使用上述非空公式，而是按第 9.2 节令
+$\alpha[r]=1$、$w[r,c]=0$，并完整保留该行的 $m[r]$、$\ell[r]$ 与
+$O_{\mathrm{acc}}[r,:]$。
+
+所有 K/V tile 完成后，完整输出矩阵 $O$ 中对应的固定行才做最终归一化：
+
+$$
+O_{q_0+r,d}=\frac{O_{\mathrm{acc}}[r,d]}{\ell[r]}.
+$$
+
+### 10.3 CTA 内共享的是 K/V，独立的是行状态
+
+同一 CTA 可以只加载一份 $K_{\mathrm{tile}}$ 和 $V_{\mathrm{tile}}$，供四条 query 行共同读取；但
+$m[r]$、$\ell[r]$、$\alpha[r]$ 与 $O_{\mathrm{acc}}[r,:]$ 必须按 query 行独立。原因是四行产生不同的 score，causal mask 的有效区域也可能不同。
+
+因此，同一个 K/V tile 到来时，四行的 $m_{\mathrm{block}}[r]$ 与
+$m_{\mathrm{new}}[r]$ 可以不同，进而四个 $\alpha[r]$ 也可以不同：某行可能出现新 max 而有 $0<\alpha[r]<1$，另一行可能保持旧 max 而有 $\alpha[r]=1$，还有一行可能局部全 mask 并通过安全分支取 $\alpha[r]=1$。$B_r=4$ 不是把四条 query 合并为一个 softmax，而是在一个 CTA 中并排维护四个彼此独立的 online softmax 状态。
+
+> **一句话记忆**：K/V tile 可以共享，softmax 状态不能跨 query 行共享。
+
+## 11. 常见错误与闭卷自测
+
+### 11.1 常见错误表
+
+| 错误 | 后果 | 修正 |
+| --- | --- | --- |
+| 把 $O_{\mathrm{acc}}$ 当成最终输出 | 输出仍带未归一化权重总量，数值随 $\ell$ 改变 | 所有 tile 完成后计算 $O_i=O_{\mathrm{acc}}/\ell$ |
+| 新 max 出现时只缩放 $\ell$ | 分母换到新指数基准，向量分子仍停在旧基准，二者不再对应同一加权平均 | 旧 $\ell$ 与旧 $O_{\mathrm{acc}}$ 共同乘同一个 $\alpha$ |
+| 每个 tile 单独 softmax 后再平均 | 各 tile 的权重总量和 max 尺度被丢弃；等权平均通常不等于全局 softmax | 合并未归一化完整状态，只在最后归一化一次 |
+| 四条 query 共用一组 $m/\ell/\alpha$ | 不同行的 score、mask 和指数基准互相污染，四行不再是独立 softmax | 使用 shape 为 $[B_r]$ 的逐行标量状态和 $[B_r,D_v]$ 的逐行向量状态 |
+| 局部全 mask 时令 $\alpha=0$ | 当前 tile 没有新贡献，却把旧 $\ell/O_{\mathrm{acc}}$ 清零 | 令 $\alpha=1$、weights 全为 $0$，完整状态不变 |
+| 空状态直接套通用公式 | 可能计算 $-\infty-(-\infty)$，产生 NaN | 显式判空；首个非空 tile 直接建立状态，空 tile 保持原状态 |
+
+### 11.2 闭卷自测
+
+先遮住后面的答题要点，尝试口述：
+
+1. 为什么 $\ell$ 是标量，而 $O_{\mathrm{acc}}$ 是长度为 $D_v$ 的向量？
+2. 为什么最终输出是 $O_{\mathrm{acc}}/\ell$，而不是直接使用 $O_{\mathrm{acc}}$？
+3. 新 max 出现时，为什么旧 $\ell$ 与旧 $O_{\mathrm{acc}}$ 必须共同乘 $\alpha$？
+4. $B_r=4$ 时，CTA 内哪些数据可以共享，哪些状态必须逐 query 行独立？为什么同一 K/V tile 的四个 $\alpha$ 可以不同？
+5. 局部全 mask 时，$\alpha$、weights 与完整状态分别应是什么？为什么不能令 $\alpha=0$？
+6. 分块顺序改变时，实数证明与浮点结果分别能保证什么？
+
+**答题要点**：
+
+1. $\ell$ 累加每个 key 的标量指数权重；$O_{\mathrm{acc}}$ 对每个 value feature 累加“权重 $\times V$”，所以有 $D_v$ 个分量。
+2. $O_{\mathrm{acc}}$ 是未归一化向量分子，除以同一基准下的标量分母 $\ell$ 后才是加权平均 $O_i$。
+3. 二者由同一批指数权重构成；基准从 $m_{\mathrm{old}}$ 改为 $m_{\mathrm{new}}$ 时，所有旧贡献都共同获得因子 $e^{m_{\mathrm{old}}-m_{\mathrm{new}}}$。
+4. $K_{\mathrm{tile}}/V_{\mathrm{tile}}$ 可共享；$m/\ell/\alpha/O_{\mathrm{acc}}$ 按行独立。不同行的 score、mask 与新 max 不同，所以换基准因子也可不同。
+5. $\alpha=1$、weights 全为 $0$，且 $m/\ell/O_{\mathrm{acc}}$ 完全不变；$\alpha=0$ 会删除旧状态。
+6. 实数下交换律、结合律保证任意合法分块与合并顺序 exact 等价；浮点下舍入和加法非结合性只允许在合理容差内比较，不能据此要求 bitwise 相同。
+
+## 12. 结论一览与最终口述
 
 | 命题 | 内容 |
 | --- | --- |
@@ -673,6 +809,9 @@ $e^{-\infty-(-\infty)}$ 产生 NaN。只要整条 query 行至少有一个有效
 | 定理 3 | 流式归纳保证每一步都保持完整状态不变量 |
 | 最终等价性 | 实数下 $O_i=O_{\mathrm{acc}}/\ell=\operatorname{softmax}(x)V$ |
 | 边界 | causal mask 和局部空 tile 等价于零贡献，需显式避免无穷减无穷 |
+| $B_r=4$ 推广 | K/V tile 在 CTA 内共享，四条 query 的完整状态逐行独立 |
 | 浮点 | 数学上 exact，有限精度下仅因运算顺序与舍入产生差异 |
 
-> **一句话记忆**：Online Attention 始终保存同一指数基准下的最大值、标量分母和向量分子；新 max 出现时，旧 $\ell$ 与旧 $O_{\mathrm{acc}}$ 共同乘 $\alpha$ 换基准，所有 tile 完成后只做一次 $O_i=O_{\mathrm{acc}}/\ell$，所以实数下与标准 Attention 完全等价。
+### 12.1 最终口述
+
+> Online Attention 保存同一指数基准下的最大值、标量分母和向量分子；新 max 出现时，旧 $\ell$ 与旧 $O_{\mathrm{acc}}$ 共同乘 $\alpha$ 换基准；所有 tile 完成后计算 $O_i=O_{\mathrm{acc}}/\ell$，因此在实数运算下与标准 Attention 数学等价。
