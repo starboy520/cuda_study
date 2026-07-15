@@ -1,6 +1,8 @@
 # AI Infra + CUDA 深水区四周聚焦学习计划
 
 > **执行方式**：核心 kernel 必须由学习者亲手实现；AI 助手只负责概念讲解、三级提示、CPU/reference、测试与计时脚手架，以及完成后的 review 和验证。
+>
+> **配套能力地图**：[CUDA 核心能力补缺学习文档](CUDA核心能力补缺学习文档.md)。它用于查询七层能力、知识缺口和验收标准，不构成第二条并行日程。
 
 **目标：** 用四周把现有分散知识收口成“一个求职定位、两个可讲项目、一条底层性能证据链和一个 PagedAttention 学习实验”。
 
@@ -22,13 +24,13 @@
 
 ### 1.2 四周只有四个学习对象
 
-| 优先级 | 对象 | 定位 | 时间预算 |
-|---|---|---|---:|
-| P0 | FP32 GEMM | 旗舰公开项目、性能方法论载体 | 7 天 |
-| P0 | PTX/SASS 与 ncu | 底层证据链，不单独做项目 | 7 天 |
-| P1 | FlashAttention | 第二个公开项目，限定教学/研究实现 | 7 天 |
-| P1 | PagedAttention | 学习实验，不作品化 | 2 天 |
-| P0 | 面试转换与投递准备 | 把能力变成面试输出 | 其余 5 天 + 每日固定时间 |
+| 优先级 | 对象               | 定位                              | 时间预算                 |
+| ------ | ------------------ | --------------------------------- | -----------------------: |
+| P0     | FP32 GEMM          | 旗舰公开项目、性能方法论载体      | 7 天                     |
+| P0     | PTX/SASS 与 ncu    | 底层证据链，不单独做项目          | 7 天                     |
+| P1     | FlashAttention     | 第二个公开项目，限定教学/研究实现 | 7 天                     |
+| P1     | PagedAttention     | 学习实验，不作品化                | 2 天                     |
+| P0     | 面试转换与投递准备 | 把能力变成面试输出                | 其余 5 天 + 每日固定时间 |
 
 ### 1.3 明确冻结
 
@@ -123,14 +125,14 @@
 
 按每天约 8 小时设计；如果当天只有 4 小时，按相同比例缩放，但不能取消验收。
 
-| 时间 | 内容 | 结束条件 |
-|---:|---|---|
-| 0.5 h | 回忆与计划 | 不看资料写出昨日三个结论和今日唯一目标 |
-| 3.0 h | 核心手写 | 核心 kernel/实验由本人完成，能编译或留下最小失败用例 |
-| 1.5 h | 正确性与边界 | reference、异常检查、非整齐 shape、sanitizer |
-| 1.5 h | 性能与底层证据 | 正常计时；按当天主题采集 ncu/PTX/SASS |
-| 1.0 h | AI Infra/面试 | 过往项目或当天 CUDA 主题的闭卷口述 |
-| 0.5 h | worklog | 记录数据、结论、失败点和明日第一步 |
+| 时间  | 内容           | 结束条件                                             |
+| ----: | -------------- | ---------------------------------------------------- |
+| 0.5 h | 回忆与计划     | 不看资料写出昨日三个结论和今日唯一目标               |
+| 3.0 h | 核心手写       | 核心 kernel/实验由本人完成，能编译或留下最小失败用例 |
+| 1.5 h | 正确性与边界   | reference、异常检查、非整齐 shape、sanitizer         |
+| 1.5 h | 性能与底层证据 | 正常计时；按当天主题采集 ncu/PTX/SASS                |
+| 1.0 h | AI Infra/面试  | 过往项目或当天 CUDA 主题的闭卷口述                   |
+| 0.5 h | worklog        | 记录数据、结论、失败点和明日第一步                   |
 
 ### 3.1 每日四类产出
 
@@ -163,7 +165,9 @@
 
 ---
 
-# Week 1：GEMM 收口——从“写过”到“能独立重建”
+# Week 1：GEMM 收口——从“写过”到“能独立重建” ✅ 已完成
+
+> 完成状态（2026-07-12）：独立公开仓已完成 Naive → Shared → Register → Vectorized → Async 16B，正式 benchmark、full sanitizer、ncu/SASS 证据均已发布并推送。
 
 ## 本周目标
 
@@ -347,388 +351,13 @@ shared_memory_per_block
 
 ---
 
-# Week 2：PTX/SASS 从零到能完成一次诊断
+# Week 2：PTX/SASS 从零到能完成一次诊断 🔄 当前执行
 
-## 4. 为什么 PTX/SASS 门槛高
+> 当前唯一执行入口：[Week 2：PTX / SASS 与性能诊断执行清单](current/Week2_PTX_SASS与性能诊断.md)。本总计划不再复制第二套日程、命令或实验选择。
 
-门槛高通常不是因为指令太多，而是学习顺序错了：
+本周 Day 1–4 固定使用已发布的 FP32 GEMM 作品作为主诊断标本；Day 5–6 只增加一个写在 `/tmp` 的依赖链 microbenchmark，用于严格单变量实验；Day 7 只观察已有 WMMA 实现，补齐 Tensor Core API → PTX → SASS 三层证据。所有 PTX、cubin、SASS、ncu 报告和临时代码只写入 `/tmp/cuda_focus/week02/`，不写回公开作品仓。
 
-```text
-错误路线：打开几千行 SASS → 从第一行逐句翻译 → 很快失去数据流
-正确路线：先锁定一个小 kernel → 画源码数据流 → PTX 找虚拟指令 → SASS 找机器指令 → 用资源和 profiler 互证
-```
-
-本周只围绕已经熟悉的 GEMM，不引入新的数学问题。每天只增加一个观察层。
-
-## 5. 本周最终能力
-
-第二周结束时，要能完成下面这条链：
-
-```text
-CUDA C++ 源码
-→ 生成 PTX
-→ 生成 sm_80 binary + ptxas 资源日志
-→ 导出 SASS
-→ 找到 load / compute / store / control
-→ 结合 ncu 提出一个候选瓶颈
-→ 做一个单变量修改
-→ 用正确性、墙钟、资源、指令和 ncu 复测
-```
-
-## 6. 本周统一实验目录
-
-所有 PTX、SASS、binary、ncu report 放 `/tmp`，避免继续污染仓库：
-
-```text
-/tmp/cuda_focus/week02/
-  day01/
-  day02/
-  ...
-  day07/
-```
-
-每个目录固定保留：
-
-```text
-environment.txt
-commands.sh
-notes.md
-source_snapshot/
-*.ptx
-*.sass
-ptxas.log
-*.ncu-rep（当天需要时）
-```
-
-执行前从仓库根目录固定路径：
-
-```bash
-export REPO_ROOT="$(git rev-parse --show-toplevel)"
-mkdir -p /tmp/cuda_focus/week02
-```
-
-## Day 1：建立编译链心智模型
-
-### 今日只研究一个对象
-
-使用最简单的 naive GEMM。不要第一天同时看五个版本。
-
-### 必须画出的图
-
-```text
-CUDA C++
-  ├─ nvcc 前端 → PTX（虚拟 ISA，面向 compute capability）
-  └─ PTX → ptxas → cubin/SASS（面向具体 sm 架构）
-                         ↓
-                executable / fatbin
-                         ↓
-            GPU 执行具体架构的机器指令
-```
-
-同时标出驱动 JIT 的可能路径：可执行文件若携带 PTX，驱动可在目标 GPU 上 JIT 成机器码；这不等同于离线 `sm_80` code object。
-
-### 实验步骤
-
-```bash
-mkdir -p /tmp/cuda_focus/week02/day01
-cd /tmp/cuda_focus/week02/day01
-
-nvidia-smi > environment.txt
-nvcc --version >> environment.txt
-ncu --version >> environment.txt
-
-nvcc -O3 -lineinfo -arch=compute_80 -ptx \
-  "$REPO_ROOT/week04_gemm/gemm_naive/gemm_naive.cu" \
-  -o naive.compute80.ptx
-
-nvcc -O3 -lineinfo -arch=sm_80 -Xptxas=-v \
-  "$REPO_ROOT/week04_gemm/gemm_naive/gemm_naive.cu" \
-  -o naive.sm80 2> ptxas.log
-
-cuobjdump --list-elf naive.sm80 > elf_list.txt
-cuobjdump --dump-sass naive.sm80 > naive.sm80.sass
-```
-
-若当前源码不是干净可编译版本，复制完整依赖到 `source_snapshot/` 后只在 `/tmp` 修复，不修改学习仓库来迎合观察实验。
-
-### 今天只回答五个问题
-
-1. PTX 是什么层，SASS 是什么层？
-2. `compute_80` 与 `sm_80` 的区别是什么？
-3. ptxas 在什么时候工作？
-4. driver JIT 可能在什么时候工作？
-5. 怎么证明 binary 中有面向 `sm_80` 的 code object？
-
-### 当日验收
-
-不看资料画出编译链，并现场重新生成 PTX、ptxas log 和 SASS。今天不要求解释具体指令。
-
-### 常见误区
-
-- 看到 `.ptx` 就说这是 A100 最终机器码；
-- 看到 SASS 中某条指令就推广到所有架构；
-- 混用 `compute_80` 和 `sm_80`；
-- 只保存截图，不保存命令和完整产物。
-
-## Day 2：只读 naive GEMM 的 PTX 数据流
-
-### 学习目标
-
-不逐行翻译，只找到一条输出元素的数据流。
-
-### 阅读顺序
-
-1. 找 `.entry` kernel 入口；
-2. 找 kernel 参数；
-3. 找 thread/block 特殊寄存器；
-4. 找 `(row,col)` 地址计算；
-5. 找循环中的 A/B load；
-6. 找浮点 multiply-add；
-7. 找 C store；
-8. 最后看边界 predicate 和 branch。
-
-### 重点指令类别
-
-实际拼写以当前 PTX 为准，只要求认识类别：
-
-| 类别 | 常见形式 | 要回答的问题 |
-|---|---|---|
-| 线程索引 | `mov ... %ctaid/%ntid/%tid` | row/col 从哪里来 |
-| 参数/地址 | `ld.param`、`cvta`、`mul.wide`、`mad` | 指针和字节偏移怎么形成 |
-| global load | `ld.global` | A/B 从哪里读 |
-| 计算 | `fma.rn` 或 mul/add | K 循环如何累加 |
-| global store | `st.global` | C 写到哪里 |
-| 控制 | `setp`、`bra` | 边界和循环如何控制 |
-
-### 动手方法
-
-在 `notes.md` 画一条链：
-
-```text
-blockIdx/threadIdx
-→ row/col
-→ A[row,k] / B[k,col] 地址
-→ global load
-→ fma accumulator
-→ C[row,col] 地址
-→ global store
-```
-
-每个箭头旁边记录 PTX 行号或标签，不复制整份 PTX。
-
-### 当日验收
-
-随机指出一条 `ld.global`，能向前追到地址来源，向后追到对应计算；再从最终 `st.global` 反向追到 accumulator。
-
-### 今天不要做
-
-- 不统计所有寄存器；
-- 不背每条指令语法；
-- 不推断精确周期；
-- 不因看见 `fma` 就断言 kernel compute-bound。
-
-## Day 3：从 PTX 对照到 SASS
-
-### 学习目标
-
-理解 PTX 与 SASS 不是逐行一一对应，但可以按数据流类别对应。
-
-### SASS 阅读顺序
-
-1. 找 kernel/function 标题；
-2. 找入口附近的 thread/block 信息读取；
-3. 找地址生成；
-4. 找 global load；
-5. 找 `FFMA` 类计算；
-6. 找 global store；
-7. 找循环分支和退出。
-
-可能遇到的类别包括 `S2R`、整数地址运算、`LDG`、`FFMA`、`STG`、branch、`EXIT`。具体助记符和宽度以实际 `sm_80` 输出为准，不要求记死。
-
-### 建立对照表
-
-| 源码动作 | PTX 证据 | SASS 证据 | 能证明什么 | 不能证明什么 |
-|---|---|---|---|---|
-| thread mapping |  |  | 索引如何生成 | 不能单独证明映射高效 |
-| A/B load |  |  | 存在何种机器 load | 不能单独证明 DRAM bound |
-| K 累加 |  |  | 使用何种计算指令 | 不能单独证明达到峰值 |
-| C store |  |  | 写回路径 | 不能单独证明写带宽是瓶颈 |
-
-### 当日验收
-
-给一段未知但结构相似的 GEMM SASS，能先按 load→compute→store 分类，而不是从第一条开始翻译。
-
-## Day 4：比较 naive、shared、register、vector、WMMA 五版
-
-### 学习目标
-
-通过横向比较理解“优化改变了什么机器数据流”。
-
-### 只比较六个维度
-
-| 版本 | global load | shared load/store | 同步 | 主计算 | 资源 | 一句话差异 |
-|---|---|---|---|---|---|---|
-| naive |  | 不适用 | 不适用 |  |  |  |
-| shared |  |  |  |  |  |  |
-| register tiled |  |  |  |  |  |  |
-| `float4` |  |  |  |  |  |  |
-| WMMA |  |  |  |  |  |  |
-
-### 观察重点
-
-- shared 版是否出现 shared load/store 和 block barrier；
-- register tiled 是否增加 accumulator 与寄存器占用；
-- `float4` 源码是否最终形成更宽的机器 load；
-- WMMA 是否出现 PTX `mma` 与 SASS HMMA 类证据；
-- 哪些差异只是源码写法，哪些真实进入机器指令。
-
-### 当日验收
-
-五版每版都能用一句话说明机器数据流变化，并且每句话有 PTX 或 SASS 定位，不靠源码外观猜测。
-
-## Day 5：寄存器、spill 与 local memory
-
-### 核心概念
-
-- 寄存器是 thread 私有、片上、低延迟资源；
-- registers/thread 增加会影响每个 SM 可驻留 block/warp 数；
-- register reuse 能提高 ILP 和减少内存访问，但资源过多可能限制 occupancy；
-- 编译器放不下的 live value 可能 spill 到 local address space；
-- CUDA 的“local”表示每线程私有地址空间，不代表物理上一定是片上存储。
-
-### 实验设计
-
-在 `/tmp` 复制 register-tiled kernel，做 baseline/pressure 两版：
-
-- baseline 保持当前实现；
-- pressure 版增加多个独立 accumulator 或延长 live range；
-- 数学结果、shape 和其他参数保持不变。
-
-两版都记录：
-
-```text
-registers/thread
-stack frame
-spill stores
-spill loads
-shared memory
-normal wall-clock time
-correctness
-```
-
-必要时再查 SASS local load/store，并用本机可用的 ncu local-memory 指标互证。不要因为没搜到某个固定助记符就宣布“绝无 spill”。
-
-### 当日验收
-
-能回答：
-
-1. 为什么少寄存器不一定更快；
-2. 为什么高 occupancy 不一定更快；
-3. ptxas 0 spill 能证明什么、不能证明什么；
-4. local memory 为什么可能很慢；
-5. register reuse、ILP、occupancy、spill 如何互相制约。
-
-## Day 6：Scheduler、scoreboard 与一次可证伪诊断
-
-### 先建立诊断顺序
-
-```text
-正常墙钟与正确性
-→ Speed of Light 高层吞吐
-→ active / eligible / issued warp
-→ 主要 stall 候选
-→ 源码和 SASS 的 load-use/依赖关系
-→ 单一假设
-→ 单一修改
-→ 复测
-```
-
-### 必须区分
-
-- active warp：驻留且尚未完成；
-- eligible warp：当前满足发射条件；
-- issued warp：调度器本周期实际选择发射；
-- scoreboard：跟踪尚未完成的依赖，不是 cache；
-- long scoreboard：只是一种症状，不能直接等同于“DRAM 带宽瓶颈”；
-- short scoreboard：也需要结合 shared/特殊单元依赖和源码判断。
-
-### 单变量实验示例
-
-从以下选一个，不允许同时改三个地方：
-
-- 增加独立 accumulator，测试依赖链/ILP 假设；
-- 改 `TM×TN`，测试资源与 ILP 取舍；
-- 对照标量与 `float4` load，测试指令压力假设；
-- 对照有/无 shared padding，测试 bank conflict 假设。
-
-### 报告固定结构
-
-```text
-现象：墙钟和高层吞吐是什么
-候选机制：为什么怀疑它
-反证条件：什么结果出现时假设应被否定
-唯一修改：只改变了什么
-正确性：是否保持
-资源：register/shared/occupancy 如何变化
-指标：eligible/issued/stall 如何变化
-墙钟：是否同方向改善
-结论：支持、否定或证据不足
-边界：只对什么 GPU/shape/kernel 成立
-```
-
-### 当日验收
-
-不能说“ncu 告诉我根因”；必须说“ncu 给出症状，我提出假设并用单变量复测支持或否定”。
-
-## Day 7：Tensor Core 三层证据与整周闭卷
-
-### 学习范围
-
-只研究一个已有 WMMA FP16 输入、FP32 累加 GEMM，不追 cuBLAS 性能，不在本日强行手写完整 inline PTX microkernel。
-
-### 三层关系
-
-```text
-CUDA C++ API：nvcuda::wmma
-PTX 虚拟 ISA：mma.sync / load fragment 相关指令
-A100 SASS：HMMA / LDSM 等实际机器指令类别
-```
-
-实际是否出现对应指令必须由当前编译产物确认，不能只凭 API 名称断言。
-
-### 必须理解
-
-- fragment 是 warp 协作持有的逻辑矩阵片段，不是每个 thread 各有一块连续小矩阵；
-- `m16n8k16` 中 M/N/K 分别代表什么；
-- 为什么常用 FP16/BF16 输入、FP32 累加；
-- `ldmatrix` 解决 shared memory 到 warp fragment 的搬运；
-- shared layout、对齐和 bank mapping 为什么重要；
-- 看到 HMMA 证明走了 Tensor Core 指令路径，但不能单独证明性能高。
-
-### 整周闭卷验收
-
-在 90 分钟内完成：
-
-1. 从 naive GEMM 源码重新生成 PTX/SASS；
-2. 画编译链；
-3. 沿数据流定位 load→compute→store；
-4. 从 ptxas log 读资源；
-5. 解释一个 ncu stall 只能形成候选假设；
-6. 指出 WMMA、PTX MMA、SASS HMMA 三层边界；
-7. 用五分钟讲述 Day 6 的真实诊断。
-
-### 第二周通过标准
-
-| 能力 | 通过条件 |
-|---|---|
-| 编译链 | 不看命令说明也能生成三层产物 |
-| PTX | 能追踪 naive GEMM 一条输出数据流 |
-| SASS | 能按类别找到 load/compute/store/control |
-| 资源 | 会解释 register/shared/spill 报告 |
-| profiler | 完成一条可证伪的单变量实验 |
-| Tensor Core | 能讲 API/PTX/SASS 三层，不夸大结论 |
-
-任何一项没过，只记录为第三、四周每日开场的 30 分钟补考项，不允许整周重学。
+通过标准：能独立生成三层产物、追踪 Naive 数据流、解释资源与 scheduler/scoreboard、完成一次严格单变量诊断，并讲清 WMMA / PTX MMA / SASS HMMA 的证据边界。
 
 ---
 
@@ -1078,15 +707,15 @@ PagedAttention 固定两天后停止。优先保住模拟面试、项目表达�
 
 每项 0～2 分：0=不会，1=看提示能做，2=闭卷能做。
 
-| 能力 | Week 1 | Week 2 | Week 3 | Week 4 |
-|---|---:|---:|---:|---:|
-| 核心代码独立实现 |  |  |  |  |
-| correctness/边界 |  |  |  |  |
-| benchmark 可信度 |  |  |  |  |
-| ncu 因果分析 |  |  |  |  |
-| PTX/SASS 数据流 |  |  |  |  |
-| 项目口述 |  |  |  |  |
-| AI Infra 系统连接 |  |  |  |  |
+| 能力              | Week 1 | Week 2 | Week 3 | Week 4 |
+| ----------------- | -----: | -----: | -----: | -----: |
+| 核心代码独立实现  |        |        |        |        |
+| correctness/边界  |        |        |        |        |
+| benchmark 可信度  |        |        |        |        |
+| ncu 因果分析      |        |        |        |        |
+| PTX/SASS 数据流   |        |        |        |        |
+| 项目口述          |        |        |        |        |
+| AI Infra 系统连接 |        |        |        |        |
 
 判断规则：
 

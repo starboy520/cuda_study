@@ -6,11 +6,16 @@
 
 当前只执行这份计划，不按旧路线或目录编号推断进度。
 
+配套知识地图与补缺验收手册：[CUDA 核心能力补缺学习文档](CUDA核心能力补缺学习文档.md)。该文档覆盖 Kernel 编程、Kernel 优化、编译与指令、执行调度、CUDA Graph、内存管理和性能工具，但不产生第二条并行日程。
+
 ## 当前阶段
 
-**Week 1：GEMM 独立重建**
+**Week 2：PTX / SASS 与性能诊断**
 
-实际实现发生在独立公开作品仓；本仓只提供历史代码与教材参考，不在此同步公开作品仓的实时进度。
+- [本周独立执行清单](current/Week2_PTX_SASS与性能诊断.md)
+- [本周 Worklog](../notes/week02_ptx_sass.md)
+
+Week 1 GEMM 已完成首版、合并到公开作品仓 `main` 并推送；本周固定使用该项目作为实验对象，不再并行优化 GEMM。
 
 ## 当前目标
 
@@ -26,8 +31,9 @@
 
 - [知识目录](../docs/README.md)：按四周与主题查资料。
 - [长期深度教材](../cuda_deep_course/README.md)：不受当前冲刺节奏约束。
-- 当前实验参考：[2D register-tiled GEMM](../week05_gemm_advanced/gemm_2d_thread_tiling.cu)、[tiled attention](../week04_attention/tiled_attention.cu)。
-- [历史 worklog](../notes/week05.md)：用于历史实验复盘，不代表当前公开作品仓进度。
+- [PTX/SASS 深水区教材](../docs/topics/performance/CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md)：本周主教材。
+- [Nsight Compute 详解](../docs/topics/performance/Nsight_Compute_ncu详解.md)：Day 6 按需查阅。
+- [Tensor Core 学习文档](../docs/courses/cuda/Week3_TensorCore学习文档.md)：Day 7 按需查阅。
 
 ## 历史计划
 

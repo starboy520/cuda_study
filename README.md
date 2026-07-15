@@ -4,7 +4,7 @@
 
 ## 当前状态
 
-唯一计划入口是 [study_plan/README.md](study_plan/README.md)。当前阶段为 **Week 1：GEMM 独立重建（公开作品仓进行中）**；实际实现发生在独立公开作品仓，本仓只提供历史代码与教材参考，不以旧计划或目录编号判断当前进度。
+唯一计划入口是 [study_plan/README.md](study_plan/README.md)。Week 1 GEMM 已完成并发布；当前阶段为 **Week 2：PTX / SASS 与性能诊断**，执行清单见[本周计划](study_plan/current/Week2_PTX_SASS与性能诊断.md)。
 
 ## 五个稳定入口
 
@@ -13,8 +13,8 @@
 | [当前计划](study_plan/README.md) | 当前目标、冻结边界、四周计划与历史计划入口 |
 | [知识目录](docs/README.md) | 按当前四周和技术主题检索课程、专题、面试与参考资料 |
 | [长期深度教材](cuda_deep_course/README.md) | 不受四周冲刺节奏约束的系统 CUDA 教材与配套实验 |
-| 当前实验参考 | 历史实现参考：[2D register-tiled GEMM](week05_gemm_advanced/gemm_2d_thread_tiling.cu)、[tiled attention](week04_attention/tiled_attention.cu) |
-| [历史 worklog](notes/week05.md) | 历史实验记录与复盘，不代表当前公开作品仓进度 |
+| [本周 Worklog](notes/week02_ptx_sass.md) | 记录 PTX/SASS、ptxas、ncu 和单变量诊断证据 |
+| [本周主教材](docs/topics/performance/CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md) | 从编译链到 scheduler/scoreboard 的指定章节 |
 
 ## 公开作品边界
 

@@ -7,7 +7,7 @@
 | 阶段 | 核心材料 |
 | --- | --- |
 | Week 1：GEMM | [四周计划](../study_plan/四周聚焦计划_AIInfra与CUDA深水区.md)、[GEMM 优化阶梯](../week05_gemm_advanced/gemm_optimization_ladder.md)、[cuBLAS / CUTLASS 技术参考](topics/gemm_tensorcore/cuBLAS与CUTLASS面试速成.md) |
-| Week 2：PTX/SASS + ncu + Tensor Core | [PTX/SASS/MMA 深水区](topics/performance/CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md)、[Nsight Compute](topics/performance/Nsight_Compute_ncu详解.md)、[Tensor Core 学习文档](courses/cuda/Week3_TensorCore学习文档.md)、[Tensor Core 实验](../week06_tensorcore/README.md) |
+| **Week 2：PTX/SASS + ncu + Tensor Core（当前）** | [本周执行清单](../study_plan/current/Week2_PTX_SASS与性能诊断.md)、[PTX/SASS/MMA 深水区](topics/performance/CUDA深水区_PTX_SASS_MMA_异步流水与Hopper.md)、[Nsight Compute](topics/performance/Nsight_Compute_ncu详解.md)、[Tensor Core 学习文档](courses/cuda/Week3_TensorCore学习文档.md) |
 | Week 3：Attention + Online proof | [Attention / FlashAttention 教材](courses/attention/Week4_Attention与FlashAttention完整学习资料.md)、[Online Softmax 正确性证明](proofs/Online_Softmax正确性证明.md)、[Attention pipeline 分析](../week04_attention/ncu_pipeline_notes.md) |
 | Week 4：KV/Paged + 面试 | [KV Cache 专题](topics/kv_cache/README.md)、[PagedAttention](topics/kv_cache/PagedAttention详解.md)、[面试准备入口](interview/README.md) |
 
