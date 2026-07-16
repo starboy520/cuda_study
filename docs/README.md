@@ -29,6 +29,7 @@
 ## GEMM / Tensor Core
 
 - [GEMM 优化阶梯](../week05_gemm_advanced/gemm_optimization_ladder.md)与[实测记录](../week05_gemm_advanced/benchmark.md)
+- [G0～G5 A100 Tensor Core GEMM 完整学习实操](courses/gemm/G0_G5_A100_TensorCore_GEMM完整学习实操.md)：按概念、手算、最小实验、correctness 与 SASS 逐阶段推进。
 - [Week 3 Tensor Core 学习文档](courses/cuda/Week3_TensorCore学习文档.md)
 - [Tensor Core 实验入口](../week06_tensorcore/README.md)
 - [cuBLAS 与 CUTLASS 面试速成](topics/gemm_tensorcore/cuBLAS与CUTLASS面试速成.md)
@@ -38,6 +39,7 @@
 - [Attention 与 FlashAttention 完整学习资料](courses/attention/Week4_Attention与FlashAttention完整学习资料.md)
 - [Online Softmax 正确性证明](proofs/Online_Softmax正确性证明.md)
 - [LLM 推理优化与 decode](courses/inference/Week5增强版_LLM推理优化与decode.md)
+- [vLLM 三天岗位实战](courses/inference/vLLM三天岗位实战.md)
 - [KV Cache 专题入口](topics/kv_cache/README.md)与[PagedAttention 详解](topics/kv_cache/PagedAttention详解.md)
 
 ## AI Infra / 多卡
